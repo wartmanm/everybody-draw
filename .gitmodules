@@ -1,0 +1,6 @@
+[submodule "src/main/rust/deps/rust-opengles"]
+	path = src/main/rust/deps/rust-opengles
+	url = git@github.com:wartman4404/rust-opengles.git
+[submodule "src/main/rust/deps/rust-egl"]
+	path = src/main/rust/deps/rust-egl
+	url = git@github.com:wartman4404/rust-egl.git
