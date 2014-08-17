@@ -1,0 +1,16 @@
+/project/project
+target/
+/.history
+/.cache
+/.externalToolBuilders/
+/bin/
+/gen/
+/unused/
+/obj/
+*.so
+*.rlib
+*.a
+*.vim
+*.class
+/notes/
+/src/main/rust/android/
