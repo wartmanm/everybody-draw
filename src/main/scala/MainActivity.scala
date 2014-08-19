@@ -96,6 +96,15 @@ class MainActivity extends Activity with TypedActivity with AndroidImplicits {
     Log.i("main", "oncreate")
     System.loadLibrary("gl-stuff")
     System.loadLibrary("luajit")
+    LuaHelper.loadScript("""
+      function main(start, end)
+        print("printing from lua!!")
+        return {start, end}
+      end
+      """)
+    Log.i("main", "loaded lua script")
+
+
     super.onCreate(bundle)
     setContentView(R.layout.activity_main)
 

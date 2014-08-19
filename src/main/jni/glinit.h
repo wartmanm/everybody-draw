@@ -1,6 +1,7 @@
 #include <android/input.h>
 #include <android/bitmap.h>
 #include <android/native_window_jni.h>
+#include <lua.h>
 
 int setup_graphics(int w, int h);
 void render_frame();
@@ -36,3 +37,6 @@ void release_pixels(const char *pixels);
 void egl_init(void *window);
 void egl_swap();
 void egl_finish();
+
+lua_State *initLua();
+void loadLuaScript(const char *script);

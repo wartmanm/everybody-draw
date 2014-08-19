@@ -140,7 +140,7 @@ pub fn draw_path(framebuffer: GLuint, shader: &PointShader, matrix: *mut f32, co
                             distance: op.distance + dist,
                             counter: op.counter,
                         };
-                        append_points(op, npdata, pointvec, pointcount);
+                        interpolate_lua_from_rust(op, npdata, pointvec);
                         oldpoint.info = Some(npdata);
                     },
                     (_, point::Stop) => {
@@ -174,3 +174,22 @@ pub fn draw_path(framebuffer: GLuint, shader: &PointShader, matrix: *mut f32, co
 
     s.pointCounter = pointCounter;
 }
+
+#[allow(non_snake_case_functions)]
+extern "C" {
+    pub fn doInterpolateLua(startpoint: ShaderPaintPoint, endpoint: ShaderPaintPoint, callback: fn(*const ShaderPaintPoint, i32)->());
+}
+
+#[allow(unused_variable)]
+fn interpolate_callback(points: *const ShaderPaintPoint, count: i32) {
+    logi!("in callback with {} points!", count);
+}
+
+#[allow(unused_variable)]
+fn interpolate_lua_from_rust(a: ShaderPaintPoint, b: ShaderPaintPoint, output: &mut Vec<ShaderPaintPoint>) -> () {
+    logi!("about to call C to interpolate Lua");
+    unsafe {
+        doInterpolateLua(a, b, interpolate_callback);
+    }
+}
+

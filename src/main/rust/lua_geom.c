@@ -3,6 +3,7 @@
 #include <lua.h>
 #include <lauxlib.h>
 #include <lualib.h>
+#include <point.h>
 
 #define PUSH_LUA_FLOAT(name, value)\
   lua_pushstring(name);\
@@ -15,9 +16,24 @@
   result = (float)lua_tonumber(L, -1);\
   lua_pop(L, 1);
 
-lua_State *createLua(const char *script) {
-  lua_State *L = lua_open();
+static lua_State *L = NULL;
+
+static lua_State *initLua() {
+  lua_State *L = luaL_newstate();
   luaL_openlibs(L);
+
+  return L;
+}
+
+void finishLua(lua_State *L) {
+  lua_close(L);
+}
+
+void loadLuaScript(const char *script) {
+
+  if (lua_State == NULL) {
+    L = initLua();
+  }
 
   if (1 == luaL_dostring(L, script)) {
     error(L, "script failed to load");
@@ -27,14 +43,28 @@ lua_State *createLua(const char *script) {
   if (!lua_isfunction(L, -1)) {
     error(L, "no main function defined :(");
   }
-  return L;
 }
 
-void finishLua(lua_State *L) {
-  //TODO: this
-}
 
-void pushShaderPoint(lua_State *L, struct ShaderPaintPoint point) {
+/*void initLuaShaderPaintPoint(lua_State *L) {*/
+  /*static const struct luaL_reg shaderpointlib [] = {*/
+    /*{"new", makeLuaShaderPaintPoint},*/
+  /*};*/
+  /*static const struct luaL_reg shaderpointlib_m [] = {*/
+    /*{*/
+    /*}*/
+  /*};*/
+  /*luaL_newmetatable(L, "glstuff.shaderpaintpoint");*/
+  /*luaL_openlib(L, "shaderpaintpoint", shaderpointlib, 0);*/
+/*}*/
+
+/*void makeLuaShaderPaintPoint(lua_State *L) {*/
+  /*struct ShaderPaintPoint *p = (* struct ShaderPaintPoint) lua_newuserdata(L, sizeof(struct ShaderPaintPoint));*/
+  /*lua_getmetatable(L, "glstuff.shaderpaintpoint");*/
+  /*lua_setmetatable(L, -2);*/
+/*}*/
+
+static void pushShaderPoint(lua_State *L, struct ShaderPaintPoint point) {
   lua_newtable(L);
   PUSH_LUA_FLOAT("x", point.pos.x);
   PUSH_LUA_FLOAT("y", point.pos.y);
@@ -44,8 +74,13 @@ void pushShaderPoint(lua_State *L, struct ShaderPaintPoint point) {
   PUSH_LUA_FLOAT("counter", point.pos.counter);
 }
 
+void doInterpolateLua(ShaderPaintPoint startpoint, ShaderPaintPoint endpoint, ShaderCallback callback) {
+  if (L == NULL) return;
+  interpolateLua(L, startpoint, endpoint, callback);
+}
+
 // TODO: would it be better to register a callback from lua?
-void interpolateLua(lua_State *L, ShaderPaintPoint startpoint, ShaderPaintPoint endpoint, ShaderCallback callback) {
+static void interpolateLua(lua_State *L, ShaderPaintPoint startpoint, ShaderPaintPoint endpoint, ShaderCallback callback) {
   lua_getglobal(L, "main");
   
   pushShaderPoint(L, startpoint);
