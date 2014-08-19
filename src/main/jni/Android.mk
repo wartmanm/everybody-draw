@@ -20,6 +20,14 @@ LOCAL_MODULE    := rustgl
 LOCAL_SRC_FILES := ../rust/librustgl.a
 
 include $(PREBUILT_STATIC_LIBRARY)
+
+include $(CLEAR_VARS)
+
+LOCAL_MODULE := luajit
+LOCAL_SRC_FILES := ../../../lib/libluajit.so
+
+include $(PREBUILT_SHARED_LIBRARY)
+
 include $(CLEAR_VARS)
 
 LOCAL_MODULE    := gl-stuff
@@ -29,6 +37,7 @@ LOCAL_CFLAGS := -std=c99 -Wall -Wextra -Wno-unused -Werror -g
 LOCAL_LDFLAGS := -L/opt/android-ndk/android-ndk-r9b/sources/cxx-stl/gnu-libstdc++/4.6/libs/armeabi
 LOCAL_LDLIBS    := -lGLESv2 -ldl -llog -lc -lEGL -landroid -ljnigraphics
 LOCAL_STATIC_LIBRARIES := rustgl
+LOCAL_SHARED_LIBRARIES := luajit
 # LOCAL_CPP_FEATURES += exceptions
 # LOCAL_CPP_FEATURES += rtti
 

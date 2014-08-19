@@ -1,7 +1,7 @@
 #include <android/input.h>
 #include <android/bitmap.h>
 #include <android/native_window_jni.h>
-#include <lua.h>
+#include "lua/lua.h"
 
 int setup_graphics(int w, int h);
 void render_frame();

@@ -1,17 +1,21 @@
 #include <android/log.h>
 
-#include <lua.h>
-#include <lauxlib.h>
-#include <lualib.h>
-#include <point.h>
+#include "lua/lua.h"
+#include "lua/lauxlib.h"
+#include "lua/lualib.h"
+#include "point.h"
+
+#define  LOG_TAG    "mygl"
+#define  LOGI(...)  __android_log_print(ANDROID_LOG_INFO,LOG_TAG,__VA_ARGS__)
+#define  LOGE(...)  __android_log_print(ANDROID_LOG_ERROR,LOG_TAG,__VA_ARGS__)
 
 #define PUSH_LUA_FLOAT(name, value)\
-  lua_pushstring(name);\
-  lua_pushnumber(value);\
+  lua_pushstring(L, name);\
+  lua_pushnumber(L, value);\
   lua_rawset(L, -3);
 
 #define READ_LUA_FLOAT(name, result)\
-  lua_pushstring(name);\
+  lua_pushstring(L, name);\
   lua_gettable(L, -2);\
   result = (float)lua_tonumber(L, -1);\
   lua_pop(L, 1);
@@ -31,17 +35,19 @@ void finishLua(lua_State *L) {
 
 void loadLuaScript(const char *script) {
 
-  if (lua_State == NULL) {
+  if (L == NULL) {
     L = initLua();
   }
 
   if (1 == luaL_dostring(L, script)) {
-    error(L, "script failed to load");
+    LOGE("script failed to load :(");
+    return;
   }
 
-  lua_getglobal("main");
+  lua_getglobal(L, "main");
   if (!lua_isfunction(L, -1)) {
-    error(L, "no main function defined :(");
+    LOGE("no main function defined :(");
+    return;
   }
 }
 
@@ -68,35 +74,32 @@ static void pushShaderPoint(lua_State *L, struct ShaderPaintPoint point) {
   lua_newtable(L);
   PUSH_LUA_FLOAT("x", point.pos.x);
   PUSH_LUA_FLOAT("y", point.pos.y);
-  PUSH_LUA_FLOAT("time", point.pos.time);
-  PUSH_LUA_FLOAT("size", point.pos.size);
-  PUSH_LUA_FLOAT("distance", point.pos.distance);
-  PUSH_LUA_FLOAT("counter", point.pos.counter);
-}
-
-void doInterpolateLua(ShaderPaintPoint startpoint, ShaderPaintPoint endpoint, ShaderCallback callback) {
-  if (L == NULL) return;
-  interpolateLua(L, startpoint, endpoint, callback);
+  PUSH_LUA_FLOAT("time", point.time);
+  PUSH_LUA_FLOAT("size", point.size);
+  PUSH_LUA_FLOAT("distance", point.distance);
+  PUSH_LUA_FLOAT("counter", point.counter);
 }
 
 // TODO: would it be better to register a callback from lua?
-static void interpolateLua(lua_State *L, ShaderPaintPoint startpoint, ShaderPaintPoint endpoint, ShaderCallback callback) {
+static void interpolateLua(lua_State *L, struct ShaderPaintPoint startpoint, struct ShaderPaintPoint endpoint, ShaderCallback callback) {
   lua_getglobal(L, "main");
   
   pushShaderPoint(L, startpoint);
   pushShaderPoint(L, endpoint);
 
   if (lua_pcall(L, 2, 1, 0) != 0) {
-    error(L, "script failed to run");
+    LOGE("script failed to run :(");
+    return;
   }
 
   if (!lua_istable(L, -1)) {
-    error(L, "result must be table");
+    LOGE("result must be table :(");
+    return;
   }
 
   int length = lua_objlen(L, -1);
 
-  ShaderPaintPoint points[length];
+  struct ShaderPaintPoint points[length];
   /*lua_pushnil(L);*/
   for (int i = 0; i < length; i++) {
     /*lua_next(L, -2);*/
@@ -109,8 +112,12 @@ static void interpolateLua(lua_State *L, ShaderPaintPoint startpoint, ShaderPain
     READ_LUA_FLOAT("distance", points[i].distance);
     READ_LUA_FLOAT("counter", points[i].counter);
 
-    lua_pop(1);
+    lua_pop(L, 1);
   }
   callback(points, length);
 }
 
+void doInterpolateLua(struct ShaderPaintPoint startpoint, struct ShaderPaintPoint endpoint, ShaderCallback callback) {
+  if (L == NULL) return;
+  interpolateLua(L, startpoint, endpoint, callback);
+}
