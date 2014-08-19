@@ -95,6 +95,7 @@ class MainActivity extends Activity with TypedActivity with AndroidImplicits {
   override def onCreate(bundle: Bundle) {
     Log.i("main", "oncreate")
     System.loadLibrary("gl-stuff")
+    System.loadLibrary("luajit")
     super.onCreate(bundle)
     setContentView(R.layout.activity_main)
 
