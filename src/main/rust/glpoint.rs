@@ -1,6 +1,7 @@
 //extern crate core;
 use core::prelude::*;
 use core::mem;
+use core::slice;
 
 use std::sync::{Once, ONCE_INIT, spsc_queue};
 
@@ -177,19 +178,24 @@ pub fn draw_path(framebuffer: GLuint, shader: &PointShader, matrix: *mut f32, co
 
 #[allow(non_snake_case_functions)]
 extern "C" {
-    pub fn doInterpolateLua(startpoint: ShaderPaintPoint, endpoint: ShaderPaintPoint, callback: fn(*const ShaderPaintPoint, i32)->());
+    pub fn doInterpolateLua(startpoint: *const ShaderPaintPoint, endpoint: *const ShaderPaintPoint, output: *mut Vec<ShaderPaintPoint>, callback: unsafe extern "C" fn(*const ShaderPaintPoint, i32, &mut Vec<ShaderPaintPoint>)->());
 }
 
 #[allow(unused_variable)]
-fn interpolate_callback(points: *const ShaderPaintPoint, count: i32) {
+unsafe extern "C" fn interpolate_callback(points: *const ShaderPaintPoint, count: i32, output: &mut Vec<ShaderPaintPoint>) {
     logi!("in callback with {} points!", count);
+    slice::raw::buf_as_slice(points, count as uint, |slice| {
+        output.push_all(slice);
+    });
 }
 
 #[allow(unused_variable)]
-fn interpolate_lua_from_rust(a: ShaderPaintPoint, b: ShaderPaintPoint, output: &mut Vec<ShaderPaintPoint>) -> () {
+pub fn interpolate_lua_from_rust(a: ShaderPaintPoint, b: ShaderPaintPoint, output: &mut Vec<ShaderPaintPoint>) -> () {
     logi!("about to call C to interpolate Lua");
+    logi!("incidentally, mem::size_of(ShaderPaintPoint) = {}", mem::size_of::<ShaderPaintPoint>());
     unsafe {
-        doInterpolateLua(a, b, interpolate_callback);
+        logi!("calling doInterpolateLua with callback: 0x{:x}", interpolate_callback as uint);
+        doInterpolateLua(&a, &b, output, interpolate_callback);
     }
 }
 

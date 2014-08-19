@@ -14,8 +14,9 @@ struct ShaderPaintPoint {
   struct Coordinate pos;
   float time;
   float size;
+  float speed;
   float distance;
   float counter;
 };
 
-typedef void (*ShaderCallback)(struct ShaderPaintPoint *points, int count);
+typedef void (*ShaderCallback)(struct ShaderPaintPoint *points, int count, void *output);

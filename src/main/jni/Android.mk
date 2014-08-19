@@ -24,9 +24,9 @@ include $(PREBUILT_STATIC_LIBRARY)
 include $(CLEAR_VARS)
 
 LOCAL_MODULE := luajit
-LOCAL_SRC_FILES := ../../../lib/libluajit.so
+LOCAL_SRC_FILES := ../../../lib/libluajit.a
 
-include $(PREBUILT_SHARED_LIBRARY)
+include $(PREBUILT_STATIC_LIBRARY)
 
 include $(CLEAR_VARS)
 
@@ -34,10 +34,10 @@ LOCAL_MODULE    := gl-stuff
 LOCAL_SRC_FILES := hello-jni.c unwind.c lua_geom.c
 
 LOCAL_CFLAGS := -std=c99 -Wall -Wextra -Wno-unused -Werror -g
-LOCAL_LDFLAGS := -L/opt/android-ndk/android-ndk-r9b/sources/cxx-stl/gnu-libstdc++/4.6/libs/armeabi
+LOCAL_LDFLAGS := -L/opt/android-ndk/android-ndk-r9b/sources/cxx-stl/gnu-libstdc++/4.6/libs/armeabi -z muldefs
 LOCAL_LDLIBS    := -lGLESv2 -ldl -llog -lc -lEGL -landroid -ljnigraphics
-LOCAL_STATIC_LIBRARIES := rustgl
-LOCAL_SHARED_LIBRARIES := luajit
+LOCAL_STATIC_LIBRARIES := rustgl luajit
+#LOCAL_SHARED_LIBRARIES := luajit
 # LOCAL_CPP_FEATURES += exceptions
 # LOCAL_CPP_FEATURES += rtti
 

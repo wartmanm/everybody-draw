@@ -94,14 +94,15 @@ class MainActivity extends Activity with TypedActivity with AndroidImplicits {
 
   override def onCreate(bundle: Bundle) {
     Log.i("main", "oncreate")
-    System.loadLibrary("gl-stuff")
     System.loadLibrary("luajit")
-    LuaHelper.loadScript("""
-      function main(start, end)
-        print("printing from lua!!")
-        return {start, end}
-      end
-      """)
+    System.loadLibrary("gl-stuff")
+    LuaHelper.loadScript(
+      """
+      |function main(a, b)
+      |  print("printing from lua!!")
+      |  return {a, b}
+      |end
+      """.stripMargin)
     Log.i("main", "loaded lua script")
 
 

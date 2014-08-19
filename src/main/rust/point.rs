@@ -1,12 +1,14 @@
 // TODO: more meaningful names
 use std::sync::spsc_queue;
 
+#[deriving(Clone, Show)]
 pub struct Coordinate {
     pub x: f32,
     pub y: f32,
 }
 
 /// Holds data from motionevent entries.
+#[deriving(Clone, Show)]
 pub struct PaintPoint {
     pub pos: Coordinate,
     pub time: f32, // floating-point seconds
@@ -16,6 +18,7 @@ pub struct PaintPoint {
 /// Holds raw data used for pointshader attribs.
 /// These fields overlap with PaintPoint somewhat but aren't necessarily directly sourced from one
 /// so adding it as a child doesn't seem ideal
+#[deriving(Clone, Show)]
 pub struct ShaderPaintPoint {
     pub pos: Coordinate,
     pub time: f32,
