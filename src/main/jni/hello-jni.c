@@ -188,9 +188,9 @@ static void jniLuaInit(JNIEnv* env, jobject thiz) {
 static void jniLuaFinish(JNIEnv* env, jobject thiz) {
 }
 static void jniLuaLoadScript(JNIEnv* env, jobject thiz, jstring script) {
-  const char* scriptchars = (*env)->GetStringUTFChars(env, script, NULL);
+  const char* scriptchars = script == NULL ? NULL : (*env)->GetStringUTFChars(env, script, NULL);
   loadLuaScript(scriptchars);
-  (*env)->ReleaseStringUTFChars(env, script, scriptchars);
+  if (scriptchars != NULL) (*env)->ReleaseStringUTFChars(env, script, scriptchars);
 }
 
 jint JNI_OnLoad(JavaVM* vm, void* reserved) {

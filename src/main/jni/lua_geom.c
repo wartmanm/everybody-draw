@@ -3,6 +3,7 @@
 #include "lua/lua.h"
 #include "lua/lauxlib.h"
 #include "lua/lualib.h"
+#include "lua/luajit.h"
 #include "point.h"
 
 #define  LOG_TAG    "mylua"
@@ -16,7 +17,7 @@
 
 #define READ_LUA_FLOAT(name, result)\
   lua_pushstring(L, name);\
-  lua_gettable(L, -2);\
+  lua_rawget(L, -2);\
   result = (float)lua_tonumber(L, -1);\
   lua_pop(L, 1);
 
@@ -25,6 +26,8 @@ static lua_State *L = NULL;
 lua_State *initLua() {
   lua_State *L = luaL_newstate();
   luaL_openlibs(L);
+  
+  luaJIT_setmode(L, 0, LUAJIT_MODE_ENGINE|LUAJIT_MODE_ON);
 
   return L;
 }
@@ -34,6 +37,9 @@ void finishLua(lua_State *L) {
 }
 
 void loadLuaScript(const char *script) {
+  if (script == NULL) {
+    script = "function main(a, b) return {a, b} end";
+  }
 
   if (L == NULL) {
     L = initLua();
@@ -53,6 +59,7 @@ void loadLuaScript(const char *script) {
     LOGE("no main function defined :(");
     return;
   }
+  luaJIT_setmode(L, -1, LUAJIT_MODE_ALLFUNC|LUAJIT_MODE_ON);
   LOGI("main function defined :)");
 }
 
@@ -75,24 +82,27 @@ void loadLuaScript(const char *script) {
   /*lua_setmetatable(L, -2);*/
 /*}*/
 
-static void pushShaderPoint(lua_State *L, struct ShaderPaintPoint *point) {
-  lua_newtable(L);
+static void pushShaderPoint(lua_State *L, const struct ShaderPaintPoint *point) {
+  lua_createtable(L, 0, 7);
   PUSH_LUA_FLOAT("x", point->pos.x);
   PUSH_LUA_FLOAT("y", point->pos.y);
   PUSH_LUA_FLOAT("time", point->time);
   PUSH_LUA_FLOAT("size", point->size);
+  PUSH_LUA_FLOAT("speed", point->speed);
   PUSH_LUA_FLOAT("distance", point->distance);
   PUSH_LUA_FLOAT("counter", point->counter);
 }
 
 // TODO: would it be better to register a callback from lua?
-static void interpolateLua(lua_State *L, struct ShaderPaintPoint *startpoint, struct ShaderPaintPoint *endpoint, void *output, ShaderCallback callback) {
+static void interpolateLua(lua_State *L, const struct ShaderPaintPoint *startpoint, const struct ShaderPaintPoint *endpoint, int x, int y, void *output, ShaderCallback callback) {
   lua_getglobal(L, "main");
   
   pushShaderPoint(L, startpoint);
   pushShaderPoint(L, endpoint);
+  lua_pushnumber(L, (float)x);
+  lua_pushnumber(L, (float)y);
 
-  if (lua_pcall(L, 2, 1, 0) != 0) {
+  if (lua_pcall(L, 4, 1, 0) != 0) {
     LOGE("script failed to run :(");
     const char *msg = lua_tostring(L, -1);
     LOGE("got error message: %s", msg);
@@ -116,6 +126,7 @@ static void interpolateLua(lua_State *L, struct ShaderPaintPoint *startpoint, st
     READ_LUA_FLOAT("y", points[i].pos.y);
     READ_LUA_FLOAT("time", points[i].time);
     READ_LUA_FLOAT("size", points[i].size);
+    READ_LUA_FLOAT("speed", points[i].speed);
     READ_LUA_FLOAT("distance", points[i].distance);
     READ_LUA_FLOAT("counter", points[i].counter);
 
@@ -124,7 +135,7 @@ static void interpolateLua(lua_State *L, struct ShaderPaintPoint *startpoint, st
   callback(points, length, output);
 }
 
-void doInterpolateLua(struct ShaderPaintPoint *startpoint, struct ShaderPaintPoint *endpoint, void *output, ShaderCallback callback) {
+void doInterpolateLua(const struct ShaderPaintPoint *startpoint, const struct ShaderPaintPoint *endpoint, int x, int y, void *output, ShaderCallback callback) {
   if (L == NULL) return;
-  interpolateLua(L, startpoint, endpoint, output, callback);
+  interpolateLua(L, startpoint, endpoint, x, y, output, callback);
 }

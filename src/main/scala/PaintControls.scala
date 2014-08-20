@@ -6,13 +6,15 @@ import android.graphics.Bitmap
 
 import java.io.{InputStream, OutputStream, OutputStreamWriter, BufferedWriter}
 
-class PaintControls(inbrushpicker: AdapterView[Adapter], inanimpicker: AdapterView[Adapter], inpaintpicker: AdapterView[Adapter]) {
+class PaintControls(inbrushpicker: AdapterView[Adapter], inanimpicker: AdapterView[Adapter], inpaintpicker: AdapterView[Adapter], ininterppicker: AdapterView[Adapter]) {
   import PaintControls._
 
   val animpicker = NamedPicker[CopyShader]("anim", inanimpicker)
   val brushpicker = NamedPicker[Bitmap]("brush", inbrushpicker)
   val paintpicker = NamedPicker[PointShader]("paint", inpaintpicker)
-  val namedPickers = Array(animpicker, brushpicker, paintpicker)
+  val interppicker = NamedPicker[String]("interp", ininterppicker)
+
+  val namedPickers = Array(animpicker, brushpicker, paintpicker, interppicker)
 
   def restoreState() = namedPickers.map(_.restoreState())
   def updateState() = namedPickers.map(_.updateState())

@@ -174,6 +174,7 @@ extends Thread with Handler.Callback with AndroidImplicits {
   // only set values, could maybe run on main thread
   def setAnimShader(shader: CopyShader) = runHere { nativeSetAnimShader(shader) }
   def setPointShader(shader: PointShader) = runHere { nativeSetPointShader(shader) }
+  def setInterpScript(script: String) = runHere { LuaHelper.loadScript(script) }
   //unused
   def setCopyShader(shader: CopyShader) = runHere { nativeSetCopyShader(shader) }
 }
