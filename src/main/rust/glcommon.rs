@@ -95,6 +95,10 @@ pub fn get_uniform_handle_option(program: GLuint, name: &str) -> Option<GLint> {
     if handle == -1 { None } else { Some(handle) }
 }
 
+pub trait Shader {
+    fn new(vertopt: Option<&str>, fragopt: Option<&str>) -> Option<Self>;
+}
+
 macro_rules! glattrib_f32 (
     // struct elements
     ($handle:expr, $count:expr, $item:ident, $elem:ident) => ({

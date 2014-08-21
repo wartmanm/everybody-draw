@@ -11,11 +11,11 @@ use log::logi;
 use opengles::gl2;
 use opengles::gl2::{GLuint, GLenum, GLubyte};
 
-use glcommon::check_gl_error;
+use glcommon::{Shader, check_gl_error};
 use glpoint::draw_path;
 use pointshader::PointShader;
 use copyshader;
-use copyshader::CopyShader;
+use copyshader::*;
 use gltexture;
 use gltexture::Texture;
 use matrix;
@@ -23,6 +23,11 @@ use eglinit;
 use dropfree::DropFree;
 
 use collections::vec::Vec;
+
+use point::PointInfo;
+use drawevent::Events;
+
+use glstore::DrawObjectIndex;
 
 static drawIndexes: [GLubyte, ..6] = [
     0, 1, 2,
@@ -71,9 +76,8 @@ impl Drop for TextureTarget {
 struct Data<'a> {
     #[allow(dead_code)]
     dimensions: (i32, i32),
+    events: Events<'a>,
     copy_shader: Option<&'a CopyShader>,
-    point_shader: Option<&'a PointShader>,
-    anim_shader: Option<&'a CopyShader>,
     targets: [TextureTarget, ..2],
     brush_texture: Texture,
     current_target: uint,
@@ -149,7 +153,7 @@ pub unsafe fn with_pixels() -> (i32, i32, *const u8) {
     let data = get_safe_data();
     let oldtarget = get_current_texturetarget(data);
     let (x,y) = oldtarget.texture.dimensions;
-    let saveshader = CopyShader::new(None, Some(copyshader::noalpha_fragment_shader));
+    let saveshader = Shader::new(None, Some(copyshader::noalpha_fragment_shader));
     let pixels = saveshader.map(|shader| {
         let newtarget = TextureTarget::new(x, y, gltexture::RGB);
         let matrix = [1f32,  0f32,  0f32,  0f32,
@@ -184,24 +188,24 @@ unsafe fn with_cstr_as_str<T>(ptr: *const i8, callback: |Option<&str>|->T)->T {
 }
 
 unsafe fn compile_shader<T>(vec: *const i8, frag: *const i8, 
-                 constructor: fn (Option<&str>, Option<&str>) -> Option<T>) -> Option<T> {
+                 callback: |Option<&str>, Option<&str>| -> Option<T>) -> Option<T> {
     // note that this will use the default shader in case of non-utf8 chars
     // also, must be separate lines b/c ownership
     with_cstr_as_str(vec, |vecstr| with_cstr_as_str(frag, |fragstr| {
-        constructor(vecstr, fragstr)
+        callback(vecstr, fragstr)
     }))
 }
 
 #[no_mangle]
-pub unsafe fn compile_copy_shader(vec: *const i8, frag: *const i8) -> *const CopyShader {
-    let shader = compile_shader(vec, frag, CopyShader::new);
-    shader.map(|x| mem::transmute(box x)).unwrap_or(ptr::null())
+pub unsafe fn compile_copy_shader(vec: *const i8, frag: *const i8) -> DrawObjectIndex<CopyShader> {
+    let shader = compile_shader(vec, frag, |v,f|get_safe_data().events.load_copyshader(v,f));
+    shader.unwrap_or(mem::transmute(-1i32))
 }
 
 #[no_mangle]
-pub unsafe fn compile_point_shader(vec: *const i8, frag: *const i8) -> *const PointShader {
-    let shader = compile_shader(vec, frag, PointShader::new);
-    shader.map(|x| mem::transmute(box x)).unwrap_or(ptr::null())
+pub unsafe fn compile_point_shader(vec: *const i8, frag: *const i8) -> DrawObjectIndex<PointShader> {
+    let shader = compile_shader(vec, frag, |v,f|get_safe_data().events.load_pointshader(v,f));
+    shader.unwrap_or(mem::transmute(-1i32))
 }
 
 fn get_safe_shader<'a, T>(shader: *const T) -> Option<&'a T> {
@@ -218,19 +222,18 @@ pub unsafe fn set_copy_shader(shader: *const CopyShader) -> () {
     get_safe_data().copy_shader = get_safe_shader(shader);
 }
 
-
 // these can also be null to unset the shader
 // TODO: document better from scala side
 #[no_mangle]
-pub unsafe fn set_anim_shader(shader: *const CopyShader) -> () {
+pub unsafe fn set_anim_shader(shader: DrawObjectIndex<CopyShader>) -> () {
     logi("setting anim shader");
-    get_safe_data().anim_shader = get_safe_shader(shader);
+    get_safe_data().events.use_animshader(shader);
 }
 
 #[no_mangle]
-pub unsafe fn set_point_shader(shader: *const PointShader) -> () {
+pub unsafe fn set_point_shader(shader: DrawObjectIndex<PointShader>) -> () {
     logi("setting point shader");
-    get_safe_data().point_shader = get_safe_shader(shader);
+    get_safe_data().events.use_pointshader(shader);
 }
 
 #[no_mangle]
@@ -245,9 +248,8 @@ pub extern fn setup_graphics(w: i32, h: i32) -> bool {
         let targets = [TextureTarget::new(w, h, gltexture::RGBA), TextureTarget::new(w, h, gltexture::RGBA)];
         dataRef = DropFree::new(Data {
             dimensions: (w, h),
+            events: Events::new(),
             copy_shader: None,
-            point_shader: None,
-            anim_shader: None,
             targets: targets,
             brush_texture: Texture::with_image(1, 1, Some([0xffu8].as_slice()), gltexture::ALPHA),
             current_target: 0,
@@ -262,7 +264,7 @@ pub extern fn setup_graphics(w: i32, h: i32) -> bool {
 
 #[no_mangle]
 pub extern fn draw_queued_points(matrix: *mut f32) {
-    match get_safe_data().point_shader {
+    match get_safe_data().events.pointshader {
         Some(point_shader) => {
             let data = get_safe_data();
             gl2::enable(gl2::BLEND);
@@ -306,13 +308,14 @@ pub extern fn clear_buffer() {
         gl2::clear_color(0f32, 0f32, 0f32, 0f32);
         gl2::clear(gl2::COLOR_BUFFER_BIT);
         check_gl_error("clear framebuffer");
+        data.events.clear();
     }
 }
 
 #[no_mangle]
 pub extern fn render_frame() {
     let data = get_safe_data();
-    match (data.copy_shader, data.anim_shader) {
+    match (data.copy_shader, data.events.animshader) {
         (Some(copy_shader), Some(anim_shader)) => {
             data.current_target = data.current_target ^ 1;
             let copymatrix = matrix::identity.as_slice();
