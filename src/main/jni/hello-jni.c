@@ -102,7 +102,7 @@ static void setBrushTexture(JNIEnv* env, jobject thiz, jobject bitmap) {
   AndroidBitmap_getInfo(env, bitmap, &info);
   void *pixels;
   AndroidBitmap_lockPixels(env, bitmap, &pixels);
-  set_brush_texture(info.width, info.height, pixels);
+  set_brush_texture(info.width, info.height, pixels, info.format);
   AndroidBitmap_unlockPixels(env, bitmap);
 }
 

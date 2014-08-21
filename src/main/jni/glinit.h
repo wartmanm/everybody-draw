@@ -13,7 +13,7 @@ void set_anim_shader(void* shader);
 void set_copy_shader(void* shader);
 void set_point_shader(void* shader);
 
-void set_brush_texture(int width, int height, const char *pixels);
+void set_brush_texture(int width, int height, const char *pixels, int format);
 
 void clear_buffer();
 

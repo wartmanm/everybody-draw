@@ -29,6 +29,17 @@ static drawIndexes: [GLubyte, ..6] = [
     0, 2, 3
 ];
 
+//#[deriving(FromPrimitive)]
+#[repr(i32)]
+#[allow(non_camel_case_types)]
+enum AndroidBitmapFormat {
+    ANDROID_BITMAP_FORMAT_NONE      = 0,
+    ANDROID_BITMAP_FORMAT_RGBA_8888 = 1,
+    ANDROID_BITMAP_FORMAT_RGB_565   = 4,
+    ANDROID_BITMAP_FORMAT_RGBA_4444 = 7,
+    ANDROID_BITMAP_FORMAT_A_8       = 8,
+}
+
 struct TextureTarget {
     framebuffer: GLuint,
     texture: Texture,
@@ -268,15 +279,23 @@ pub extern fn draw_queued_points(matrix: *mut f32) {
 }
 
 #[no_mangle]
-pub extern fn set_brush_texture(w: i32, h: i32, a_pixels: *const u8) {
-    logi!("setting brush texture for {:x}", a_pixels as uint);
-    let pixelopt = unsafe { a_pixels.to_option() };
-    // pixelvec has lifetime of a_pixels, not x
-    // there must be some way around this
-    let pixelvec: Option<&[u8]> = unsafe {
-        pixelopt.map(|x| ::std::slice::raw::buf_as_slice(x, (w*h) as uint, |x| mem::transmute(x)))
+pub extern fn set_brush_texture(w: i32, h: i32, a_pixels: *const u8, format: i32) {
+    let formatenum: AndroidBitmapFormat = unsafe { mem::transmute(format) };
+    let aformat = match formatenum {
+        ANDROID_BITMAP_FORMAT_RGBA_8888 => Some(gltexture::RGBA),
+        ANDROID_BITMAP_FORMAT_A_8 => Some(gltexture::ALPHA),
+        _ => None,
     };
-    get_safe_data().brush_texture.set_image(w, h, pixelvec, gltexture::ALPHA);
+    aformat.map(|texformat| {
+        logi!("setting brush texture for {:x}", a_pixels as uint);
+        let pixelopt = unsafe { a_pixels.to_option() };
+        // pixelvec has lifetime of a_pixels, not x
+        // there must be some way around this
+        let pixelvec: Option<&[u8]> = unsafe {
+            pixelopt.map(|x| ::std::slice::raw::buf_as_slice(x, (w*h) as uint, |x| mem::transmute(x)))
+        };
+        get_safe_data().brush_texture.set_image(w, h, pixelvec, texformat);
+    });
 }
 
 #[no_mangle]
