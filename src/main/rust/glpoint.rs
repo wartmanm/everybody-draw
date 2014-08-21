@@ -181,6 +181,10 @@ extern "C" {
     pub fn doInterpolateLua(startpoint: *const ShaderPaintPoint, endpoint: *const ShaderPaintPoint, x: i32, y: i32, output: *mut Vec<ShaderPaintPoint>, callback: unsafe extern "C" fn(*const ShaderPaintPoint, i32, &mut Vec<ShaderPaintPoint>)->());
 }
 
+#[no_mangle]
+pub unsafe extern "C" fn pushrustvec(vec: &mut Vec<ShaderPaintPoint>, point: *const ShaderPaintPoint) {
+    vec.push(*point);
+}
 unsafe extern "C" fn interpolate_callback(points: *const ShaderPaintPoint, count: i32, output: &mut Vec<ShaderPaintPoint>) {
     slice::raw::buf_as_slice(points, count as uint, |slice| {
         output.push_all(slice);

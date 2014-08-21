@@ -1,4 +1,6 @@
-function main(a, b, x, y)
+function main(aptr, bptr, x, y, points)
+  local a = ffi.cast("struct ShaderPaintPoint*", aptr)
+  local b = ffi.cast("struct ShaderPaintPoint*", bptr)
   local steps = math.max(math.abs(a.x - b.x), math.abs(a.y - b.y))
   if steps < 1 then steps = 1 end
   local timescale = 10
@@ -9,9 +11,9 @@ function main(a, b, x, y)
   local stepspeed = (b.speed - a.speed) / steps
   local stepdistance = (b.distance - a.distance) / steps
   local x,y,time,size,speed,distance = a.x, a.y, a.time, a.size, a.speed, a.distance
-  local out = {}
   for i = 1,steps do
-    out[i] = {x=x, y=y, time=time, size=size, speed=speed, distance=distance, counter=a.counter}
+    out = ffi.new("struct ShaderPaintPoint", x, y, time, size, speed, distance, counter)
+    ffi.C.pushrustvec(points, out)
     x = x + stepx
     y = y + stepy
     size = size + stepsize
@@ -20,7 +22,6 @@ function main(a, b, x, y)
     time = time + steptime
     if time > 1 then time = time - 1 end
   end
-  return out
 end
 
 
