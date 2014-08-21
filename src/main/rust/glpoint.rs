@@ -178,23 +178,18 @@ pub fn draw_path(framebuffer: GLuint, shader: &PointShader, matrix: *mut f32, co
 
 #[allow(non_snake_case_functions)]
 extern "C" {
-    pub fn doInterpolateLua(startpoint: *const ShaderPaintPoint, endpoint: *const ShaderPaintPoint, x: i32, y: i32, output: *mut Vec<ShaderPaintPoint>, callback: unsafe extern "C" fn(*const ShaderPaintPoint, i32, &mut Vec<ShaderPaintPoint>)->());
+    pub fn doInterpolateLua(startpoint: *const ShaderPaintPoint, endpoint: *const ShaderPaintPoint, x: i32, y: i32, output: *mut Vec<ShaderPaintPoint>);
 }
 
 #[no_mangle]
 pub unsafe extern "C" fn pushrustvec(vec: &mut Vec<ShaderPaintPoint>, point: *const ShaderPaintPoint) {
     vec.push(*point);
 }
-unsafe extern "C" fn interpolate_callback(points: *const ShaderPaintPoint, count: i32, output: &mut Vec<ShaderPaintPoint>) {
-    slice::raw::buf_as_slice(points, count as uint, |slice| {
-        output.push_all(slice);
-    });
-}
 
 fn interpolate_lua_from_rust(a: ShaderPaintPoint, b: ShaderPaintPoint, dimensions: (i32, i32), output: &mut Vec<ShaderPaintPoint>) -> () {
     unsafe {
         let (x,y) = dimensions;
-        doInterpolateLua(&a, &b, x, y, output, interpolate_callback);
+        doInterpolateLua(&a, &b, x, y, output);
     }
 }
 

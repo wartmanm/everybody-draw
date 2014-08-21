@@ -1,4 +1,4 @@
-function main(a, b, screenx, screeny)
+function main(a, b, screenx, screeny, points)
   local steps = math.max(math.abs(a.x - b.x), math.abs(a.y - b.y))
   if steps < 1 then steps = 1 end
   local timescale = 10
@@ -8,27 +8,24 @@ function main(a, b, screenx, screeny)
   local stepsize = (b.size - a.size) / steps
   local stepspeed = (b.speed - a.speed) / steps
   local stepdistance = (b.distance - a.distance) / steps
-  local x,y,time,size,speed,distance = a.x, a.y, a.time, a.size, a.speed, a.distance
-  local out = {}
-  local index = 1
+  local x,y,time,size,speed,distance,counter = a.x, a.y, a.time, a.size, a.speed, a.distance, a.counter
+  local out = ShaderPaintPoint(x,y,time,size,speed,distance,counter)
   for i = 1,steps do
-    out[index] = {x=x, y=y, time=time, size=size, speed=speed, distance=distance, counter=a.counter}
-    index = index + 1
-    out[index] = {x=screenx - x, y=y, time=time, size=size, speed=speed, distance=distance, counter=a.counter}
-    index = index + 1
-    out[index] = {x=x, y=screeny - y, time=time, size=size, speed=speed, distance=distance, counter=a.counter}
-    index = index + 1
-    out[index] = {x=screenx - x, y=screeny - y, time=time, size=size, speed=speed, distance=distance, counter=a.counter}
-    index = index + 1
+    out.x = x; out.y = y
+    pushpoint(points, out)
+    out.x = screenx - x; out.y = y
+    pushpoint(points, out)
+    out.x = x; out.y = screeny - y
+    pushpoint(points, out)
+    out.x = screenx - x; out.y = screeny - y
+    pushpoint(points, out)
+
     x = x + stepx
     y = y + stepy
-    size = size + stepsize
-    speed = speed + stepspeed
-    distance = distance + stepdistance
+    out.size = out.size + stepsize
+    out.speed = out.speed + stepspeed
+    out.distance = out.distance + stepdistance
     time = time + steptime
     if time > 1 then time = time - 1 end
   end
-  return out
 end
-
-

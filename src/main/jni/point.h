@@ -1,4 +1,3 @@
-
 struct Coordinate {
   float x;
   float y;
@@ -18,5 +17,3 @@ struct ShaderPaintPoint {
   float distance;
   float counter;
 };
-
-typedef void (*ShaderCallback)(struct ShaderPaintPoint *points, int count, void *output);

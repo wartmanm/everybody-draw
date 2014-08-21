@@ -25,15 +25,20 @@ static const char *lua_ffi_script =
 "  void pushrustvec(void *vec, struct ShaderPaintPoint *point);\n"
 "\n"
 "]]\n"
-"return ffi.C.pushrustvec\n"
+"function runmain(aptr, bptr, x, y, points, main)\n"
+"  local a = ffi.cast(\"struct ShaderPaintPoint*\", aptr);\n"
+"  local b = ffi.cast(\"struct ShaderPaintPoint*\", bptr);\n"
+"  main(a, b, x, y, points)\n"
+"end\n"
+"pushpoint=ffi.C.pushrustvec\n"
+"ShaderPaintPoint=ffi.typeof(\"struct ShaderPaintPoint\")\n"
+"return {}\n"
 "\n";
 
 static const char *defaultscript =
-"function main(aptr, bptr, x, y, points)\n"
-"  local a = ffi.cast(\"struct ShaderPaintPoint*\", aptr);\n"
-"  local b = ffi.cast(\"struct ShaderPaintPoint*\", bptr);\n"
-"  dopushrustvec(points, a)\n"
-"  dopushrustvec(points, b)\n"
+"function main(a, b, x, y, points)\n"
+"  pushpoint(points, a)\n"
+"  pushpoint(points, b)\n"
 "end\n";
 
 static lua_State *L = NULL;
@@ -49,9 +54,6 @@ lua_State *initLua() {
     return NULL;
   }
   LOGI("ffi init script loaded :)");
-  lua_setglobal(L, "dopushrustvec");
-  LOGI("set global pushrustvec :)");
-
 
   return L;
 }
@@ -88,16 +90,17 @@ void loadLuaScript(const char *script) {
 }
 
 // TODO: would it be better to register a callback from lua?
-static void interpolateLua(lua_State *L, struct ShaderPaintPoint *startpoint, struct ShaderPaintPoint *endpoint, int x, int y, void *output, ShaderCallback callback) {
-  lua_getglobal(L, "main");
+static void interpolateLua(lua_State *L, struct ShaderPaintPoint *startpoint, struct ShaderPaintPoint *endpoint, int x, int y, void *output) {
+  lua_getglobal(L, "runmain");
   
   lua_pushlightuserdata(L, startpoint);
   lua_pushlightuserdata(L, endpoint);
   lua_pushnumber(L, (float)x);
   lua_pushnumber(L, (float)y);
   lua_pushlightuserdata(L, output);
+  lua_getglobal(L, "main");
 
-  if (lua_pcall(L, 5, 0, 0) != 0) {
+  if (lua_pcall(L, 6, 0, 0) != 0) {
     LOGE("script failed to run :(");
     const char *msg = lua_tostring(L, -1);
     LOGE("got error message: %s", msg);
@@ -105,7 +108,7 @@ static void interpolateLua(lua_State *L, struct ShaderPaintPoint *startpoint, st
   }
 }
 
-void doInterpolateLua(struct ShaderPaintPoint *startpoint, struct ShaderPaintPoint *endpoint, int x, int y, void *output, ShaderCallback callback) {
+void doInterpolateLua(struct ShaderPaintPoint *startpoint, struct ShaderPaintPoint *endpoint, int x, int y, void *output) {
   if (L == NULL) return;
-  interpolateLua(L, startpoint, endpoint, x, y, output, callback);
+  interpolateLua(L, startpoint, endpoint, x, y, output);
 }
