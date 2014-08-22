@@ -8,15 +8,14 @@
 
 use core::prelude::*;
 use collections::vec::Vec;
-use core::cell::{Ref};
 use collections::{Mutable, MutableSeq};
-use collections::str::StrAllocating;
 use collections::slice::CloneableVector;
 use point::PointEntry;
 use glstore::{DrawObjectIndex, DrawObjectList, ShaderInit, BrushInit, CachedInit};
 use gltexture::{Texture, PixelFormat};
 use pointshader::PointShader;
 use copyshader::CopyShader;
+use std::to_string::ToString;
 
 enum DrawEvent {
     UseAnimShader(DrawObjectIndex<CopyShader>),
@@ -45,9 +44,9 @@ impl<'a> Events<'a> {
     }
     // FIXME: let glstore deal with optionalness
     pub fn load_copyshader(&mut self, vert: Option<&str>, frag: Option<&str>) -> Option<DrawObjectIndex<CopyShader>> {
-        let initargs = (vert.map(|x|x.to_owned()), frag.map(|x|x.to_owned()));
+        let initargs = (vert.map(|x|x.to_string()), frag.map(|x|x.to_string()));
         let initopt: ShaderInit<CopyShader> = CachedInit::new(initargs);
-        if (initopt.get().is_some()) { Some(self.objects.push_copyshader(initopt)) }
+        if initopt.get().is_some() { Some(self.objects.push_copyshader(initopt)) }
         else { None }
     }
     pub fn use_animshader(&'a mut self, idx: DrawObjectIndex<CopyShader>) -> &CopyShader {
@@ -57,9 +56,9 @@ impl<'a> Events<'a> {
         shader
     }
     pub fn load_pointshader(&mut self, vert: Option<&str>, frag: Option<&str>) -> Option<DrawObjectIndex<PointShader>> {
-        let initargs = (vert.map(|x|x.to_owned()), frag.map(|x|x.to_owned()));
+        let initargs = (vert.map(|x|x.to_string()), frag.map(|x|x.to_string()));
         let initopt: ShaderInit<PointShader> = CachedInit::new(initargs);
-        if (initopt.get().is_some()) { Some(self.objects.push_pointshader(initopt)) }
+        if initopt.get().is_some() { Some(self.objects.push_pointshader(initopt)) }
         else { None }
     }
     pub fn use_pointshader(&'a mut self, idx: DrawObjectIndex<PointShader>) -> &PointShader {
@@ -70,7 +69,7 @@ impl<'a> Events<'a> {
     }
     pub fn load_brush(&mut self, w: i32, h: i32, pixels: &[u8], format: PixelFormat) -> DrawObjectIndex<Texture> {
         let ownedpixels = pixels.to_vec();
-        let init = CachedInit::new((format, (w, h), ownedpixels));
+        let init: BrushInit = CachedInit::new((format, (w, h), ownedpixels));
         self.objects.push_brush(init)
     }
     pub fn use_brush(&mut self, idx: DrawObjectIndex<Texture>) -> &Texture {

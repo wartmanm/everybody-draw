@@ -1,7 +1,6 @@
 //extern crate core;
 use core::prelude::*;
 use core::mem;
-use core::slice;
 
 use std::sync::{Once, ONCE_INIT, spsc_queue};
 

@@ -7,22 +7,14 @@
 /// TODO: cleanup, deduplication
 
 use core::prelude::*;
-use core::cell::{RefCell, Ref, UnsafeCell};
+use core::cell::UnsafeCell;
 use collections::vec::Vec;
 use collections::string::String;
-use collections::str::StrAllocating;
 use collections::MutableSeq;
-use collections::slice::CloneableVector;
 use copyshader::CopyShader;
 use gltexture::{PixelFormat, Texture};
 use pointshader::PointShader;
 use glcommon::Shader;
-
-pub struct DrawObjects {
-    copyshaders: Vec<ShaderInit<CopyShader>>,
-    pointshaders: Vec<ShaderInit<PointShader>>,
-    brushes: Vec<Texture>,
-}
 
 //pub enum DrawObject {
     //CopyShaderObj(ShaderInit<CopyShader>),
@@ -111,14 +103,14 @@ impl DrawObjectList {
     // FIXME: push optionalness out elsewhere
     pub fn get_copyshader(&self, i: DrawObjectIndex<CopyShader>) -> &CopyShader {
         let DrawObjectIndex(idx) = i;
-        self.copyshaderlist.get(idx as uint).get().as_ref().unwrap()
+        self.copyshaderlist[idx as uint].get().as_ref().unwrap()
     }
     pub fn get_pointshader(&self, i: DrawObjectIndex<PointShader>) -> &PointShader {
         let DrawObjectIndex(idx) = i;
-        self.pointshaderlist.get(idx as uint).get().as_ref().unwrap()
+        self.pointshaderlist[idx as uint].get().as_ref().unwrap()
     }
     pub fn get_brush(&self, i: DrawObjectIndex<Texture>) -> &Texture {
         let DrawObjectIndex(idx) = i;
-        self.brushlist.get(idx as uint).get()
+        self.brushlist[idx as uint].get()
     }
 }

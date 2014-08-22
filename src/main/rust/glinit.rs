@@ -1,7 +1,6 @@
 extern crate opengles;
 use core::prelude::*;
 use core::mem;
-use core::ptr;
 use alloc::boxed::Box;
 
 use std::c_str::CString;
@@ -24,7 +23,6 @@ use dropfree::DropFree;
 
 use collections::vec::Vec;
 
-use point::PointInfo;
 use drawevent::Events;
 
 use glstore::DrawObjectIndex;
