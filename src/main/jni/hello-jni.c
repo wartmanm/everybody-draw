@@ -76,23 +76,23 @@ static void nativeAppendMotionEvent(JNIEnv* env, jobject thiz, jobject evtobj) {
   jni_append_motion_event(evtptr);
 }
 
-static void* shaderStrObjects(JNIEnv* env, jstring vec, jstring frag, void* callback(const char* vec, const char* frag)) {
+static int shaderStrObjects(JNIEnv* env, jstring vec, jstring frag, int callback(const char* vec, const char* frag)) {
   const char* vecstr = vec == NULL ? NULL : (*env)->GetStringUTFChars(env, vec, NULL);
   const char* fragstr = frag == NULL ? NULL : (*env)->GetStringUTFChars(env, frag, NULL);
-  void* ret = callback(vecstr, fragstr);
+  int ret = callback(vecstr, fragstr);
   if (vecstr != NULL) (*env)->ReleaseStringUTFChars(env, vec, vecstr);
   if (fragstr != NULL) (*env)->ReleaseStringUTFChars(env, frag, fragstr);
   return ret;
 }
 
 static void setAnimShader(JNIEnv* env, jobject thiz, jint shader) {
-  set_anim_shader((void*)shader);
+  set_anim_shader(shader);
 }
 static void setCopyShader(JNIEnv* env, jobject thiz, jint shader) {
-  set_copy_shader((void*)shader);
+  set_copy_shader(shader);
 }
 static void setPointShader(JNIEnv* env, jobject thiz, jint shader) {
-  set_point_shader((void*)shader);
+  set_point_shader(shader);
 }
 
 static void setBrushTexture(JNIEnv* env, jobject thiz, jobject bitmap) {
@@ -110,22 +110,14 @@ static void clearFramebuffer(JNIEnv* env, jobject thiz) {
   clear_buffer();
 }
 
-static jobject compileCopyShader(JNIEnv* env, jobject thiz, jstring vec, jstring frag) {
-  void* shader = shaderStrObjects(env, vec, frag, compile_copy_shader);
+static jint compileCopyShader(JNIEnv* env, jobject thiz, jstring vec, jstring frag) {
+  int shader = shaderStrObjects(env, vec, frag, compile_copy_shader);
   return shader;
 }
 
-static jobject compilePointShader(JNIEnv* env, jobject thiz, jstring vec, jstring frag) {
-  void* shader = shaderStrObjects(env, vec, frag, compile_point_shader);
+static jint compilePointShader(JNIEnv* env, jobject thiz, jstring vec, jstring frag) {
+  int shader = shaderStrObjects(env, vec, frag, compile_point_shader);
   return shader;
-}
-
-static void deinitCopyShader(JNIEnv* env, jobject thiz, jint copyshader) {
-  deinit_copy_shader((void*)copyshader);
-}
-
-static void deinitPointShader(JNIEnv* env, jobject thiz, jint pointshader) {
-  deinit_point_shader((void*)pointshader);
 }
 
 static void drawImage(JNIEnv* env, jobject thiz, jobject bitmap) {
@@ -264,10 +256,6 @@ jint JNI_OnLoad(JavaVM* vm, void* reserved) {
       .name = "compile",
       .signature = "(Ljava/lang/String;Ljava/lang/String;)I",
       .fnPtr = compilePointShader,
-    }, {
-      .name = "destroy$extension",
-      .signature = "(I)V",
-      .fnPtr = deinitPointShader,
     },
   };
   JNINativeMethod copyshaderstaticmethods[] = {
@@ -276,11 +264,6 @@ jint JNI_OnLoad(JavaVM* vm, void* reserved) {
       .signature = "(Ljava/lang/String;Ljava/lang/String;)I",
       .fnPtr = compileCopyShader,
     },
-    {
-      .name = "destroy$extension",
-      .signature = "(I)V",
-      .fnPtr = deinitCopyShader,
-    }
   };
 
   jclass copyshaderstatic = (*env)->FindClass(env, "com/github/wartman4404/gldraw/CopyShader$");

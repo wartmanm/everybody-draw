@@ -19,6 +19,7 @@ use std::to_string::ToString;
 
 enum DrawEvent {
     UseAnimShader(DrawObjectIndex<CopyShader>),
+    UseCopyShader(DrawObjectIndex<CopyShader>),
     UsePointShader(DrawObjectIndex<PointShader>),
     UseBrush(DrawObjectIndex<Texture>),
     Point(PointEntry),
@@ -29,6 +30,7 @@ pub struct Events<'a> {
     objects: DrawObjectList,
     pub pointshader: Option<&'a PointShader>,
     pub animshader: Option<&'a CopyShader>,
+    pub copyshader: Option<&'a CopyShader>,
     pub brush: Texture,
 }
 
@@ -39,6 +41,7 @@ impl<'a> Events<'a> {
             objects: DrawObjectList::new(),
             pointshader: None,
             animshader: None,
+            copyshader: None,
             brush: brush,
         }
     }
@@ -49,6 +52,13 @@ impl<'a> Events<'a> {
         if initopt.get().is_some() { Some(self.objects.push_copyshader(initopt)) }
         else { None }
     }
+    pub fn use_copyshader(&'a mut self, idx: DrawObjectIndex<CopyShader>) -> &CopyShader {
+        self.eventlist.push(UseCopyShader(idx));
+        let shader = self.objects.get_copyshader(idx);
+        self.copyshader = Some(shader);
+        shader
+    }
+
     pub fn use_animshader(&'a mut self, idx: DrawObjectIndex<CopyShader>) -> &CopyShader {
         self.eventlist.push(UseAnimShader(idx));
         let shader = self.objects.get_copyshader(idx);

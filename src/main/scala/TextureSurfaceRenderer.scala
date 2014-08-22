@@ -126,11 +126,6 @@ extends Thread with Handler.Callback with AndroidImplicits {
   }
 
   def cleanupGL(copyShaders: Array[CopyShader], pointShaders: Array[PointShader]) = {
-    runHere {
-      copyShaders.foreach(_.destroy())
-      pointShaders.foreach(_.destroy())
-      outputShader.foreach(_.destroy())
-    }
     handler.obtainMessage(MSG_END_GL).sendToTarget()
   }
 

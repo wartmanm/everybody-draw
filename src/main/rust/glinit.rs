@@ -1,7 +1,6 @@
 extern crate opengles;
 use core::prelude::*;
 use core::mem;
-use alloc::boxed::Box;
 
 use std::c_str::CString;
 
@@ -75,7 +74,6 @@ struct Data<'a> {
     #[allow(dead_code)]
     dimensions: (i32, i32),
     events: Events<'a>,
-    copy_shader: Option<&'a CopyShader>,
     targets: [TextureTarget, ..2],
     current_target: uint,
 }
@@ -135,7 +133,7 @@ pub fn draw_image(w: i32, h: i32, pixels: *const u8) -> () {
 
     unsafe {
         pixels.to_option().map(|x| ::core::slice::raw::buf_as_slice(x, (w*h*4) as uint, |pixelvec| {
-            data.copy_shader.map(|shader| {
+            data.events.copyshader.map(|shader| {
                 let intexture = Texture::with_image(w, h, Some(pixelvec), gltexture::RGBA);
                 check_gl_error("creating texture");
                 perform_copy(target.framebuffer, &intexture, shader, matrix.as_slice());
@@ -205,18 +203,11 @@ pub unsafe fn compile_point_shader(vec: *const i8, frag: *const i8) -> DrawObjec
     shader.unwrap_or(mem::transmute(-1i32))
 }
 
-fn get_safe_shader<'a, T>(shader: *const T) -> Option<&'a T> {
-    unsafe { shader.to_option().map(|x| {
-        logi!("got shader addr: {:x}", x as *const T as int);
-        mem::transmute(x)
-    })}
-}
-
 // TODO: make an enum for these with a scala counterpart
 #[no_mangle]
-pub unsafe fn set_copy_shader(shader: *const CopyShader) -> () {
+pub unsafe fn set_copy_shader(shader: DrawObjectIndex<CopyShader>) -> () {
     logi("setting copy shader");
-    get_safe_data().copy_shader = get_safe_shader(shader);
+    get_safe_data().events.use_copyshader(shader);
 }
 
 // these can also be null to unset the shader
@@ -247,7 +238,6 @@ pub extern fn setup_graphics(w: i32, h: i32) -> bool {
         dataRef = DropFree::new(Data {
             dimensions: (w, h),
             events: Events::new(brush),
-            copy_shader: None,
             targets: targets,
             current_target: 0,
         });
@@ -313,7 +303,7 @@ pub extern fn clear_buffer() {
 #[no_mangle]
 pub extern fn render_frame() {
     let data = get_safe_data();
-    match (data.copy_shader, data.events.animshader) {
+    match (data.events.copyshader, data.events.animshader) {
         (Some(copy_shader), Some(anim_shader)) => {
             data.current_target = data.current_target ^ 1;
             let copymatrix = matrix::identity.as_slice();
@@ -322,7 +312,9 @@ pub extern fn render_frame() {
             perform_copy(target.framebuffer, &source.texture, anim_shader, copymatrix);
             perform_copy(0 as GLuint, &target.texture, copy_shader, copymatrix);
         },
-        _ => { },
+        (x, y) => {
+            logi!("copyshader is {}None, animshader is {}None", if x.is_none() {""} else {"not "}, if y.is_none() {""} else {"not "});
+        }
     }
 }
 
@@ -330,16 +322,4 @@ pub extern fn render_frame() {
 pub extern fn deinit_gl() {
     unsafe { dataRef.destroy(); }
     gl2::finish();
-}
-
-#[no_mangle]
-pub unsafe extern fn deinit_copy_shader(s: *const CopyShader) {
-    let s: Box<CopyShader> = mem::transmute(s);
-    mem::drop(s);
-}
-
-#[no_mangle]
-pub unsafe extern fn deinit_point_shader(s: *const PointShader) {
-    let s: Box<PointShader> = mem::transmute(s);
-    mem::drop(s);
 }
