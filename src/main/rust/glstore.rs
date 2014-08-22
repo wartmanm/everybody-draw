@@ -7,6 +7,7 @@
 /// TODO: cleanup, deduplication
 
 use core::prelude::*;
+use core::cell::{RefCell, Ref, UnsafeCell};
 use collections::vec::Vec;
 use collections::string::String;
 use collections::str::StrAllocating;
@@ -16,12 +17,6 @@ use copyshader::CopyShader;
 use gltexture::{PixelFormat, Texture};
 use pointshader::PointShader;
 use glcommon::Shader;
-
-pub struct ShaderInit<T> {
-    shader: Option<T>,
-    vert: Option<String>,
-    frag: Option<String>,
-}
 
 pub struct DrawObjects {
     copyshaders: Vec<ShaderInit<CopyShader>>,
@@ -43,49 +38,51 @@ pub struct DrawObjectList {
 
 pub struct DrawObjectIndex<T>(i32);
 
-impl<T: Shader> ShaderInit<T> {
+pub type ShaderInitValues = (Option<String>, Option<String>);
+pub type BrushInitValues = (PixelFormat, (i32, i32), Vec<u8>);
+pub type ShaderInit<T> = CachedInit<Option<T>, ShaderInitValues>;
+pub type BrushInit = CachedInit<Texture, BrushInitValues>;
+
+pub struct CachedInit<T, Init> {
+    value: UnsafeCell<Option<T>>,
+    init: Init,
+}
+
+pub trait InitFromCache<Init> {
+    fn init(&Init) -> Self;
+}
+
+impl<T: InitFromCache<Init>, Init> CachedInit<T, Init> {
     pub fn get(&self) -> &T {
-        match self.shader {
-            Some(x) => &x,
-            None => {
-                let (vert, frag) = (self.vert.map(|x|x.as_slice()), self.frag.map(|x|x.as_slice()));
-                let shader = Shader::new(vert, frag).unwrap();
-                self.shader = Some(shader);
-                &shader
+        match unsafe { &*self.value.get() } {
+            &Some(ref x) => x,
+            &None => {
+                let value: T = InitFromCache::init(&self.init);
+                unsafe { *self.value.get() = Some(value); }
+                self.get()
             }
         }
     }
-    pub fn new(vert: Option<&str>, frag: Option<&str>) -> Option<ShaderInit<T>> {
-        let shaderopt: Option<T> = Shader::new(vert, frag);
-        shaderopt.map(|shader| {
-            let (vertstr, fragstr) = (vert.map(|x| x.to_owned()), frag.map(|x| x.to_owned()));
-            ShaderInit { shader: Some(shader), vert: vertstr, frag: fragstr }
-        })
+}
+
+impl<T, Init> CachedInit<T, Init> {
+    pub fn new(init: Init) -> CachedInit<T, Init> {
+        CachedInit { value: UnsafeCell::new(None), init: init }
     }
 }
 
-pub struct BrushInit {
-    format: PixelFormat,
-    dimensions: (i32, i32),
-    pixels: Vec<u8>,
-    texture: Option<Texture>,
+impl<T: Shader> InitFromCache<ShaderInitValues> for Option<T> {
+    fn init(value: &(Option<String>, Option<String>)) -> Option<T> {
+        let &(ref frag, ref vert) = value;
+        let (vertopt, fragopt) = (vert.as_ref().map(|x|x.as_slice()), frag.as_ref().map(|x|x.as_slice()));
+        Shader::new(fragopt, vertopt)
+    }
 }
 
-impl BrushInit {
-    pub fn get(&self) -> &Texture {
-        match self.texture {
-            Some(x) => &x,
-            None => {
-                let (w,h) = self.dimensions;
-                let texture = Texture::with_image(w, h, Some(self.pixels.as_slice()), self.format);
-                self.texture = Some(texture);
-                &texture
-            }
-        }
-    }
-
-    pub fn new(w: i32, h: i32, pixels: &[u8], format: PixelFormat) -> BrushInit {
-        BrushInit { format: format, dimensions: (w,h), pixels: pixels.to_vec(), texture: None }
+impl InitFromCache<BrushInitValues> for Texture {
+    fn init(value: &BrushInitValues) -> Texture {
+        let &(format, (w, h), ref pixels) = value;
+        Texture::with_image(w, h, Some(pixels.as_slice()), format)
     }
 }
 
@@ -98,26 +95,27 @@ impl DrawObjectList {
         }
     }
 
-    pub fn push_copyshader(&self, shader: ShaderInit<CopyShader>) -> DrawObjectIndex<CopyShader> {
+    pub fn push_copyshader(&mut self, shader: ShaderInit<CopyShader>) -> DrawObjectIndex<CopyShader> {
         self.copyshaderlist.push(shader);
         DrawObjectIndex((self.copyshaderlist.len() - 1) as i32)
     }
-    pub fn push_pointshader(&self, shader: ShaderInit<PointShader>) -> DrawObjectIndex<PointShader> {
+    pub fn push_pointshader(&mut self, shader: ShaderInit<PointShader>) -> DrawObjectIndex<PointShader> {
         self.pointshaderlist.push(shader);
         DrawObjectIndex((self.copyshaderlist.len() - 1) as i32)
     }
-    pub fn push_brush(&self, brush: BrushInit) -> DrawObjectIndex<Texture> {
+    pub fn push_brush(&mut self, brush: BrushInit) -> DrawObjectIndex<Texture> {
         self.brushlist.push(brush);
         DrawObjectIndex((self.brushlist.len() - 1) as i32)
     }
 
+    // FIXME: push optionalness out elsewhere
     pub fn get_copyshader(&self, i: DrawObjectIndex<CopyShader>) -> &CopyShader {
         let DrawObjectIndex(idx) = i;
-        self.copyshaderlist.get(idx as uint).get()
+        self.copyshaderlist.get(idx as uint).get().as_ref().unwrap()
     }
     pub fn get_pointshader(&self, i: DrawObjectIndex<PointShader>) -> &PointShader {
         let DrawObjectIndex(idx) = i;
-        self.pointshaderlist.get(idx as uint).get()
+        self.pointshaderlist.get(idx as uint).get().as_ref().unwrap()
     }
     pub fn get_brush(&self, i: DrawObjectIndex<Texture>) -> &Texture {
         let DrawObjectIndex(idx) = i;

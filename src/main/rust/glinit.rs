@@ -79,7 +79,6 @@ struct Data<'a> {
     events: Events<'a>,
     copy_shader: Option<&'a CopyShader>,
     targets: [TextureTarget, ..2],
-    brush_texture: Texture,
     current_target: uint,
 }
 
@@ -246,12 +245,12 @@ pub extern fn setup_graphics(w: i32, h: i32) -> bool {
     logi!("setupGraphics({},{})", w, h);
     unsafe {
         let targets = [TextureTarget::new(w, h, gltexture::RGBA), TextureTarget::new(w, h, gltexture::RGBA)];
+        let brush = Texture::with_image(1, 1, Some([0xffu8].as_slice()), gltexture::ALPHA);
         dataRef = DropFree::new(Data {
             dimensions: (w, h),
-            events: Events::new(),
+            events: Events::new(brush),
             copy_shader: None,
             targets: targets,
-            brush_texture: Texture::with_image(1, 1, Some([0xffu8].as_slice()), gltexture::ALPHA),
             current_target: 0,
         });
     }
@@ -264,15 +263,15 @@ pub extern fn setup_graphics(w: i32, h: i32) -> bool {
 
 #[no_mangle]
 pub extern fn draw_queued_points(matrix: *mut f32) {
-    match get_safe_data().events.pointshader {
+    let data = get_safe_data();
+    match data.events.pointshader {
         Some(point_shader) => {
-            let data = get_safe_data();
             gl2::enable(gl2::BLEND);
             gl2::blend_func(gl2::SRC_ALPHA, gl2::ONE_MINUS_SRC_ALPHA);
             let (target, source) = get_texturetargets(data);
             // TODO: brush color selection
             draw_path(target.framebuffer, point_shader, matrix, [1f32, 1f32, 0f32],
-                      &data.brush_texture, &source.texture);
+                      &data.events.brush, &source.texture);
 
             eglinit::egl_swap();
         },
@@ -293,10 +292,11 @@ pub extern fn set_brush_texture(w: i32, h: i32, a_pixels: *const u8, format: i32
         let pixelopt = unsafe { a_pixels.to_option() };
         // pixelvec has lifetime of a_pixels, not x
         // there must be some way around this
-        let pixelvec: Option<&[u8]> = unsafe {
-            pixelopt.map(|x| ::std::slice::raw::buf_as_slice(x, (w*h) as uint, |x| mem::transmute(x)))
-        };
-        get_safe_data().brush_texture.set_image(w, h, pixelvec, texformat);
+        unsafe {
+            pixelopt.map(|x| ::std::slice::raw::buf_as_slice(x, (w*h) as uint, |x| {
+                get_safe_data().events.load_brush(w, h, x, texformat);
+            }));
+        }
     });
 }
 
