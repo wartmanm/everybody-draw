@@ -42,13 +42,6 @@ struct RustStatics {
     pointCounter: i32,
 }
 
-#[allow(dead_code)]
-pub struct PointPair {
-    exists: u8,
-    prev: ShaderPaintPoint,
-    current: ShaderPaintPoint,
-}
-
 static mut dataRef: DropFree<RustStatics> = DropFree(0 as *mut RustStatics);
 static mut pathinit: Once = ONCE_INIT;
 
@@ -129,7 +122,7 @@ pub fn draw_path(framebuffer: GLuint, shader: &PointShader, matrix: *mut f32, co
 }
 
 #[no_mangle]
-pub extern "C" fn next_point_from_lua() -> PointPair {
+pub extern "C" fn next_point_from_lua(points: &mut (ShaderPaintPoint, ShaderPaintPoint)) -> bool {
     let s = get_statics();
     let ref mut queue = s.consumer;
     let ref mut currentPoints = s.currentPoints;
@@ -160,7 +153,8 @@ pub extern "C" fn next_point_from_lua() -> PointPair {
                             counter: op.counter,
                         };
                         oldpoint.info = Some(npdata);
-                        return PointPair { exists: 1, prev: op, current: npdata };
+                        *points = (op, npdata);
+                        return true;
                     },
                     (_, point::Stop) => {
                         oldpoint.info = None;
@@ -180,7 +174,9 @@ pub extern "C" fn next_point_from_lua() -> PointPair {
                     },
                 }
             },
-            None => { return unsafe { PointPair { exists: 0, prev: mem::zeroed(), current: mem::zeroed() } } }
+            None => {
+                return false;
+            }
         }
     }
 }

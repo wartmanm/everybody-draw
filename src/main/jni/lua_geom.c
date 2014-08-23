@@ -22,24 +22,16 @@ static const char *lua_ffi_script =
 "    float distance;\n"
 "    float counter;\n"
 "  };\n"
-"  struct PointPair {\n"
-"    char exists;\n"
-"    struct ShaderPaintPoint prev;\n"
-"    struct ShaderPaintPoint current;\n"
-"  };\n"
 "\n"
 "  void pushrustvec(void *vec, struct ShaderPaintPoint *point);\n"
-"  struct PointPair next_point_from_lua();\n"
+"  char next_point_from_lua(struct ShaderPaintPoint *points);\n"
+"  void loglua(const char *message);\n"
 "\n"
 "]]\n"
 "function runmain(x, y, points, main)\n"
-"  while true do\n"
-"    local points = ffi.C.next_point_from_lua();\n"
-"    if points.exists then\n"
-"      main(points.prev, points.current, x, y, points)\n"
-"    else\n"
-"      break\n"
-"    end\n"
+"  local pointpair = ffi.new(\"struct ShaderPaintPoint[2]\")\n"
+"  while ffi.C.next_point_from_lua(pointpair) ~= 0 do\n"
+"    main(pointpair[0], pointpair[1], x, y, points)\n"
 "  end\n"
 "end\n"
 "pushpoint=ffi.C.pushrustvec\n"
@@ -54,6 +46,10 @@ static const char *defaultscript =
 "end\n";
 
 static lua_State *L = NULL;
+
+void loglua(char *message) {
+  __android_log_print(ANDROID_LOG_INFO, "lua", "%s", message);
+}
 
 lua_State *initLua() {
   lua_State *L = luaL_newstate();
