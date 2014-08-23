@@ -31,18 +31,18 @@ pub struct Events<'a> {
     pub pointshader: Option<&'a PointShader>,
     pub animshader: Option<&'a CopyShader>,
     pub copyshader: Option<&'a CopyShader>,
-    pub brush: Texture,
+    pub brush: Option<&'a Texture>,
 }
 
 impl<'a> Events<'a> {
-    pub fn new(brush: Texture) -> Events<'a> {
+    pub fn new() -> Events<'a> {
         Events {
             eventlist: Vec::new(),
             objects: DrawObjectList::new(),
             pointshader: None,
             animshader: None,
             copyshader: None,
-            brush: brush,
+            brush: None,
         }
     }
     // FIXME: let glstore deal with optionalness
@@ -82,9 +82,11 @@ impl<'a> Events<'a> {
         let init: BrushInit = CachedInit::new((format, (w, h), ownedpixels));
         self.objects.push_brush(init)
     }
-    pub fn use_brush(&mut self, idx: DrawObjectIndex<Texture>) -> &Texture {
+    pub fn use_brush(&'a mut self, idx: DrawObjectIndex<Texture>) -> &Texture {
         self.eventlist.push(UseBrush(idx));
-        self.objects.get_brush(idx)
+        let brush = self.objects.get_brush(idx);
+        self.brush = Some(brush);
+        brush
     }
     pub fn pushpoint(&mut self, event: PointEntry) {
         self.eventlist.push(Point(event));

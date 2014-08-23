@@ -234,10 +234,9 @@ pub extern fn setup_graphics(w: i32, h: i32) -> bool {
     logi!("setupGraphics({},{})", w, h);
     unsafe {
         let targets = [TextureTarget::new(w, h, gltexture::RGBA), TextureTarget::new(w, h, gltexture::RGBA)];
-        let brush = Texture::with_image(1, 1, Some([0xffu8].as_slice()), gltexture::ALPHA);
         dataRef = DropFree::new(Data {
             dimensions: (w, h),
-            events: Events::new(brush),
+            events: Events::new(),
             targets: targets,
             current_target: 0,
         });
@@ -252,14 +251,14 @@ pub extern fn setup_graphics(w: i32, h: i32) -> bool {
 #[no_mangle]
 pub extern fn draw_queued_points(matrix: *mut f32) {
     let data = get_safe_data();
-    match data.events.pointshader {
-        Some(point_shader) => {
+    match (data.events.pointshader, data.events.brush) {
+        (Some(point_shader), Some(brush)) => {
             gl2::enable(gl2::BLEND);
             gl2::blend_func(gl2::SRC_ALPHA, gl2::ONE_MINUS_SRC_ALPHA);
             let (target, source) = get_texturetargets(data);
             // TODO: brush color selection
             draw_path(target.framebuffer, point_shader, matrix, [1f32, 1f32, 0f32],
-                      &data.events.brush, &source.texture);
+                      brush, &source.texture);
 
             eglinit::egl_swap();
         },
@@ -268,24 +267,29 @@ pub extern fn draw_queued_points(matrix: *mut f32) {
 }
 
 #[no_mangle]
-pub extern fn set_brush_texture(w: i32, h: i32, a_pixels: *const u8, format: i32) {
+pub extern fn load_texture(w: i32, h: i32, a_pixels: *const u8, format: i32) -> i32 {
     let formatenum: AndroidBitmapFormat = unsafe { mem::transmute(format) };
     let aformat = match formatenum {
         ANDROID_BITMAP_FORMAT_RGBA_8888 => Some(gltexture::RGBA),
         ANDROID_BITMAP_FORMAT_A_8 => Some(gltexture::ALPHA),
         _ => None,
     };
-    aformat.map(|texformat| {
+    aformat.and_then(|texformat| {
         logi!("setting brush texture for {:x}", a_pixels as uint);
         let pixelopt = unsafe { a_pixels.to_option() };
         // pixelvec has lifetime of a_pixels, not x
         // there must be some way around this
         unsafe {
             pixelopt.map(|x| ::std::slice::raw::buf_as_slice(x, (w*h) as uint, |x| {
-                get_safe_data().events.load_brush(w, h, x, texformat);
-            }));
+                mem::transmute(get_safe_data().events.load_brush(w, h, x, texformat))
+            }))
         }
-    });
+    }).unwrap_or(-1)
+}
+
+#[no_mangle]
+pub extern fn set_brush_texture(texture: i32) {
+    get_safe_data().events.use_brush(unsafe { mem::transmute(texture) });
 }
 
 #[no_mangle]

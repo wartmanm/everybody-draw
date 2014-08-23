@@ -59,8 +59,9 @@ object DrawFiles {
 
   def loadBrushes(c: Context) = {
     val decoder = decodeBitmap(Bitmap.Config.ALPHA_8) _
-    val filenamed = withFilename[Bitmap](decoder)
-    val files = allfiles[Bitmap](c, "brushes")
+    val toTexture = (ob: Option[Bitmap]) => ob.map(Texture.apply _)
+    val filenamed = withFilename[Texture](toTexture.compose(decoder))
+    val files = allfiles[Texture](c, "brushes")
     files.map(filenamed).flatMap(_.opt).flatten
   }
 

@@ -2,7 +2,6 @@ package com.github.wartman4404.gldraw
 
 import android.os.Bundle
 import android.widget.{AdapterView, Adapter}
-import android.graphics.Bitmap
 
 import java.io.{InputStream, OutputStream, OutputStreamWriter, BufferedWriter}
 
@@ -10,7 +9,7 @@ class PaintControls(inbrushpicker: AdapterView[Adapter], inanimpicker: AdapterVi
   import PaintControls._
 
   val animpicker = NamedPicker[CopyShader]("anim", inanimpicker)
-  val brushpicker = NamedPicker[Bitmap]("brush", inbrushpicker)
+  val brushpicker = NamedPicker[Texture]("brush", inbrushpicker)
   val paintpicker = NamedPicker[PointShader]("paint", inpaintpicker)
   val interppicker = NamedPicker[String]("interp", ininterppicker)
 

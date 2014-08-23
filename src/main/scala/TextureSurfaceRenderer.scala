@@ -26,7 +26,7 @@ extends Thread with Handler.Callback with AndroidImplicits {
   @native protected def nativeSetAnimShader(shader: CopyShader): Boolean
   @native protected def nativeSetCopyShader(shader: CopyShader): Boolean
   @native protected def nativeSetPointShader(shader: PointShader): Boolean
-  @native protected def nativeSetBrushTexture(b: Bitmap): Unit
+  @native protected def nativeSetBrushTexture(t: Texture): Unit
   @native protected def exportPixels(): Bitmap
 
   override def run() = {
@@ -160,10 +160,10 @@ extends Thread with Handler.Callback with AndroidImplicits {
     constructor(vec, frag)
   }
 
-  def setBrushTexture(bitmap: Bitmap) = {
-    Log.i("tst", s"setting brush texture to ${bitmap}")
+  def setBrushTexture(texture: Texture) = {
+    Log.i("tst", s"setting brush texture to ${texture}")
     runHere {
-      nativeSetBrushTexture(bitmap)
+      nativeSetBrushTexture(texture)
     }
   }
   // only set values, could maybe run on main thread

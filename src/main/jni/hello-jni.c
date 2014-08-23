@@ -95,15 +95,20 @@ static void setPointShader(JNIEnv* env, jobject thiz, jint shader) {
   set_point_shader(shader);
 }
 
-static void setBrushTexture(JNIEnv* env, jobject thiz, jobject bitmap) {
+static void setBrushTexture(JNIEnv* env, jobject thiz, jint texture) {
+  set_brush_texture(texture);
+}
+
+static jint createTexture(JNIEnv* env, jobject thiz, jobject bitmap) {
   // TODO: ensure rgba_8888 format and throw error
   // TODO: or alpha8?
   AndroidBitmapInfo info;
   AndroidBitmap_getInfo(env, bitmap, &info);
   void *pixels;
   AndroidBitmap_lockPixels(env, bitmap, &pixels);
-  set_brush_texture(info.width, info.height, pixels, info.format);
+  int texture = load_texture(info.width, info.height, pixels, info.format);
   AndroidBitmap_unlockPixels(env, bitmap);
+  return texture;
 }
 
 static void clearFramebuffer(JNIEnv* env, jobject thiz) {
@@ -241,7 +246,7 @@ jint JNI_OnLoad(JavaVM* vm, void* reserved) {
       .fnPtr = setPointShader,
     }, {
       .name = "nativeSetBrushTexture",
-      .signature = "(Landroid/graphics/Bitmap;)V",
+      .signature = "(I)V",
       .fnPtr = setBrushTexture,
     }, {
       .name = "exportPixels",
@@ -265,11 +270,20 @@ jint JNI_OnLoad(JavaVM* vm, void* reserved) {
       .fnPtr = compileCopyShader,
     },
   };
+  JNINativeMethod texturestaticmethods[] = {
+    {
+      .name = "init",
+      .signature = "(Landroid/graphics/Bitmap;)I",
+      .fnPtr = createTexture,
+    },
+  };
 
   jclass copyshaderstatic = (*env)->FindClass(env, "com/github/wartman4404/gldraw/CopyShader$");
   jclass pointshaderstatic = (*env)->FindClass(env, "com/github/wartman4404/gldraw/PointShader$");
+  jclass texturestatic = (*env)->FindClass(env, "com/github/wartman4404/gldraw/Texture$");
   (*env)->RegisterNatives(env, copyshaderstatic, copyshaderstaticmethods, sizeof(copyshaderstaticmethods)/sizeof(JNINativeMethod));
   (*env)->RegisterNatives(env, pointshaderstatic, pointshaderstaticmethods, sizeof(pointshaderstaticmethods)/sizeof(JNINativeMethod));
+  (*env)->RegisterNatives(env, texturestatic, texturestaticmethods, sizeof(texturestaticmethods)/sizeof(JNINativeMethod));
 
   JNINativeMethod eglhelpermethods[] = {
     {

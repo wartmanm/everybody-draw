@@ -1,9 +1,9 @@
 package com.github.wartman4404.gldraw
+import android.graphics.Bitmap
 
-class CopyShader private (private val nativePtr: Int) extends AnyVal {
-}
-class PointShader private (private val nativePtr: Int) extends AnyVal {
-}
+class CopyShader private (private val nativePtr: Int) extends AnyVal
+class PointShader private (private val nativePtr: Int) extends AnyVal
+class Texture private (private val nativePtr: Int) extends AnyVal
 
 object CopyShader {
   @native def compile(vec: String, frag: String): Int
@@ -21,6 +21,13 @@ object PointShader {
       case -1 => None
       case x => Some(new PointShader(x))
     }
+  }
+}
+
+object Texture {
+  @native def init(image: Bitmap): Int;
+  def apply(image: Bitmap): Texture = {
+    new Texture(init(image))
   }
 }
 
