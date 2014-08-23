@@ -11,7 +11,7 @@ class PaintControls(inbrushpicker: AdapterView[Adapter], inanimpicker: AdapterVi
   val animpicker = NamedPicker[CopyShader]("anim", inanimpicker)
   val brushpicker = NamedPicker[Texture]("brush", inbrushpicker)
   val paintpicker = NamedPicker[PointShader]("paint", inpaintpicker)
-  val interppicker = NamedPicker[String]("interp", ininterppicker)
+  val interppicker = NamedPicker[LuaScript]("interp", ininterppicker)
 
   val namedPickers = Array(animpicker, brushpicker, paintpicker, interppicker)
 

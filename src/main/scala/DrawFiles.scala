@@ -80,10 +80,10 @@ object DrawFiles {
     defaultShader.toSeq ++ shaders
   }
 
-  def loadScripts(c: Context): Seq[(String, String)] = {
-    val defaultShader = Some("Default Interpolator" -> null)
-    val filenamed = withFilename((Some.apply[String] _).compose(readStream _))
-    defaultShader.toSeq ++ allfiles[String](c, "interpolators").map(filenamed).flatMap(_.opt).flatten.toSeq
+  def loadScripts(c: Context): Seq[(String, LuaScript)] = {
+    val defaultScript = LuaScript(null).map(("Default Interpolator", _))
+    val filenamed = withFilename((LuaScript.apply _).compose(readStream _))
+    defaultScript.toSeq ++ allfiles[String](c, "interpolators").map(filenamed).flatMap(_.opt).flatten.toSeq
   }
 
   def halfShaderPair(shader: String) = {

@@ -1,5 +1,7 @@
 // HEEERE'S JNI!
 // I'm so sorry.  I couldn't help myself.
+//
+// TODO: fix signatures on e.g. nativeSetAnimShader
 
 /*
  * Copyright (C) 2009 The Android Open Source Project
@@ -184,10 +186,15 @@ static void jniLuaInit(JNIEnv* env, jobject thiz) {
 }
 static void jniLuaFinish(JNIEnv* env, jobject thiz) {
 }
-static void jniLuaLoadScript(JNIEnv* env, jobject thiz, jstring script) {
+static int jniLuaCompileScript(JNIEnv* env, jobject thiz, jstring script) {
   const char* scriptchars = script == NULL ? NULL : (*env)->GetStringUTFChars(env, script, NULL);
-  loadLuaScript(scriptchars);
+  int scriptid = compile_luascript(scriptchars);
   if (scriptchars != NULL) (*env)->ReleaseStringUTFChars(env, script, scriptchars);
+  return scriptid;
+}
+
+static void jniLuaSetInterpolator(JNIEnv* env, jobject thiz, jint scriptid) {
+  set_interpolator(scriptid);
 }
 
 jint JNI_OnLoad(JavaVM* vm, void* reserved) {
@@ -252,6 +259,10 @@ jint JNI_OnLoad(JavaVM* vm, void* reserved) {
       .name = "exportPixels",
       .signature = "()Landroid/graphics/Bitmap;",
       .fnPtr = exportPixels,
+    }, {
+      .name = "nativeSetInterpolator",
+      .signature = "(I)V",
+      .fnPtr = jniLuaSetInterpolator,
     }
   };
   jclass textureclass = (*env)->FindClass(env, "com/github/wartman4404/gldraw/TextureSurfaceThread");
@@ -303,28 +314,18 @@ jint JNI_OnLoad(JavaVM* vm, void* reserved) {
   jclass eglhelper = (*env)->FindClass(env, "com/github/wartman4404/gldraw/EGLHelper");
   (*env)->RegisterNatives(env, eglhelper, eglhelpermethods, sizeof(eglhelpermethods)/sizeof(JNINativeMethod));
 
-  JNINativeMethod luahelpermethods[] = {
+  JNINativeMethod luastaticmethods[] = {
     {
-      /*.name = "nativeInit",*/
-      /*.signature = "()V",*/
-      /*.fnPtr = jniLuaInit,*/
-    /*}, {*/
-      /*.name = "nativeFinish",*/
-      /*.signature = "()V",*/
-      /*.fnPtr = jniLuaFinish,*/
-    /*}, {*/
-      .name = "nativeLoadScript",
-      .signature = "(Ljava/lang/String;)V",
-      .fnPtr = jniLuaLoadScript,
-    /*}, {*/
-      /*.name = "nativeRunScript",*/
-      /*.signature = "()V",*/
-      /*.fnPtr = jniLuaRunScript,*/
+      .name = "init",
+      .signature = "(Ljava/lang/String;)I",
+      .fnPtr = jniLuaCompileScript,
     }
   };
+  jclass luastatic = (*env)->FindClass(env, "com/github/wartman4404/gldraw/LuaScript$");
+  (*env)->RegisterNatives(env, luastatic, luastaticmethods, sizeof(luastaticmethods)/sizeof(JNINativeMethod));
 
-  jclass luahelper = (*env)->FindClass(env, "com/github/wartman4404/gldraw/LuaHelper$");
-  (*env)->RegisterNatives(env, luahelper, luahelpermethods, sizeof(luahelpermethods)/sizeof(JNINativeMethod));
+  /*jclass luahelper = (*env)->FindClass(env, "com/github/wartman4404/gldraw/LuaHelper$");*/
+  /*(*env)->RegisterNatives(env, luahelper, luahelpermethods, sizeof(luahelpermethods)/sizeof(JNINativeMethod));*/
 
   return JNI_VERSION_1_2;
 }

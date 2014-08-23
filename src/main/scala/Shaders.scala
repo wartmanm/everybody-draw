@@ -4,6 +4,7 @@ import android.graphics.Bitmap
 class CopyShader private (private val nativePtr: Int) extends AnyVal
 class PointShader private (private val nativePtr: Int) extends AnyVal
 class Texture private (private val nativePtr: Int) extends AnyVal
+class LuaScript private (private val nativePtr: Int) extends AnyVal
 
 object CopyShader {
   @native def compile(vec: String, frag: String): Int
@@ -31,3 +32,12 @@ object Texture {
   }
 }
 
+object LuaScript {
+  @native def init(script: String): Int;
+  def apply(script: String): Option[LuaScript] = {
+    init(script) match {
+      case -1 => None
+      case x => Some(new LuaScript(x))
+    }
+  }
+}

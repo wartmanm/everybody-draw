@@ -28,6 +28,7 @@ extends Thread with Handler.Callback with AndroidImplicits {
   @native protected def nativeSetPointShader(shader: PointShader): Boolean
   @native protected def nativeSetBrushTexture(t: Texture): Unit
   @native protected def exportPixels(): Bitmap
+  @native protected def nativeSetInterpolator(script: LuaScript): Unit
 
   override def run() = {
     Looper.prepare()
@@ -169,7 +170,7 @@ extends Thread with Handler.Callback with AndroidImplicits {
   // only set values, could maybe run on main thread
   def setAnimShader(shader: CopyShader) = runHere { nativeSetAnimShader(shader) }
   def setPointShader(shader: PointShader) = runHere { nativeSetPointShader(shader) }
-  def setInterpScript(script: String) = runHere { LuaHelper.loadScript(script) }
+  def setInterpScript(script: LuaScript) = runHere { nativeSetInterpolator(script) }
   //unused
   def setCopyShader(shader: CopyShader) = runHere { nativeSetCopyShader(shader) }
 }

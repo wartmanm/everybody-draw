@@ -5,23 +5,27 @@
 /// use timestamps on point events, rather than Frame events, so writing can be done from one
 /// thread
 /// think about how to make shaders handle accelerated time
+///
+// TODO: remove all this duplication
 
 use core::prelude::*;
 use collections::vec::Vec;
 use collections::{Mutable, MutableSeq};
 use collections::slice::CloneableVector;
 use point::PointEntry;
-use glstore::{DrawObjectIndex, DrawObjectList, ShaderInit, BrushInit, CachedInit};
+use glstore::{DrawObjectIndex, DrawObjectList, ShaderInit, BrushInit, CachedInit, LuaInit};
 use gltexture::{Texture, PixelFormat};
 use pointshader::PointShader;
 use copyshader::CopyShader;
 use std::to_string::ToString;
+use luascript::LuaScript;
 
 enum DrawEvent {
     UseAnimShader(DrawObjectIndex<CopyShader>),
     UseCopyShader(DrawObjectIndex<CopyShader>),
     UsePointShader(DrawObjectIndex<PointShader>),
     UseBrush(DrawObjectIndex<Texture>),
+    UseInterpolator(DrawObjectIndex<LuaScript>),
     Point(PointEntry),
 }
 
@@ -32,6 +36,7 @@ pub struct Events<'a> {
     pub animshader: Option<&'a CopyShader>,
     pub copyshader: Option<&'a CopyShader>,
     pub brush: Option<&'a Texture>,
+    pub interpolator: Option<&'a LuaScript>,
 }
 
 impl<'a> Events<'a> {
@@ -43,6 +48,7 @@ impl<'a> Events<'a> {
             animshader: None,
             copyshader: None,
             brush: None,
+            interpolator: None,
         }
     }
     // FIXME: let glstore deal with optionalness
@@ -88,6 +94,20 @@ impl<'a> Events<'a> {
         self.brush = Some(brush);
         brush
     }
+    pub fn load_interpolator(&mut self, script: Option<&str>) -> Option<DrawObjectIndex<LuaScript>> {
+        let initopt: LuaInit = CachedInit::new(script.map(|x|x.to_string()));
+        //let initopt: LuaInit = CachedInit::new(initargs);
+        if initopt.get().is_some() { Some(self.objects.push_interpolator(initopt)) }
+        else { None }
+    }
+
+    pub fn use_interpolator(&'a mut self, idx: DrawObjectIndex<LuaScript>) -> &LuaScript {
+        self.eventlist.push(UseInterpolator(idx));
+        let interpolator = self.objects.get_interpolator(idx);
+        self.interpolator = Some(interpolator);
+        interpolator
+    }
+
     pub fn pushpoint(&mut self, event: PointEntry) {
         self.eventlist.push(Point(event));
     }

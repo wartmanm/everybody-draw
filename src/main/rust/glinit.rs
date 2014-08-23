@@ -19,12 +19,12 @@ use gltexture::Texture;
 use matrix;
 use eglinit;
 use dropfree::DropFree;
+use drawevent::Events;
+use glstore::DrawObjectIndex;
+use luascript::LuaScript;
 
 use collections::vec::Vec;
 
-use drawevent::Events;
-
-use glstore::DrawObjectIndex;
 
 static drawIndexes: [GLubyte, ..6] = [
     0, 1, 2,
@@ -192,15 +192,23 @@ unsafe fn compile_shader<T>(vec: *const i8, frag: *const i8,
 }
 
 #[no_mangle]
-pub unsafe fn compile_copy_shader(vec: *const i8, frag: *const i8) -> DrawObjectIndex<CopyShader> {
-    let shader = compile_shader(vec, frag, |v,f|get_safe_data().events.load_copyshader(v,f));
+pub unsafe fn compile_copy_shader(vert: *const i8, frag: *const i8) -> DrawObjectIndex<CopyShader> {
+    let shader = compile_shader(vert, frag, |v,f|get_safe_data().events.load_copyshader(v,f));
     shader.unwrap_or(mem::transmute(-1i32))
 }
 
 #[no_mangle]
-pub unsafe fn compile_point_shader(vec: *const i8, frag: *const i8) -> DrawObjectIndex<PointShader> {
-    let shader = compile_shader(vec, frag, |v,f|get_safe_data().events.load_pointshader(v,f));
+pub unsafe fn compile_point_shader(vert: *const i8, frag: *const i8) -> DrawObjectIndex<PointShader> {
+    let shader = compile_shader(vert, frag, |v,f|get_safe_data().events.load_pointshader(v,f));
     shader.unwrap_or(mem::transmute(-1i32))
+}
+
+#[no_mangle]
+pub unsafe fn compile_luascript(luachars: *const i8) -> DrawObjectIndex<LuaScript> {
+    let script = with_cstr_as_str(luachars, |luastr| {
+        get_safe_data().events.load_interpolator(luastr)
+    });
+    script.unwrap_or(mem::transmute(-1i32))
 }
 
 // TODO: make an enum for these with a scala counterpart
@@ -222,6 +230,12 @@ pub unsafe fn set_anim_shader(shader: DrawObjectIndex<CopyShader>) -> () {
 pub unsafe fn set_point_shader(shader: DrawObjectIndex<PointShader>) -> () {
     logi("setting point shader");
     get_safe_data().events.use_pointshader(shader);
+}
+
+#[no_mangle]
+pub unsafe fn set_interpolator(interpolator: DrawObjectIndex<LuaScript>) -> () {
+    logi("setting interpolator");
+    get_safe_data().events.use_interpolator(interpolator);
 }
 
 #[no_mangle]
@@ -251,13 +265,13 @@ pub extern fn setup_graphics(w: i32, h: i32) -> bool {
 #[no_mangle]
 pub extern fn draw_queued_points(matrix: *mut f32) {
     let data = get_safe_data();
-    match (data.events.pointshader, data.events.brush) {
-        (Some(point_shader), Some(brush)) => {
+    match (data.events.pointshader, data.events.brush, data.events.interpolator) {
+        (Some(point_shader), Some(brush), Some(interpolator)) => {
             gl2::enable(gl2::BLEND);
             gl2::blend_func(gl2::SRC_ALPHA, gl2::ONE_MINUS_SRC_ALPHA);
             let (target, source) = get_texturetargets(data);
             // TODO: brush color selection
-            draw_path(target.framebuffer, point_shader, matrix, [1f32, 1f32, 0f32],
+            draw_path(target.framebuffer, point_shader, interpolator, matrix, [1f32, 1f32, 0f32],
                       brush, &source.texture);
 
             eglinit::egl_swap();
