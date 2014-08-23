@@ -107,11 +107,11 @@ fn append_points(a: ShaderPaintPoint, b: ShaderPaintPoint, c: &mut Vec<ShaderPai
 
 pub fn draw_path(framebuffer: GLuint, shader: &PointShader, matrix: *mut f32, color: [f32, ..3], brush: &Texture, backBuffer: &Texture) -> () {
     let s = get_statics();
+    s.drawvec.clear();
+
+    run_lua_shader(backBuffer.dimensions, s);
+
     let ref mut pointvec = s.drawvec;
-    pointvec.clear();
-
-    run_lua_shader(backBuffer.dimensions, pointvec);
-
     if pointvec.len() > 0 {
         bind_framebuffer(FRAMEBUFFER, framebuffer);
         let safe_matrix: &Matrix = unsafe { mem::transmute(matrix) };
@@ -122,8 +122,7 @@ pub fn draw_path(framebuffer: GLuint, shader: &PointShader, matrix: *mut f32, co
 }
 
 #[no_mangle]
-pub extern "C" fn next_point_from_lua(points: &mut (ShaderPaintPoint, ShaderPaintPoint)) -> bool {
-    let s = get_statics();
+pub extern "C" fn next_point_from_lua(s: &mut RustStatics, points: &mut (ShaderPaintPoint, ShaderPaintPoint)) -> bool {
     let ref mut queue = s.consumer;
     let ref mut currentPoints = s.currentPoints;
     loop {
@@ -181,21 +180,21 @@ pub extern "C" fn next_point_from_lua(points: &mut (ShaderPaintPoint, ShaderPain
     }
 }
 
-fn run_lua_shader(dimensions: (i32, i32), output: &mut Vec<ShaderPaintPoint>) {
+fn run_lua_shader(dimensions: (i32, i32), statics: &mut RustStatics) {
     let (x,y) = dimensions;
     unsafe {
-        doInterpolateLua(x, y, output);
+        doInterpolateLua(x, y, statics);
     }
 }
 
 
 #[allow(non_snake_case_functions)]
 extern "C" {
-    pub fn doInterpolateLua(x: i32, y: i32, output: *mut Vec<ShaderPaintPoint>);
+    pub fn doInterpolateLua(x: i32, y: i32, statics: *mut RustStatics);
 }
 
 #[no_mangle]
-pub unsafe extern "C" fn pushrustvec(vec: &mut Vec<ShaderPaintPoint>, point: *const ShaderPaintPoint) {
-    vec.push(*point);
+pub unsafe extern "C" fn pushrustvec(statics: &mut RustStatics, point: *const ShaderPaintPoint) {
+    statics.drawvec.push(*point);
 }
 
