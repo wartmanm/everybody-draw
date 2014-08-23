@@ -42,6 +42,13 @@ struct RustStatics {
     pointCounter: i32,
 }
 
+#[allow(dead_code)]
+pub struct PointPair {
+    exists: u8,
+    prev: ShaderPaintPoint,
+    current: ShaderPaintPoint,
+}
+
 static mut dataRef: DropFree<RustStatics> = DropFree(0 as *mut RustStatics);
 static mut pathinit: Once = ONCE_INIT;
 
@@ -107,14 +114,25 @@ fn append_points(a: ShaderPaintPoint, b: ShaderPaintPoint, c: &mut Vec<ShaderPai
 
 pub fn draw_path(framebuffer: GLuint, shader: &PointShader, matrix: *mut f32, color: [f32, ..3], brush: &Texture, backBuffer: &Texture) -> () {
     let s = get_statics();
-    let ref mut queue = s.consumer;
-    let ref mut currentPoints = s.currentPoints;
-
     let ref mut pointvec = s.drawvec;
     pointvec.clear();
 
-    let mut pointCounter = s.pointCounter;
+    run_lua_shader(backBuffer.dimensions, pointvec);
 
+    if pointvec.len() > 0 {
+        bind_framebuffer(FRAMEBUFFER, framebuffer);
+        let safe_matrix: &Matrix = unsafe { mem::transmute(matrix) };
+        shader.prep(safe_matrix.as_slice(), pointvec.as_slice(), color, brush, backBuffer);
+        draw_arrays(POINTS, 0, pointvec.len() as i32);
+        check_gl_error("draw_arrays");
+    }
+}
+
+#[no_mangle]
+pub extern "C" fn next_point_from_lua() -> PointPair {
+    let s = get_statics();
+    let ref mut queue = s.consumer;
+    let ref mut currentPoints = s.currentPoints;
     loop {
         match queue.pop() {
             Some(point) => {
@@ -141,15 +159,15 @@ pub fn draw_path(framebuffer: GLuint, shader: &PointShader, matrix: *mut f32, co
                             distance: op.distance + dist,
                             counter: op.counter,
                         };
-                        interpolate_lua_from_rust(op, npdata, backBuffer.dimensions, pointvec);
                         oldpoint.info = Some(npdata);
+                        return PointPair { exists: 1, prev: op, current: npdata };
                     },
                     (_, point::Stop) => {
                         oldpoint.info = None;
                     },
                     (_, point::Point(p)) => {
-                        let oldCounter = pointCounter;
-                        pointCounter += 1;
+                        let oldCounter = s.pointCounter;
+                        s.pointCounter += 1;
                         oldpoint.info = Some(ShaderPaintPoint {
                             pos: p.pos,
                             time: p.time,
@@ -158,38 +176,30 @@ pub fn draw_path(framebuffer: GLuint, shader: &PointShader, matrix: *mut f32, co
                             speed: 0f32,
                             counter: oldCounter as f32,
                         });
+
                     },
                 }
             },
-            None => { break; },
+            None => { return unsafe { PointPair { exists: 0, prev: mem::zeroed(), current: mem::zeroed() } } }
         }
     }
-
-    if pointvec.len() > 0 {
-        bind_framebuffer(FRAMEBUFFER, framebuffer);
-        let safe_matrix: &Matrix = unsafe { mem::transmute(matrix) };
-        shader.prep(safe_matrix.as_slice(), pointvec.as_slice(), color, brush, backBuffer);
-        draw_arrays(POINTS, 0, pointvec.len() as i32);
-        check_gl_error("draw_arrays");
-    }
-
-    s.pointCounter = pointCounter;
 }
+
+fn run_lua_shader(dimensions: (i32, i32), output: &mut Vec<ShaderPaintPoint>) {
+    let (x,y) = dimensions;
+    unsafe {
+        doInterpolateLua(x, y, output);
+    }
+}
+
 
 #[allow(non_snake_case_functions)]
 extern "C" {
-    pub fn doInterpolateLua(startpoint: *const ShaderPaintPoint, endpoint: *const ShaderPaintPoint, x: i32, y: i32, output: *mut Vec<ShaderPaintPoint>);
+    pub fn doInterpolateLua(x: i32, y: i32, output: *mut Vec<ShaderPaintPoint>);
 }
 
 #[no_mangle]
 pub unsafe extern "C" fn pushrustvec(vec: &mut Vec<ShaderPaintPoint>, point: *const ShaderPaintPoint) {
     vec.push(*point);
-}
-
-fn interpolate_lua_from_rust(a: ShaderPaintPoint, b: ShaderPaintPoint, dimensions: (i32, i32), output: &mut Vec<ShaderPaintPoint>) -> () {
-    unsafe {
-        let (x,y) = dimensions;
-        doInterpolateLua(&a, &b, x, y, output);
-    }
 }
 

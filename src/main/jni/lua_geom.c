@@ -22,13 +22,25 @@ static const char *lua_ffi_script =
 "    float distance;\n"
 "    float counter;\n"
 "  };\n"
+"  struct PointPair {\n"
+"    char exists;\n"
+"    struct ShaderPaintPoint prev;\n"
+"    struct ShaderPaintPoint current;\n"
+"  };\n"
+"\n"
 "  void pushrustvec(void *vec, struct ShaderPaintPoint *point);\n"
+"  struct PointPair next_point_from_lua();\n"
 "\n"
 "]]\n"
-"function runmain(aptr, bptr, x, y, points, main)\n"
-"  local a = ffi.cast(\"struct ShaderPaintPoint*\", aptr);\n"
-"  local b = ffi.cast(\"struct ShaderPaintPoint*\", bptr);\n"
-"  main(a, b, x, y, points)\n"
+"function runmain(x, y, points, main)\n"
+"  while true do\n"
+"    local points = ffi.C.next_point_from_lua();\n"
+"    if points.exists then\n"
+"      main(points.prev, points.current, x, y, points)\n"
+"    else\n"
+"      break\n"
+"    end\n"
+"  end\n"
 "end\n"
 "pushpoint=ffi.C.pushrustvec\n"
 "ShaderPaintPoint=ffi.typeof(\"struct ShaderPaintPoint\")\n"
@@ -90,17 +102,15 @@ void loadLuaScript(const char *script) {
 }
 
 // TODO: would it be better to register a callback from lua?
-static void interpolateLua(lua_State *L, struct ShaderPaintPoint *startpoint, struct ShaderPaintPoint *endpoint, int x, int y, void *output) {
+static void interpolateLua(lua_State *L, int x, int y, void *output) {
   lua_getglobal(L, "runmain");
-  
-  lua_pushlightuserdata(L, startpoint);
-  lua_pushlightuserdata(L, endpoint);
+
   lua_pushnumber(L, (float)x);
   lua_pushnumber(L, (float)y);
   lua_pushlightuserdata(L, output);
   lua_getglobal(L, "main");
 
-  if (lua_pcall(L, 6, 0, 0) != 0) {
+  if (lua_pcall(L, 4, 0, 0) != 0) {
     LOGE("script failed to run :(");
     const char *msg = lua_tostring(L, -1);
     LOGE("got error message: %s", msg);
@@ -108,7 +118,7 @@ static void interpolateLua(lua_State *L, struct ShaderPaintPoint *startpoint, st
   }
 }
 
-void doInterpolateLua(struct ShaderPaintPoint *startpoint, struct ShaderPaintPoint *endpoint, int x, int y, void *output) {
+void doInterpolateLua(int x, int y, void *output) {
   if (L == NULL) return;
-  interpolateLua(L, startpoint, endpoint, x, y, output);
+  interpolateLua(L, x, y, output);
 }

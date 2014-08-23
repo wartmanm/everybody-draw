@@ -17,3 +17,9 @@ struct ShaderPaintPoint {
   float distance;
   float counter;
 };
+
+struct PointPair {
+  char exists;
+  struct ShaderPaintPoint prev;
+  struct ShaderPaintPoint current;
+};
