@@ -3,7 +3,8 @@ PLATFORM_PATH := $(ANDROID_NDK_ROOT)/platforms/${PLATFORM_NAME}/arch-arm
 
 RUST_FILES := copyshader.rs glcommon.rs glinit.rs glpoint.rs\
 						 motionevent.rs pointshader.rs point.rs gltexture.rs\
-						 rollingaverage.rs macros.rs matrix.rs eglinit.rs
+						 rollingaverage.rs macros.rs matrix.rs eglinit.rs\
+						 drawevent.rs glstore.rs
 
 RUST_LIBS := opengles egl
 

@@ -183,7 +183,7 @@ unsafe fn with_cstr_as_str<T>(ptr: *const i8, callback: |Option<&str>|->T)->T {
 }
 
 unsafe fn compile_shader<T>(vec: *const i8, frag: *const i8, 
-                 callback: |Option<&str>, Option<&str>| -> Option<T>) -> Option<T> {
+                 callback: |Option<&str>, Option<&str>| -> T) -> T {
     // note that this will use the default shader in case of non-utf8 chars
     // also, must be separate lines b/c ownership
     with_cstr_as_str(vec, |vecstr| with_cstr_as_str(frag, |fragstr| {
@@ -192,28 +192,28 @@ unsafe fn compile_shader<T>(vec: *const i8, frag: *const i8,
 }
 
 #[no_mangle]
-pub unsafe fn compile_copy_shader(vert: *const i8, frag: *const i8) -> DrawObjectIndex<CopyShader> {
+pub unsafe fn compile_copy_shader(vert: *const i8, frag: *const i8) -> DrawObjectIndex<Option<CopyShader>> {
     let shader = compile_shader(vert, frag, |v,f|get_safe_data().events.load_copyshader(v,f));
-    shader.unwrap_or(mem::transmute(-1i32))
+    shader
 }
 
 #[no_mangle]
-pub unsafe fn compile_point_shader(vert: *const i8, frag: *const i8) -> DrawObjectIndex<PointShader> {
+pub unsafe fn compile_point_shader(vert: *const i8, frag: *const i8) -> DrawObjectIndex<Option<PointShader>> {
     let shader = compile_shader(vert, frag, |v,f|get_safe_data().events.load_pointshader(v,f));
-    shader.unwrap_or(mem::transmute(-1i32))
+    shader
 }
 
 #[no_mangle]
-pub unsafe fn compile_luascript(luachars: *const i8) -> DrawObjectIndex<LuaScript> {
+pub unsafe fn compile_luascript(luachars: *const i8) -> DrawObjectIndex<Option<LuaScript>> {
     let script = with_cstr_as_str(luachars, |luastr| {
         get_safe_data().events.load_interpolator(luastr)
     });
-    script.unwrap_or(mem::transmute(-1i32))
+    script
 }
 
 // TODO: make an enum for these with a scala counterpart
 #[no_mangle]
-pub unsafe fn set_copy_shader(shader: DrawObjectIndex<CopyShader>) -> () {
+pub unsafe fn set_copy_shader(shader: DrawObjectIndex<Option<CopyShader>>) -> () {
     logi("setting copy shader");
     get_safe_data().events.use_copyshader(shader);
 }
@@ -221,19 +221,19 @@ pub unsafe fn set_copy_shader(shader: DrawObjectIndex<CopyShader>) -> () {
 // these can also be null to unset the shader
 // TODO: document better from scala side
 #[no_mangle]
-pub unsafe fn set_anim_shader(shader: DrawObjectIndex<CopyShader>) -> () {
+pub unsafe fn set_anim_shader(shader: DrawObjectIndex<Option<CopyShader>>) -> () {
     logi("setting anim shader");
     get_safe_data().events.use_animshader(shader);
 }
 
 #[no_mangle]
-pub unsafe fn set_point_shader(shader: DrawObjectIndex<PointShader>) -> () {
+pub unsafe fn set_point_shader(shader: DrawObjectIndex<Option<PointShader>>) -> () {
     logi("setting point shader");
     get_safe_data().events.use_pointshader(shader);
 }
 
 #[no_mangle]
-pub unsafe fn set_interpolator(interpolator: DrawObjectIndex<LuaScript>) -> () {
+pub unsafe fn set_interpolator(interpolator: DrawObjectIndex<Option<LuaScript>>) -> () {
     logi("setting interpolator");
     get_safe_data().events.use_interpolator(interpolator);
 }

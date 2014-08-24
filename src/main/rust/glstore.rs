@@ -5,6 +5,8 @@
 /// TODO: further backing store, caching init objs by sha1 or so
 /// TODO: free shaders + textures on gl pause
 /// TODO: cleanup, deduplication
+///
+/// more importantly, switch to a map and return keys, rather than using indices
 
 use core::prelude::*;
 use core::cell::UnsafeCell;
@@ -17,11 +19,8 @@ use pointshader::PointShader;
 use glcommon::Shader;
 use luascript::LuaScript;
 
-pub struct DrawObjectList {
-    copyshaderlist: Vec<ShaderInit<CopyShader>>,
-    pointshaderlist: Vec<ShaderInit<PointShader>>,
-    brushlist: Vec<BrushInit>,
-    interplist: Vec<LuaInit>,
+pub struct DrawObjectList<T, Init> {
+    list: Vec<CachedInit<T, Init>>,
 }
 
 pub struct DrawObjectIndex<T>(i32);
@@ -89,48 +88,20 @@ impl InitFromCache<LuaInitValues> for Option<LuaScript> {
     }
 }
 
-impl DrawObjectList {
-    pub fn new() -> DrawObjectList {
+impl<T: InitFromCache<Init>, Init> DrawObjectList<T, Init> {
+    pub fn new() -> DrawObjectList<T, Init> {
         DrawObjectList {
-            copyshaderlist: Vec::new(),
-            pointshaderlist: Vec::new(),
-            brushlist: Vec::new(),
-            interplist: Vec::new(),
+            list: Vec::new()
         }
     }
 
-    pub fn push_copyshader(&mut self, shader: ShaderInit<CopyShader>) -> DrawObjectIndex<CopyShader> {
-        self.copyshaderlist.push(shader);
-        DrawObjectIndex((self.copyshaderlist.len() - 1) as i32)
-    }
-    pub fn push_pointshader(&mut self, shader: ShaderInit<PointShader>) -> DrawObjectIndex<PointShader> {
-        self.pointshaderlist.push(shader);
-        DrawObjectIndex((self.copyshaderlist.len() - 1) as i32)
-    }
-    pub fn push_brush(&mut self, brush: BrushInit) -> DrawObjectIndex<Texture> {
-        self.brushlist.push(brush);
-        DrawObjectIndex((self.brushlist.len() - 1) as i32)
-    }
-    pub fn push_interpolator(&mut self, interpolator: LuaInit) -> DrawObjectIndex<LuaScript> {
-        self.interplist.push(interpolator);
-        DrawObjectIndex((self.interplist.len() -1) as i32)
+    pub fn push_object(&mut self, init: CachedInit<T, Init>) -> DrawObjectIndex<T> {
+        self.list.push(init);
+        DrawObjectIndex((self.list.len() -1) as i32)
     }
 
-    // FIXME: push optionalness out elsewhere
-    pub fn get_copyshader(&self, i: DrawObjectIndex<CopyShader>) -> &CopyShader {
+    pub fn get_object(&self, i: DrawObjectIndex<T>) -> &T {
         let DrawObjectIndex(idx) = i;
-        self.copyshaderlist[idx as uint].get().as_ref().unwrap()
-    }
-    pub fn get_pointshader(&self, i: DrawObjectIndex<PointShader>) -> &PointShader {
-        let DrawObjectIndex(idx) = i;
-        self.pointshaderlist[idx as uint].get().as_ref().unwrap()
-    }
-    pub fn get_brush(&self, i: DrawObjectIndex<Texture>) -> &Texture {
-        let DrawObjectIndex(idx) = i;
-        self.brushlist[idx as uint].get()
-    }
-    pub fn get_interpolator(&self, i: DrawObjectIndex<LuaScript>) -> &LuaScript {
-        let DrawObjectIndex(idx) = i;
-        self.interplist[idx as uint].get().as_ref().unwrap()
+        self.list[idx as uint].get()
     }
 }
