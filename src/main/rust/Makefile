@@ -1,4 +1,4 @@
-RUST_FLAGS := --target=${TARGET_TRIPLE} --out-dir=${OUT_DIR} --opt-level=3
+RUST_FLAGS := --target=${TARGET_TRIPLE} --out-dir=${OUT_DIR} -g
 PLATFORM_PATH := $(ANDROID_NDK_ROOT)/platforms/${PLATFORM_NAME}/arch-arm
 
 RUST_FILES := copyshader.rs glcommon.rs glinit.rs glpoint.rs\

@@ -1,6 +1,7 @@
 //extern crate core;
 use core::prelude::*;
 use core::mem;
+use core::slice;
 
 use std::sync::{Once, ONCE_INIT, spsc_queue};
 
@@ -78,6 +79,7 @@ fn manhattan_distance(a: Coordinate, b: Coordinate) -> f32 {
     return if x > y { x } else { y };
 }
 
+#[allow(dead_code)]
 fn append_points(a: ShaderPaintPoint, b: ShaderPaintPoint, c: &mut Vec<ShaderPaintPoint>, count: uint) -> () {
     // transform seconds from [0..timescale] to [0..1]
     // this is done here to avoid rollover resulting in negative steptime
@@ -105,14 +107,24 @@ fn append_points(a: ShaderPaintPoint, b: ShaderPaintPoint, c: &mut Vec<ShaderPai
 
 pub fn draw_path(framebuffer: GLuint, shader: &PointShader, matrix: *mut f32, color: [f32, ..3], brush: &Texture, backBuffer: &Texture) -> () {
     let s = get_statics();
-    let ref mut queue = s.consumer;
-    let ref mut currentPoints = s.currentPoints;
+    s.drawvec.clear();
+
+    run_lua_shader(backBuffer.dimensions, s);
 
     let ref mut pointvec = s.drawvec;
-    pointvec.clear();
+    if pointvec.len() > 0 {
+        bind_framebuffer(FRAMEBUFFER, framebuffer);
+        let safe_matrix: &Matrix = unsafe { mem::transmute(matrix) };
+        shader.prep(safe_matrix.as_slice(), pointvec.as_slice(), color, brush, backBuffer);
+        draw_arrays(POINTS, 0, pointvec.len() as i32);
+        check_gl_error("draw_arrays");
+    }
+}
 
-    let mut pointCounter = s.pointCounter;
-
+#[no_mangle]
+pub extern "C" fn next_point_from_lua(s: &mut RustStatics, points: &mut (ShaderPaintPoint, ShaderPaintPoint)) -> bool {
+    let ref mut queue = s.consumer;
+    let ref mut currentPoints = s.currentPoints;
     loop {
         match queue.pop() {
             Some(point) => {
@@ -129,7 +141,6 @@ pub fn draw_path(framebuffer: GLuint, shader: &PointShader, matrix: *mut f32, co
                 match (oldpoint.info, newpoint) {
                     (Some(op), point::Point(np)) => {
                         let dist = manhattan_distance(op.pos, np.pos);
-                        let pointcount = if dist < 1f32 { 1 } else { dist as uint };
                         let avgsize = oldpoint.sizeavg.push(np.size);
                         let avgspeed = oldpoint.speedavg.push(dist);
                         let npdata = ShaderPaintPoint {
@@ -140,15 +151,16 @@ pub fn draw_path(framebuffer: GLuint, shader: &PointShader, matrix: *mut f32, co
                             distance: op.distance + dist,
                             counter: op.counter,
                         };
-                        append_points(op, npdata, pointvec, pointcount);
                         oldpoint.info = Some(npdata);
+                        *points = (op, npdata);
+                        return true;
                     },
                     (_, point::Stop) => {
                         oldpoint.info = None;
                     },
                     (_, point::Point(p)) => {
-                        let oldCounter = pointCounter;
-                        pointCounter += 1;
+                        let oldCounter = s.pointCounter;
+                        s.pointCounter += 1;
                         oldpoint.info = Some(ShaderPaintPoint {
                             pos: p.pos,
                             time: p.time,
@@ -157,20 +169,32 @@ pub fn draw_path(framebuffer: GLuint, shader: &PointShader, matrix: *mut f32, co
                             speed: 0f32,
                             counter: oldCounter as f32,
                         });
+
                     },
                 }
             },
-            None => { break; },
+            None => {
+                return false;
+            }
         }
     }
-
-    if pointvec.len() > 0 {
-        bind_framebuffer(FRAMEBUFFER, framebuffer);
-        let safe_matrix: &Matrix = unsafe { mem::transmute(matrix) };
-        shader.prep(safe_matrix.as_slice(), pointvec.as_slice(), color, brush, backBuffer);
-        draw_arrays(POINTS, 0, pointvec.len() as i32);
-        check_gl_error("draw_arrays");
-    }
-
-    s.pointCounter = pointCounter;
 }
+
+fn run_lua_shader(dimensions: (i32, i32), statics: &mut RustStatics) {
+    let (x,y) = dimensions;
+    unsafe {
+        doInterpolateLua(x, y, statics);
+    }
+}
+
+
+#[allow(non_snake_case_functions)]
+extern "C" {
+    pub fn doInterpolateLua(x: i32, y: i32, statics: *mut RustStatics);
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn pushrustvec(statics: &mut RustStatics, point: *const ShaderPaintPoint) {
+    statics.drawvec.push(*point);
+}
+

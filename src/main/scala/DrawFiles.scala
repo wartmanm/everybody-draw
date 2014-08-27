@@ -79,6 +79,12 @@ object DrawFiles {
     defaultShader.toSeq ++ shaders
   }
 
+  def loadScripts(c: Context): Seq[(String, String)] = {
+    val defaultShader = Some("Default Interpolator" -> null)
+    val filenamed = withFilename((Some.apply[String] _).compose(readStream _))
+    defaultShader.toSeq ++ allfiles[String](c, "interpolators").map(filenamed).flatMap(_.opt).flatten.toSeq
+  }
+
   def halfShaderPair(shader: String) = {
     if (shader.contains("gl_Position")) Some((shader, null))
       else if (shader.contains("gl_FragColor")) Some((null, shader))

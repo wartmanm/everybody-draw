@@ -8,12 +8,12 @@ uniform sampler2D backbuffer;
 uniform vec2 texturesize;
 uniform mat4 textureMatrix;
 void main() {
-  vec2 scale = (vec2(size) / texturesize);
-  vec2 coord = gl_PointCoord -0.5;
-  vec2 point = coord * scale;
-  vec2 trueposition = position / 2.0 + 0.5;
-  vec2 uv = trueposition + vec2(point.x, -point.y);
+  vec2 uv = vec2(gl_FragCoord * textureMatrix) * vec2(0.5, -0.5);
+  vec3 old = vec3(texture2D(backbuffer, uv));
   float alpha = texture2D(texture, gl_PointCoord).a;
-  vec3 color = vec3(1.0) - vec3(texture2D(backbuffer, uv));
-  gl_FragColor = vec4(color, alpha);
+  // I have absolutely no idea why these must be done separately, but it's the only approach that works
+  float ir = 1.0 - old.r;
+  float ig = 1.0 - old.g;
+  float ib = 1.0 - old.b;
+  gl_FragColor = vec4(ir, ig, ib, alpha);
 }

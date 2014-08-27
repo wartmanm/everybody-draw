@@ -1,6 +1,7 @@
 #include <android/input.h>
 #include <android/bitmap.h>
 #include <android/native_window_jni.h>
+#include "lua/lua.h"
 
 int setup_graphics(int w, int h);
 void render_frame();
@@ -12,7 +13,7 @@ void set_anim_shader(void* shader);
 void set_copy_shader(void* shader);
 void set_point_shader(void* shader);
 
-void set_brush_texture(int width, int height, const char *pixels);
+void set_brush_texture(int width, int height, const char *pixels, int format);
 
 void clear_buffer();
 
@@ -36,3 +37,6 @@ void release_pixels(const char *pixels);
 void egl_init(void *window);
 void egl_swap();
 void egl_finish();
+
+lua_State *initLua();
+void loadLuaScript(const char *script);

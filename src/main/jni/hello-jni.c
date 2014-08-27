@@ -102,7 +102,7 @@ static void setBrushTexture(JNIEnv* env, jobject thiz, jobject bitmap) {
   AndroidBitmap_getInfo(env, bitmap, &info);
   void *pixels;
   AndroidBitmap_lockPixels(env, bitmap, &pixels);
-  set_brush_texture(info.width, info.height, pixels);
+  set_brush_texture(info.width, info.height, pixels, info.format);
   AndroidBitmap_unlockPixels(env, bitmap);
 }
 
@@ -183,6 +183,15 @@ static void jniEglInit(JNIEnv* env, jobject thiz, jobject surface) {
   ANativeWindow_release(window);
 }
 
+static void jniLuaInit(JNIEnv* env, jobject thiz) {
+}
+static void jniLuaFinish(JNIEnv* env, jobject thiz) {
+}
+static void jniLuaLoadScript(JNIEnv* env, jobject thiz, jstring script) {
+  const char* scriptchars = script == NULL ? NULL : (*env)->GetStringUTFChars(env, script, NULL);
+  loadLuaScript(scriptchars);
+  if (scriptchars != NULL) (*env)->ReleaseStringUTFChars(env, script, scriptchars);
+}
 
 jint JNI_OnLoad(JavaVM* vm, void* reserved) {
   JNIEnv *env;
@@ -296,6 +305,29 @@ jint JNI_OnLoad(JavaVM* vm, void* reserved) {
   };
   jclass eglhelper = (*env)->FindClass(env, "com/github/wartman4404/gldraw/EGLHelper");
   (*env)->RegisterNatives(env, eglhelper, eglhelpermethods, sizeof(eglhelpermethods)/sizeof(JNINativeMethod));
+
+  JNINativeMethod luahelpermethods[] = {
+    {
+      /*.name = "nativeInit",*/
+      /*.signature = "()V",*/
+      /*.fnPtr = jniLuaInit,*/
+    /*}, {*/
+      /*.name = "nativeFinish",*/
+      /*.signature = "()V",*/
+      /*.fnPtr = jniLuaFinish,*/
+    /*}, {*/
+      .name = "nativeLoadScript",
+      .signature = "(Ljava/lang/String;)V",
+      .fnPtr = jniLuaLoadScript,
+    /*}, {*/
+      /*.name = "nativeRunScript",*/
+      /*.signature = "()V",*/
+      /*.fnPtr = jniLuaRunScript,*/
+    }
+  };
+
+  jclass luahelper = (*env)->FindClass(env, "com/github/wartman4404/gldraw/LuaHelper$");
+  (*env)->RegisterNatives(env, luahelper, luahelpermethods, sizeof(luahelpermethods)/sizeof(JNINativeMethod));
 
   return JNI_VERSION_1_2;
 }

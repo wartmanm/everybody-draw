@@ -40,7 +40,8 @@ class MainActivity extends Activity with TypedActivity with AndroidImplicits {
   lazy val controls = new PaintControls(
     inbrushpicker = findView(TR.brushpicker).asInstanceOf[AdapterView[Adapter]],
     inanimpicker = findView(TR.animpicker).asInstanceOf[AdapterView[Adapter]],
-    inpaintpicker = findView(TR.paintpicker).asInstanceOf[AdapterView[Adapter]])
+    inpaintpicker = findView(TR.paintpicker).asInstanceOf[AdapterView[Adapter]],
+    ininterppicker = findView(TR.interppicker).asInstanceOf[AdapterView[Adapter]])
 
   lazy val clearbutton = findView(TR.clearbutton)
   lazy val loadbutton = findView(TR.loadbutton)
@@ -95,6 +96,7 @@ class MainActivity extends Activity with TypedActivity with AndroidImplicits {
   override def onCreate(bundle: Bundle) {
     Log.i("main", "oncreate")
     System.loadLibrary("gl-stuff")
+
     super.onCreate(bundle)
     setContentView(R.layout.activity_main)
 
@@ -253,7 +255,8 @@ class MainActivity extends Activity with TypedActivity with AndroidImplicits {
         val brushes = DrawFiles.loadBrushes(this).map(SpinnerItem(_)).toArray
         val anims = DrawFiles.loadAnimShaders(this).map(SpinnerItem(_)).toArray
         val paints = DrawFiles.loadPointShaders(this).map(SpinnerItem(_)).toArray
-        Log.i("main", s"got ${brushes.length} brushes, ${anims.length} anims, ${paints.length} paints")
+        val interpscripts = DrawFiles.loadScripts(this).map(SpinnerItem(_)).toArray
+        Log.i("main", s"got ${brushes.length} brushes, ${anims.length} anims, ${paints.length} paints, ${interpscripts.length} interpolation scripts")
 
         animshaders = anims
         paintshaders = paints
@@ -263,9 +266,10 @@ class MainActivity extends Activity with TypedActivity with AndroidImplicits {
             populatePicker(controls.brushpicker, brushes,  thread.setBrushTexture _)
             populatePicker(controls.animpicker, anims,  thread.setAnimShader _)
             populatePicker(controls.paintpicker, paints,  thread.setPointShader _)
+            populatePicker(controls.interppicker, interpscripts,  thread.setInterpScript _)
           })
-        }
       }
+    }
   }
 
   override def onCreateOptionsMenu(menu: Menu): Boolean = {
