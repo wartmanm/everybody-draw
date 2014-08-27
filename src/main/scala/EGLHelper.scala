@@ -7,7 +7,6 @@ class EGLHelper {
   private var surface: Surface = null
 
   @native def nativeInit(surface: Surface): Unit
-  @native def swap(): Unit
   @native def nativeFinish(): Unit
 
 

@@ -167,10 +167,6 @@ static jobject exportPixels(JNIEnv* env, jobject thiz) {
     return bitmap;
 }
 
-static void jniEglSwap(JNIEnv* env, jobject thiz) {
-  egl_swap();
-}
-
 static void jniEglFinish(JNIEnv* env, jobject thiz) {
   egl_finish();
 }
@@ -298,10 +294,6 @@ jint JNI_OnLoad(JavaVM* vm, void* reserved) {
 
   JNINativeMethod eglhelpermethods[] = {
     {
-      .name = "swap",
-      .signature = "()V",
-      .fnPtr = jniEglSwap,
-    }, {
       .name = "nativeFinish",
       .signature = "()V",
       .fnPtr = jniEglFinish,
