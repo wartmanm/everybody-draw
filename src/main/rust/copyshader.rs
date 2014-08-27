@@ -7,8 +7,8 @@ use opengles::gl2::{GLint, GLuint, GLfloat};
 use log::{logi,loge};
 
 use glcommon;
-use glcommon::{check_gl_error, get_shader_handle, get_uniform_handle_option};
-use gltexture::Texture;
+use glcommon::{check_gl_error, get_shader_handle, get_uniform_handle_option, Shader};
+use gltexture::{Texture};
     
 static gTriangleVertices: [GLfloat, ..8] = [
    -1.0,  1.0,
@@ -57,8 +57,8 @@ pub struct CopyShader {
     matrixHandle: GLint,
 }
 
-impl CopyShader {
-    pub fn new(vertopt: Option<&str>, fragopt: Option<&str>) -> Option<CopyShader> {
+impl Shader for CopyShader {
+    fn new(vertopt: Option<&str>, fragopt: Option<&str>) -> Option<CopyShader> {
         let vert = vertopt.unwrap_or_else(|| { logi("copy shader: using default vertex shader"); default_vertex_shader});
         let frag = fragopt.unwrap_or_else(|| { logi("copy shader: using default fragment shader"); default_fragment_shader});
         let programOption = glcommon::create_program(vert, frag);
@@ -90,7 +90,9 @@ impl CopyShader {
             }
         }
     }
+}
 
+impl CopyShader {
     pub fn prep(&self, texture: &Texture, matrix: &[f32]) {
         gl2::use_program(self.program);
         check_gl_error("copyshader: use_program");

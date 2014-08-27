@@ -28,3 +28,6 @@ pub mod point;
 pub mod rollingaverage;
 pub mod matrix;
 pub mod dropfree;
+pub mod drawevent;
+pub mod glstore;
+pub mod luascript;

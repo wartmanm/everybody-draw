@@ -1,7 +1,7 @@
 use core::prelude::*;
 
 use opengles::gl2;
-use opengles::gl2::{GLint, GLuint};
+use opengles::gl2::GLuint;
 
 use glcommon::check_gl_error;
 

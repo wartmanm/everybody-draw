@@ -1,5 +1,7 @@
 // HEEERE'S JNI!
 // I'm so sorry.  I couldn't help myself.
+//
+// TODO: fix signatures on e.g. nativeSetAnimShader
 
 /*
  * Copyright (C) 2009 The Android Open Source Project
@@ -76,56 +78,53 @@ static void nativeAppendMotionEvent(JNIEnv* env, jobject thiz, jobject evtobj) {
   jni_append_motion_event(evtptr);
 }
 
-static void* shaderStrObjects(JNIEnv* env, jstring vec, jstring frag, void* callback(const char* vec, const char* frag)) {
+static int shaderStrObjects(JNIEnv* env, jstring vec, jstring frag, int callback(const char* vec, const char* frag)) {
   const char* vecstr = vec == NULL ? NULL : (*env)->GetStringUTFChars(env, vec, NULL);
   const char* fragstr = frag == NULL ? NULL : (*env)->GetStringUTFChars(env, frag, NULL);
-  void* ret = callback(vecstr, fragstr);
+  int ret = callback(vecstr, fragstr);
   if (vecstr != NULL) (*env)->ReleaseStringUTFChars(env, vec, vecstr);
   if (fragstr != NULL) (*env)->ReleaseStringUTFChars(env, frag, fragstr);
   return ret;
 }
 
 static void setAnimShader(JNIEnv* env, jobject thiz, jint shader) {
-  set_anim_shader((void*)shader);
+  set_anim_shader(shader);
 }
 static void setCopyShader(JNIEnv* env, jobject thiz, jint shader) {
-  set_copy_shader((void*)shader);
+  set_copy_shader(shader);
 }
 static void setPointShader(JNIEnv* env, jobject thiz, jint shader) {
-  set_point_shader((void*)shader);
+  set_point_shader(shader);
 }
 
-static void setBrushTexture(JNIEnv* env, jobject thiz, jobject bitmap) {
+static void setBrushTexture(JNIEnv* env, jobject thiz, jint texture) {
+  set_brush_texture(texture);
+}
+
+static jint createTexture(JNIEnv* env, jobject thiz, jobject bitmap) {
   // TODO: ensure rgba_8888 format and throw error
   // TODO: or alpha8?
   AndroidBitmapInfo info;
   AndroidBitmap_getInfo(env, bitmap, &info);
   void *pixels;
   AndroidBitmap_lockPixels(env, bitmap, &pixels);
-  set_brush_texture(info.width, info.height, pixels, info.format);
+  int texture = load_texture(info.width, info.height, pixels, info.format);
   AndroidBitmap_unlockPixels(env, bitmap);
+  return texture;
 }
 
 static void clearFramebuffer(JNIEnv* env, jobject thiz) {
   clear_buffer();
 }
 
-static jobject compileCopyShader(JNIEnv* env, jobject thiz, jstring vec, jstring frag) {
-  void* shader = shaderStrObjects(env, vec, frag, compile_copy_shader);
+static jint compileCopyShader(JNIEnv* env, jobject thiz, jstring vec, jstring frag) {
+  int shader = shaderStrObjects(env, vec, frag, compile_copy_shader);
   return shader;
 }
 
-static jobject compilePointShader(JNIEnv* env, jobject thiz, jstring vec, jstring frag) {
-  void* shader = shaderStrObjects(env, vec, frag, compile_point_shader);
+static jint compilePointShader(JNIEnv* env, jobject thiz, jstring vec, jstring frag) {
+  int shader = shaderStrObjects(env, vec, frag, compile_point_shader);
   return shader;
-}
-
-static void deinitCopyShader(JNIEnv* env, jobject thiz, jint copyshader) {
-  deinit_copy_shader((void*)copyshader);
-}
-
-static void deinitPointShader(JNIEnv* env, jobject thiz, jint pointshader) {
-  deinit_point_shader((void*)pointshader);
 }
 
 static void drawImage(JNIEnv* env, jobject thiz, jobject bitmap) {
@@ -187,10 +186,15 @@ static void jniLuaInit(JNIEnv* env, jobject thiz) {
 }
 static void jniLuaFinish(JNIEnv* env, jobject thiz) {
 }
-static void jniLuaLoadScript(JNIEnv* env, jobject thiz, jstring script) {
+static int jniLuaCompileScript(JNIEnv* env, jobject thiz, jstring script) {
   const char* scriptchars = script == NULL ? NULL : (*env)->GetStringUTFChars(env, script, NULL);
-  loadLuaScript(scriptchars);
+  int scriptid = compile_luascript(scriptchars);
   if (scriptchars != NULL) (*env)->ReleaseStringUTFChars(env, script, scriptchars);
+  return scriptid;
+}
+
+static void jniLuaSetInterpolator(JNIEnv* env, jobject thiz, jint scriptid) {
+  set_interpolator(scriptid);
 }
 
 jint JNI_OnLoad(JavaVM* vm, void* reserved) {
@@ -249,12 +253,16 @@ jint JNI_OnLoad(JavaVM* vm, void* reserved) {
       .fnPtr = setPointShader,
     }, {
       .name = "nativeSetBrushTexture",
-      .signature = "(Landroid/graphics/Bitmap;)V",
+      .signature = "(I)V",
       .fnPtr = setBrushTexture,
     }, {
       .name = "exportPixels",
       .signature = "()Landroid/graphics/Bitmap;",
       .fnPtr = exportPixels,
+    }, {
+      .name = "nativeSetInterpolator",
+      .signature = "(I)V",
+      .fnPtr = jniLuaSetInterpolator,
     }
   };
   jclass textureclass = (*env)->FindClass(env, "com/github/wartman4404/gldraw/TextureSurfaceThread");
@@ -264,10 +272,6 @@ jint JNI_OnLoad(JavaVM* vm, void* reserved) {
       .name = "compile",
       .signature = "(Ljava/lang/String;Ljava/lang/String;)I",
       .fnPtr = compilePointShader,
-    }, {
-      .name = "destroy$extension",
-      .signature = "(I)V",
-      .fnPtr = deinitPointShader,
     },
   };
   JNINativeMethod copyshaderstaticmethods[] = {
@@ -276,17 +280,21 @@ jint JNI_OnLoad(JavaVM* vm, void* reserved) {
       .signature = "(Ljava/lang/String;Ljava/lang/String;)I",
       .fnPtr = compileCopyShader,
     },
+  };
+  JNINativeMethod texturestaticmethods[] = {
     {
-      .name = "destroy$extension",
-      .signature = "(I)V",
-      .fnPtr = deinitCopyShader,
-    }
+      .name = "init",
+      .signature = "(Landroid/graphics/Bitmap;)I",
+      .fnPtr = createTexture,
+    },
   };
 
   jclass copyshaderstatic = (*env)->FindClass(env, "com/github/wartman4404/gldraw/CopyShader$");
   jclass pointshaderstatic = (*env)->FindClass(env, "com/github/wartman4404/gldraw/PointShader$");
+  jclass texturestatic = (*env)->FindClass(env, "com/github/wartman4404/gldraw/Texture$");
   (*env)->RegisterNatives(env, copyshaderstatic, copyshaderstaticmethods, sizeof(copyshaderstaticmethods)/sizeof(JNINativeMethod));
   (*env)->RegisterNatives(env, pointshaderstatic, pointshaderstaticmethods, sizeof(pointshaderstaticmethods)/sizeof(JNINativeMethod));
+  (*env)->RegisterNatives(env, texturestatic, texturestaticmethods, sizeof(texturestaticmethods)/sizeof(JNINativeMethod));
 
   JNINativeMethod eglhelpermethods[] = {
     {
@@ -306,28 +314,18 @@ jint JNI_OnLoad(JavaVM* vm, void* reserved) {
   jclass eglhelper = (*env)->FindClass(env, "com/github/wartman4404/gldraw/EGLHelper");
   (*env)->RegisterNatives(env, eglhelper, eglhelpermethods, sizeof(eglhelpermethods)/sizeof(JNINativeMethod));
 
-  JNINativeMethod luahelpermethods[] = {
+  JNINativeMethod luastaticmethods[] = {
     {
-      /*.name = "nativeInit",*/
-      /*.signature = "()V",*/
-      /*.fnPtr = jniLuaInit,*/
-    /*}, {*/
-      /*.name = "nativeFinish",*/
-      /*.signature = "()V",*/
-      /*.fnPtr = jniLuaFinish,*/
-    /*}, {*/
-      .name = "nativeLoadScript",
-      .signature = "(Ljava/lang/String;)V",
-      .fnPtr = jniLuaLoadScript,
-    /*}, {*/
-      /*.name = "nativeRunScript",*/
-      /*.signature = "()V",*/
-      /*.fnPtr = jniLuaRunScript,*/
+      .name = "init",
+      .signature = "(Ljava/lang/String;)I",
+      .fnPtr = jniLuaCompileScript,
     }
   };
+  jclass luastatic = (*env)->FindClass(env, "com/github/wartman4404/gldraw/LuaScript$");
+  (*env)->RegisterNatives(env, luastatic, luastaticmethods, sizeof(luastaticmethods)/sizeof(JNINativeMethod));
 
-  jclass luahelper = (*env)->FindClass(env, "com/github/wartman4404/gldraw/LuaHelper$");
-  (*env)->RegisterNatives(env, luahelper, luahelpermethods, sizeof(luahelpermethods)/sizeof(JNINativeMethod));
+  /*jclass luahelper = (*env)->FindClass(env, "com/github/wartman4404/gldraw/LuaHelper$");*/
+  /*(*env)->RegisterNatives(env, luahelper, luahelpermethods, sizeof(luahelpermethods)/sizeof(JNINativeMethod));*/
 
   return JNI_VERSION_1_2;
 }

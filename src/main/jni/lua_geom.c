@@ -10,6 +10,8 @@
 #define  LOGI(...)  __android_log_print(ANDROID_LOG_INFO,LOG_TAG,__VA_ARGS__)
 #define  LOGE(...)  __android_log_print(ANDROID_LOG_ERROR,LOG_TAG,__VA_ARGS__)
 
+int glstuff_lua_key = 0;
+
 static const char *lua_ffi_script =
 "ffi = require(\"ffi\")\n"
 "ffi.cdef[[\n"
@@ -70,7 +72,7 @@ void finishLua(lua_State *L) {
   lua_close(L);
 }
 
-void loadLuaScript(const char *script) {
+int loadLuaScript(const char *script) {
   if (script == NULL) {
     script = defaultscript;
   }
@@ -80,21 +82,36 @@ void loadLuaScript(const char *script) {
   }
   LOGI("lua inited");
 
+  int key = ((int) &glstuff_lua_key) + glstuff_lua_key;
+  lua_pushlightuserdata(L, (void*)key);
+
   LOGI("loading script:\n%s", script);
 
   if (1 == luaL_dostring(L, script)) {
     LOGE("script failed to load: %s", lua_tostring(L, -1));
-    return;
+    lua_pop(L, 1);
+    return -1;
   }
   LOGI("script loaded :)");
 
   lua_getglobal(L, "main");
   if (!lua_isfunction(L, -1)) {
     LOGE("no main function defined :(");
-    return;
+    lua_pop(L, 2);
+    return -1;
   }
   luaJIT_setmode(L, -1, LUAJIT_MODE_ALLFUNC|LUAJIT_MODE_ON);
   LOGI("main function defined :)");
+
+  lua_settable(L, LUA_REGISTRYINDEX);
+  glstuff_lua_key += 1;
+  return key;
+}
+
+void useLuaScript(int key) {
+  lua_pushlightuserdata(L, (void*)key);
+  lua_gettable(L, LUA_REGISTRYINDEX);
+  lua_setglobal(L, "main");
 }
 
 // TODO: would it be better to register a callback from lua?

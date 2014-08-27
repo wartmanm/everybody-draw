@@ -1,7 +1,6 @@
 //extern crate core;
 use core::prelude::*;
 use core::mem;
-use core::slice;
 
 use std::sync::{Once, ONCE_INIT, spsc_queue};
 
@@ -26,6 +25,7 @@ use point::{ShaderPaintPoint, Coordinate, PointEntry, PointConsumer, PointProduc
 use rollingaverage::RollingAverage;
 use dropfree::DropFree;
 use matrix::Matrix;
+use luascript::LuaScript;
 
 /// lifetime storage for a pointer's past state
 struct PointStorage {
@@ -34,7 +34,7 @@ struct PointStorage {
     speedavg: RollingAverage<f32>,
 }
 
-struct RustStatics {
+pub struct RustStatics {
     consumer: PointConsumer,
     producer: PointProducer,
     currentPoints: SmallIntMap<PointStorage>,
@@ -105,10 +105,11 @@ fn append_points(a: ShaderPaintPoint, b: ShaderPaintPoint, c: &mut Vec<ShaderPai
     }
 }
 
-pub fn draw_path(framebuffer: GLuint, shader: &PointShader, matrix: *mut f32, color: [f32, ..3], brush: &Texture, backBuffer: &Texture) -> () {
+pub fn draw_path(framebuffer: GLuint, shader: &PointShader, interpolator: &LuaScript, matrix: *mut f32, color: [f32, ..3], brush: &Texture, backBuffer: &Texture) -> () {
     let s = get_statics();
     s.drawvec.clear();
 
+    interpolator.prep();
     run_lua_shader(backBuffer.dimensions, s);
 
     let ref mut pointvec = s.drawvec;

@@ -7,7 +7,7 @@ use opengles::gl2;
 use opengles::gl2::{GLint, GLuint};
 
 use glcommon;
-use glcommon::{check_gl_error, get_shader_handle, get_uniform_handle_option};
+use glcommon::{check_gl_error, get_shader_handle, get_uniform_handle_option, Shader};
 use point::ShaderPaintPoint;
 use gltexture::Texture;
 
@@ -64,8 +64,8 @@ pub struct PointShader {
     textureSizeHandle: GLint,
 }
 
-impl PointShader {
-    pub fn new(vertopt: Option<&str>, fragopt: Option<&str>) -> Option<PointShader> {
+impl Shader for PointShader {
+    fn new(vertopt: Option<&str>, fragopt: Option<&str>) -> Option<PointShader> {
         let vert = vertopt.unwrap_or_else(|| { logi("point shader: using default vertex shader"); default_vertex_shader});
         let frag = fragopt.unwrap_or_else(|| { logi("point shader: using default fragment shader"); default_fragment_shader});
         let programOption = glcommon::create_program(vert, frag);
@@ -102,6 +102,9 @@ impl PointShader {
             }
         }
     }
+}
+
+impl PointShader {
 
     pub fn prep(&self, matrix: &[f32], points: &[ShaderPaintPoint], color: [f32, ..3], brush: &Texture, backbuffer: &Texture) {
         gl2::use_program(self.program);

@@ -2,7 +2,7 @@ use egl::egl::*;
 use log::{logi, loge};
 use core::prelude::*;
 use libc::{c_void, c_uint};
-use core::{ptr, mem};
+use core::mem;
 
 static default_egl_config: [u32, ..15] = [
     EGL_RENDERABLE_TYPE, EGL_OPENGL_ES2_BIT,

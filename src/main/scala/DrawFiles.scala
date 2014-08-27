@@ -59,8 +59,9 @@ object DrawFiles {
 
   def loadBrushes(c: Context) = {
     val decoder = decodeBitmap(Bitmap.Config.ALPHA_8) _
-    val filenamed = withFilename[Bitmap](decoder)
-    val files = allfiles[Bitmap](c, "brushes")
+    val toTexture = (ob: Option[Bitmap]) => ob.map(Texture.apply _)
+    val filenamed = withFilename[Texture](toTexture.compose(decoder))
+    val files = allfiles[Texture](c, "brushes")
     files.map(filenamed).flatMap(_.opt).flatten
   }
 
@@ -79,10 +80,10 @@ object DrawFiles {
     defaultShader.toSeq ++ shaders
   }
 
-  def loadScripts(c: Context): Seq[(String, String)] = {
-    val defaultShader = Some("Default Interpolator" -> null)
-    val filenamed = withFilename((Some.apply[String] _).compose(readStream _))
-    defaultShader.toSeq ++ allfiles[String](c, "interpolators").map(filenamed).flatMap(_.opt).flatten.toSeq
+  def loadScripts(c: Context): Seq[(String, LuaScript)] = {
+    val defaultScript = LuaScript(null).map(("Default Interpolator", _))
+    val filenamed = withFilename((LuaScript.apply _).compose(readStream _))
+    defaultScript.toSeq ++ allfiles[String](c, "interpolators").map(filenamed).flatMap(_.opt).flatten.toSeq
   }
 
   def halfShaderPair(shader: String) = {
