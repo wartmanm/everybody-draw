@@ -1,5 +1,6 @@
 use core::prelude::*;
-use core::mem;
+use core::{mem, fmt};
+use core::fmt::Show;
 
 use opengles::gl2;
 use opengles::gl2::{GLint, GLuint, GLfloat};
@@ -74,16 +75,19 @@ impl Shader for CopyShader {
                 let matrixOption = get_uniform_handle_option(program, "textureMatrix");
                 match (positionOption, texCoordOption, textureOption, matrixOption) {
                     (Some(position), Some(texCoord), Some(texture), Some(matrix)) => {
-                        Some(CopyShader {
+                        let shader = CopyShader {
                             program: program,
                             positionHandle: position,
                             texCoordHandle: texCoord,
                             textureHandle: texture,
                             matrixHandle: matrix,
-                        })
+                        };
+                        logi!("created {}", shader);
+                        Some(shader)
                     }
                     _ => {
-                        loge("copy shader missing vPosition, vTexCoord, or texture");
+                        loge!("copy shader missing vPosition, vTexCoord, or texture");
+                        gl2::delete_program(program);
                         None
                     }
                 }
@@ -109,6 +113,13 @@ impl CopyShader {
 
 impl Drop for CopyShader {
     fn drop(&mut self) {
+        logi!("dropping {}", self);
         gl2::delete_program(self.program);
+    }
+}
+
+impl Show for CopyShader {
+    fn fmt(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
+        write!(formatter, "copy shader 0x{:x}", self.program)
     }
 }

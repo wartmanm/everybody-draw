@@ -108,6 +108,12 @@ int loadLuaScript(const char *script) {
   return key;
 }
 
+void unloadLuaScript(int key) {
+  lua_pushlightuserdata(L, (void*)key);
+  lua_pushnil(L);
+  lua_settable(L, LUA_REGISTRYINDEX);
+}
+
 void useLuaScript(int key) {
   lua_pushlightuserdata(L, (void*)key);
   lua_gettable(L, LUA_REGISTRYINDEX);

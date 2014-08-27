@@ -1,5 +1,6 @@
 use core::prelude::*;
-use core::mem;
+use core::{mem, fmt};
+use core::fmt::Show;
 
 use log::{logi, loge};
 
@@ -79,7 +80,7 @@ impl Shader for PointShader {
                 let matrixOption = gl2::get_uniform_location(program, "textureMatrix");
                 match (positionOption, matrixOption) {
                     (Some(position), matrix) if matrix != -1 => {
-                        Some(PointShader {
+                        let shader = PointShader {
                             program: program,
                             positionHandle: position,
                             sizeHandle: get_shader_handle(program, "vSize"),
@@ -92,10 +93,13 @@ impl Shader for PointShader {
                             distanceHandle: get_shader_handle(program, "vDistance"),
                             backBufferHandle: get_uniform_handle_option(program, "backbuffer"),
                             textureSizeHandle: gl2::get_uniform_location(program, "texturesize"),
-                        })
+                        };
+                        logi!("created {}", shader);
+                        Some(shader)
                     }
                     _ => {
                         loge("point shader missing vPosition or textureMatrix attribute");
+                        gl2::delete_program(program);
                         None
                     }
                 }
@@ -150,8 +154,18 @@ impl PointShader {
         check_gl_error("uniform3fv");
     }
 
+}
 
-    pub unsafe fn destroy(&mut self) {
+impl Drop for PointShader {
+    fn drop(&mut self) {
+        logi!("dropping {}", self);
         gl2::delete_program(self.program);
     }
 }
+
+impl Show for PointShader {
+    fn fmt(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
+        write!(formatter, "point shader 0x{:x}", self.program)
+    }
+}
+

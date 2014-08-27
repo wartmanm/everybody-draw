@@ -331,7 +331,7 @@ pub extern fn render_frame() {
             perform_copy(0 as GLuint, &target.texture, copy_shader, copymatrix);
         },
         (x, y) => {
-            logi!("copyshader is {}None, animshader is {}None", if x.is_none() {""} else {"not "}, if y.is_none() {""} else {"not "});
+            logi!("skipped frame! copyshader is {}, animshader is {}", x, y);
         }
     }
 }
