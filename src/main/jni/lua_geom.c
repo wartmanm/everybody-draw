@@ -31,6 +31,9 @@ static const char *lua_ffi_script =
 "\n"
 "]]\n"
 "function runmain(x, y, output, main)\n"
+"  if type(onframe) == \"function\" then\n"
+"    onframe(x, y, output)\n"
+"  end\n"
 "  local pointpair = ffi.new(\"struct ShaderPaintPoint[2]\")\n"
 "  while ffi.C.next_point_from_lua(output, pointpair) ~= 0 do\n"
 "    main(pointpair[0], pointpair[1], x, y, output)\n"
@@ -81,6 +84,11 @@ int loadLuaScript(const char *script) {
     L = initLua();
   }
   LOGI("lua inited");
+
+  lua_pushnil(L);
+  lua_setglobal(L, "main");
+  lua_pushnil(L);
+  lua_setglobal(L, "onframe");
 
   int key = ((int) &glstuff_lua_key) + glstuff_lua_key;
   lua_pushlightuserdata(L, (void*)key);
