@@ -273,8 +273,6 @@ pub extern fn draw_queued_points(matrix: *mut f32) {
             // TODO: brush color selection
             draw_path(target.framebuffer, point_shader, interpolator, matrix, [1f32, 1f32, 0f32],
                       brush, &source.texture);
-
-            eglinit::egl_swap();
         },
         _ => { }
     }
@@ -329,6 +327,7 @@ pub extern fn render_frame() {
             let (target, source) = get_texturetargets(data);
             perform_copy(target.framebuffer, &source.texture, anim_shader, copymatrix);
             perform_copy(0 as GLuint, &target.texture, copy_shader, copymatrix);
+            eglinit::egl_swap();
         },
         (x, y) => {
             logi!("skipped frame! copyshader is {}, animshader is {}", x, y);
