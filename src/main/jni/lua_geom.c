@@ -6,7 +6,7 @@
 #include "lua/luajit.h"
 #include "point.h"
 
-#define  LOG_TAG    "mylua"
+#define  LOG_TAG    "luageom"
 #define  LOGI(...)  __android_log_print(ANDROID_LOG_INFO,LOG_TAG,__VA_ARGS__)
 #define  LOGE(...)  __android_log_print(ANDROID_LOG_ERROR,LOG_TAG,__VA_ARGS__)
 
@@ -50,7 +50,7 @@ static const char *defaultscript =
 static lua_State *L = NULL;
 
 void loglua(char *message) {
-  __android_log_print(ANDROID_LOG_INFO, "lua", "%s", message);
+  __android_log_print(ANDROID_LOG_INFO, "luascript", "%s", message);
 }
 
 lua_State *initLua() {
