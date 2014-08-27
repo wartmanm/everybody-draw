@@ -76,6 +76,7 @@ struct Data<'a> {
     events: Events<'a>,
     targets: [TextureTarget, ..2],
     current_target: uint,
+    brushlayer: Option<TextureTarget>,
 }
 
 /// right now this doesn't require a mutex because it's only used to communicate with GL, which
@@ -239,6 +240,21 @@ pub unsafe fn set_interpolator(interpolator: DrawObjectIndex<Option<LuaScript>>)
 }
 
 #[no_mangle]
+pub unsafe fn set_separate_brushlayer(separate_layer: bool) -> () {
+    let data = get_safe_data();
+    match (data.brushlayer.as_ref(), separate_layer) {
+        (_, false) => {
+            data.brushlayer = None;
+        },
+        (None, true) => {
+            let (w,h) = data.dimensions;
+            data.brushlayer = Some(TextureTarget::new(w, h, gltexture::RGBA));
+        },
+        _ => { },
+    };
+}
+
+#[no_mangle]
 pub extern fn setup_graphics(w: i32, h: i32) -> bool {
     print_gl_string("Version", gl2::VERSION);
     print_gl_string("Vendor", gl2::VENDOR);
@@ -253,6 +269,7 @@ pub extern fn setup_graphics(w: i32, h: i32) -> bool {
             events: Events::new(),
             targets: targets,
             current_target: 0,
+            brushlayer: None,
         });
     }
 
@@ -271,7 +288,8 @@ pub extern fn draw_queued_points(matrix: *mut f32) {
             gl2::blend_func(gl2::SRC_ALPHA, gl2::ONE_MINUS_SRC_ALPHA);
             let (target, source) = get_texturetargets(data);
             // TODO: brush color selection
-            draw_path(target.framebuffer, point_shader, interpolator, matrix, [1f32, 1f32, 0f32],
+            let brushtarget = data.brushlayer.as_ref().unwrap_or(target);
+            draw_path(brushtarget.framebuffer, point_shader, interpolator, matrix, [1f32, 1f32, 0f32],
                       brush, &source.texture);
         },
         _ => { }
@@ -327,6 +345,10 @@ pub extern fn render_frame() {
             let (target, source) = get_texturetargets(data);
             perform_copy(target.framebuffer, &source.texture, anim_shader, copymatrix);
             perform_copy(0 as GLuint, &target.texture, copy_shader, copymatrix);
+            match data.brushlayer.as_ref() {
+                Some(ref brushtarget) => perform_copy(0 as GLuint, &brushtarget.texture, copy_shader, copymatrix),
+                None => { },
+            };
             eglinit::egl_swap();
         },
         (x, y) => {

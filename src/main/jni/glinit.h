@@ -29,6 +29,8 @@ void deinit_point_shader(const void *shader);
 
 void draw_image(int w, int h, const char *pixels);
 
+void set_separate_brushlayer(char separate_layer);
+
 struct withpixels_tuple {
   int x;
   int y;
