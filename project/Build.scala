@@ -67,7 +67,7 @@ object General {
   )
 
   lazy val debugSettings = Seq (
-    scalacOptions ++= Seq("-Ywarn-dead-code", "-Ywarn-unused", "-Ywarn-unused-import", "-Ywarn-adapted-args", "-Ywarn-inaccessible", "-Ywarn-infer-any", "-Ywarn-nullary-override", "-Ywarn-nullary-unit")
+    scalacOptions ++= Seq("-Ywarn-dead-code", "-Ywarn-unused", "-Ywarn-unused-import", "-Ywarn-adapted-args", "-Ywarn-inaccessible", "-Ywarn-infer-any", "-Ywarn-nullary-override", "-Ywarn-nullary-unit", "-Ymacro-debug-lite")
   )
   
   lazy val excessiveDebugSettings = Seq (
@@ -76,6 +76,7 @@ object General {
 
   val settings = Defaults.defaultSettings ++ Seq (
     resolvers += "Local Maven Repository" at "file://"+Path.userHome.absolutePath+"/.m2/repository",
+    resolvers += "spray" at "http://repo.spray.io/",
     name := "everybodydraw",
     version := "0.1",
     versionCode := 0,
@@ -96,8 +97,7 @@ object General {
       libraryDependencies ++= Seq(
         apklib("com.github.iPaulPro" % "aFileChooser" % "0.1" changing() ),
         "com.jsuereth" %% "scala-arm" % "1.5-SNAPSHOT",
-        "org.json4s" % "json4s-core_2.11" % "3.2.11-SNAPSHOT",
-        "org.json4s" % "json4s-jackson_2.11" % "3.2.11-SNAPSHOT"
+        "io.spray" %%  "spray-json" % "1.2.7-A" changing()
       )
     )
 }

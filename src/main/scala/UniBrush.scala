@@ -2,48 +2,54 @@ package com.github.wartman4404.gldraw
 
 import java.io.File
 import android.graphics.Bitmap
+import android.util.Log
 
-import org.json4s._
-import org.json4s.jackson.JsonMethods._
+import spray.json._
 
-object UniBrush {
-  implicit lazy val formats = DefaultFormats
+object UniBrush extends AutoProductFormat {
 
   case class ShaderSource(
-    `fragment-shader`: Option[String],
-    `vertex-shader`: Option[String]
+    fragmentshader: Option[String],
+    vertexshader: Option[String]
   ) {
     def compile[T](compiler: (String, String) => Option[T]) = {
-      compiler(`vertex-shader`.getOrElse(null), `fragment-shader`.getOrElse(null))
+      compiler(vertexshader.getOrElse(null), fragmentshader.getOrElse(null))
     }
   }
   
-  case class UniBrushSource(
-    `brush-path`: Option[String],
-    `point-shader`: Option[ShaderSource],
-    `anim-shader`: Option[ShaderSource],
+  case class UniBrushSource (
+    brushpath: Option[String],
+    pointshader: Option[ShaderSource],
+    animshader: Option[ShaderSource],
     interpolator: Option[String],
-    `separate-layer`: Option[Boolean]
+    separatelayer: Option[Boolean]
   )
 
+  object UniBrushSource {
+    def fromJson(s: String) = s.parseJson.convertTo[UniBrushSource]
+  }
+
   class UniBrush(s: UniBrushSource, path: String) {
+    Log.i("unibrush", s"initing unibrush at ${path}")
     def this(s: String, path: String) = this(UniBrushSource.fromJson(s), path)
 
     val brush = {
-      val bitmap = s.`brush-path`.flatMap(bp => {
+      val bitmap = s.brushpath.flatMap(bp => {
           DrawFiles.withFileStream(new File(path, bp))
           .map(DrawFiles.decodeBitmap(Bitmap.Config.ALPHA_8) _).opt.flatten
         })
       bitmap.map(Texture.apply _)
     }
+    Log.i("unibrush", "compiling unibrush");
     val interpolator = s.interpolator.flatMap(LuaScript.apply _)
-    val pointshader = s.`point-shader`.flatMap(_.compile(PointShader.apply _))
-    val animshader = s.`anim-shader`.flatMap(_.compile(CopyShader.apply _))
-    val separateLayer = s.`separate-layer`.getOrElse(false)
-  }
-
-  object UniBrushSource {
-    def fromJson(s: String) = parse(s).extract[UniBrushSource]
+    val pointshader = s.pointshader.flatMap(_.compile(PointShader.apply _))
+    val animshader = s.animshader.flatMap(_.compile(CopyShader.apply _))
+    val separateLayer = s.separatelayer.getOrElse(false)
+    Log.i("unibrush", s"have interpolator: ${interpolator.nonEmpty}");
+    Log.i("unibrush", s"have pointshader: ${pointshader.nonEmpty}");
+    Log.i("unibrush", s"have animshader: ${animshader.nonEmpty}");
+    Log.i("unibrush", s"have separateLayer: ${separateLayer}");
+    Log.i("unibrush", s"have brush: ${brush.nonEmpty}");
   }
 }
 

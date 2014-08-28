@@ -91,7 +91,7 @@ object DrawFiles {
   def loadUniBrushes(c: Context): Seq[(String, UniBrush)] = {
     val userdirs = c.getExternalFilesDirs("unibrushes")
     userdirs.flatMap(_.listFiles())
-    .filter(_.isDirectory())
+    .filter(dir => dir.isDirectory() && new File(dir, "brush.json").isFile())
     .flatMap(dir => {
         withFileStream(new File(dir, "brush.json")).map(readStream _).opt
         .map(src => (dir.getName(), new UniBrush(src, dir.getAbsolutePath())))
