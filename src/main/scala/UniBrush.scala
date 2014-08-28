@@ -12,11 +12,11 @@ object UniBrush extends AutoProductFormat {
     fragmentshader: Option[String],
     vertexshader: Option[String]
   ) {
-    def compile[T](compiler: (String, String) => Option[T]) = {
+    def compile[T](compiler: Shader[T]) = {
       compiler(vertexshader.getOrElse(null), fragmentshader.getOrElse(null))
     }
   }
-  
+
   case class UniBrushSource (
     brushpath: Option[String],
     pointshader: Option[ShaderSource],
@@ -25,31 +25,35 @@ object UniBrush extends AutoProductFormat {
     separatelayer: Option[Boolean]
   )
 
-  object UniBrushSource {
-    def fromJson(s: String) = s.parseJson.convertTo[UniBrushSource]
-  }
+  case class UniBrush(
+    brush: Option[Texture],
+    pointshader: Option[PointShader],
+    animshader: Option[CopyShader],
+    interpolator: Option[LuaScript],
+    separatelayer: Boolean)
 
-  class UniBrush(s: UniBrushSource, path: String) {
-    Log.i("unibrush", s"initing unibrush at ${path}")
-    def this(s: String, path: String) = this(UniBrushSource.fromJson(s), path)
+  def compile(s: String, path: String): Option[UniBrush] = compile(s.parseJson.convertTo[UniBrushSource], path)
 
+  def compile(s: UniBrushSource, path: String): Option[UniBrush] = {
+    Log.i("unibrush", "compiling unibrush");
     val brush = {
-      val bitmap = s.brushpath.flatMap(bp => {
+      s.brushpath.map(bp => {
           DrawFiles.withFileStream(new File(path, bp))
           .map(DrawFiles.decodeBitmap(Bitmap.Config.ALPHA_8) _).opt.flatten
+          .map(Texture.apply _)
+          .getOrElse(return None)
         })
-      bitmap.map(Texture.apply _)
     }
-    Log.i("unibrush", "compiling unibrush");
-    val interpolator = s.interpolator.flatMap(LuaScript.apply _)
-    val pointshader = s.pointshader.flatMap(_.compile(PointShader.apply _))
-    val animshader = s.animshader.flatMap(_.compile(CopyShader.apply _))
+    val interpolator = s.interpolator.map(LuaScript(_).getOrElse(return None))
+    val pointshader = s.pointshader.map(_.compile(PointShader).getOrElse(return None))
+    val animshader = s.animshader.map(_.compile(CopyShader).getOrElse(return None))
     val separateLayer = s.separatelayer.getOrElse(false)
     Log.i("unibrush", s"have interpolator: ${interpolator.nonEmpty}");
     Log.i("unibrush", s"have pointshader: ${pointshader.nonEmpty}");
     Log.i("unibrush", s"have animshader: ${animshader.nonEmpty}");
     Log.i("unibrush", s"have separateLayer: ${separateLayer}");
     Log.i("unibrush", s"have brush: ${brush.nonEmpty}");
+    Some(UniBrush(brush, pointshader, animshader, interpolator, separateLayer))
   }
 }
 

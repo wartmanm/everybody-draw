@@ -8,7 +8,6 @@ import android.util.Log
 
 import resource._
 
-import UniBrush.UniBrush
 
 object DrawFiles {
   type MaybeRead[T] = (InputStream)=>Option[T]
@@ -88,13 +87,14 @@ object DrawFiles {
     defaultScript.toSeq ++ allfiles[String](c, "interpolators").map(filenamed).flatMap(_.opt).flatten.toSeq
   }
 
-  def loadUniBrushes(c: Context): Seq[(String, UniBrush)] = {
+  def loadUniBrushes(c: Context): Seq[(String, UniBrush.UniBrush)] = {
     val userdirs = c.getExternalFilesDirs("unibrushes")
     userdirs.flatMap(_.listFiles())
     .filter(dir => dir.isDirectory() && new File(dir, "brush.json").isFile())
     .flatMap(dir => {
         withFileStream(new File(dir, "brush.json")).map(readStream _).opt
-        .map(src => (dir.getName(), new UniBrush(src, dir.getAbsolutePath())))
+        .flatMap(src => UniBrush.compile(src, dir.getAbsolutePath()))
+        .map(dir.getName() -> _)
       })
   }
 
