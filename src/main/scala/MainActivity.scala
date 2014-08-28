@@ -278,19 +278,23 @@ class MainActivity extends Activity with TypedActivity with AndroidImplicits {
     }
   }
 
+  def loadUniBrushItem[T](setter: (T)=>Unit, item: Option[T], picker: NamedPicker[T]) = {
+    val (setting, enablePicker) = item.map((_, false)).getOrElse {
+      (picker.control.getSelectedItem().asInstanceOf[SpinnerItem[T]].item, true)
+    }
+    setter(setting)
+    picker.control.setEnabled(enablePicker)
+  }
+
   def loadUniBrush(unibrush: UniBrush) = {
     for (thread <- textureThread) {
-      unibrush.brush.map(thread.setBrushTexture _)
-      unibrush.animshader.map(thread.setAnimShader _)
-      unibrush.pointshader.map(thread.setPointShader _)
-      unibrush.interpolator.map(thread.setInterpScript _)
+      // TODO: don't load when nothing changed; perform load from texturethread side
+      loadUniBrushItem(thread.setBrushTexture, unibrush.brush, controls.brushpicker)
+      loadUniBrushItem(thread.setAnimShader, unibrush.animshader, controls.animpicker)
+      loadUniBrushItem(thread.setPointShader, unibrush.pointshader, controls.paintpicker)
+      loadUniBrushItem(thread.setInterpScript, unibrush.interpolator, controls.interppicker)
+      thread.setSeparateBrushlayer(unibrush.separatelayer)
     }
-    Array(
-      controls.brushpicker -> unibrush.brush,
-      controls.animpicker -> unibrush.animshader,
-      controls.paintpicker -> unibrush.pointshader,
-      controls.interppicker -> unibrush.interpolator
-    ).map { case (picker, brushopt) => picker.control.setEnabled(brushopt.isEmpty) }
   }
 
   override def onCreateOptionsMenu(menu: Menu): Boolean = {

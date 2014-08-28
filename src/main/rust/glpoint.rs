@@ -105,7 +105,7 @@ fn append_points(a: ShaderPaintPoint, b: ShaderPaintPoint, c: &mut Vec<ShaderPai
     }
 }
 
-pub fn draw_path(framebuffer: GLuint, shader: &PointShader, interpolator: &LuaScript, matrix: *mut f32, color: [f32, ..3], brush: &Texture, backBuffer: &Texture) -> () {
+pub fn draw_path(framebuffer: GLuint, shader: &PointShader, interpolator: &LuaScript, matrix: *mut f32, color: [f32, ..3], brush: &Texture, backBuffer: &Texture) -> bool {
     let s = get_statics();
     s.drawvec.clear();
 
@@ -120,6 +120,13 @@ pub fn draw_path(framebuffer: GLuint, shader: &PointShader, interpolator: &LuaSc
         draw_arrays(POINTS, 0, pointvec.len() as i32);
         check_gl_error("draw_arrays");
     }
+    s.currentPoints.iter().all(|x: (uint, &PointStorage)| {
+        let (_, point) = x;
+        logi!("getting point info");
+        let isnone = point.info.is_none();
+        logi!("got point info: {}", isnone);
+        isnone
+    })
 }
 
 #[no_mangle]
@@ -158,6 +165,8 @@ pub extern "C" fn next_point_from_lua(s: &mut RustStatics, points: &mut (ShaderP
                     },
                     (_, point::Stop) => {
                         oldpoint.info = None;
+                        oldpoint.sizeavg.clear();
+                        oldpoint.speedavg.clear();
                     },
                     (_, point::Point(p)) => {
                         let oldCounter = s.pointCounter;
