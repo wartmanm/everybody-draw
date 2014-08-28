@@ -5,13 +5,16 @@ import android.widget.{AdapterView, Adapter}
 
 import java.io.{InputStream, OutputStream, OutputStreamWriter, BufferedWriter}
 
-class PaintControls(inbrushpicker: AdapterView[Adapter], inanimpicker: AdapterView[Adapter], inpaintpicker: AdapterView[Adapter], ininterppicker: AdapterView[Adapter]) {
+import UniBrush.UniBrush
+
+class PaintControls(inbrushpicker: AdapterView[Adapter], inanimpicker: AdapterView[Adapter], inpaintpicker: AdapterView[Adapter], ininterppicker: AdapterView[Adapter], inunipicker: AdapterView[Adapter]) {
   import PaintControls._
 
   val animpicker = NamedPicker[CopyShader]("anim", inanimpicker)
   val brushpicker = NamedPicker[Texture]("brush", inbrushpicker)
   val paintpicker = NamedPicker[PointShader]("paint", inpaintpicker)
   val interppicker = NamedPicker[LuaScript]("interp", ininterppicker)
+  val unipicker = NamedPicker[UniBrush]("unib", inunipicker)
 
   val namedPickers = Array(animpicker, brushpicker, paintpicker, interppicker)
 

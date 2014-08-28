@@ -95,7 +95,9 @@ object General {
       useTypedResources := true,
       libraryDependencies ++= Seq(
         apklib("com.github.iPaulPro" % "aFileChooser" % "0.1" changing() ),
-        "com.jsuereth" %% "scala-arm" % "1.5-SNAPSHOT"
+        "com.jsuereth" %% "scala-arm" % "1.5-SNAPSHOT",
+        "org.json4s" % "json4s-core_2.11" % "3.2.11-SNAPSHOT",
+        "org.json4s" % "json4s-jackson_2.11" % "3.2.11-SNAPSHOT"
       )
     )
 }

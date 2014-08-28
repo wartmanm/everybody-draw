@@ -8,6 +8,8 @@ import android.util.Log
 
 import resource._
 
+import UniBrush.UniBrush
+
 object DrawFiles {
   type MaybeRead[T] = (InputStream)=>Option[T]
   type MaybeReader[T] = (MaybeRead[T])=>Option[T]
@@ -84,6 +86,16 @@ object DrawFiles {
     val defaultScript = LuaScript(null).map(("Default Interpolator", _))
     val filenamed = withFilename((LuaScript.apply _).compose(readStream _))
     defaultScript.toSeq ++ allfiles[String](c, "interpolators").map(filenamed).flatMap(_.opt).flatten.toSeq
+  }
+
+  def loadUniBrushes(c: Context): Seq[(String, UniBrush)] = {
+    val userdirs = c.getExternalFilesDirs("unibrushes")
+    userdirs.flatMap(_.listFiles())
+    .filter(_.isDirectory())
+    .flatMap(dir => {
+        withFileStream(new File(dir, "brush.json")).map(readStream _).opt
+        .map(src => (dir.getName(), new UniBrush(src, dir.getAbsolutePath())))
+      })
   }
 
   def halfShaderPair(shader: String) = {

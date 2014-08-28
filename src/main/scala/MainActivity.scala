@@ -22,6 +22,7 @@ import com.ipaulpro.afilechooser.utils.FileUtils
 
 import PaintControls.SpinnerItem
 import PaintControls.NamedPicker
+import UniBrush.UniBrush
 
 import resource._
 
@@ -41,7 +42,8 @@ class MainActivity extends Activity with TypedActivity with AndroidImplicits {
     inbrushpicker = findView(TR.brushpicker).asInstanceOf[AdapterView[Adapter]],
     inanimpicker = findView(TR.animpicker).asInstanceOf[AdapterView[Adapter]],
     inpaintpicker = findView(TR.paintpicker).asInstanceOf[AdapterView[Adapter]],
-    ininterppicker = findView(TR.interppicker).asInstanceOf[AdapterView[Adapter]])
+    ininterppicker = findView(TR.interppicker).asInstanceOf[AdapterView[Adapter]],
+    inunipicker = findView(TR.unipicker).asInstanceOf[AdapterView[Adapter]])
 
   lazy val clearbutton = findView(TR.clearbutton)
   lazy val loadbutton = findView(TR.loadbutton)
@@ -258,6 +260,7 @@ class MainActivity extends Activity with TypedActivity with AndroidImplicits {
         val anims = DrawFiles.loadAnimShaders(this).map(SpinnerItem(_)).toArray
         val paints = DrawFiles.loadPointShaders(this).map(SpinnerItem(_)).toArray
         val interpscripts = DrawFiles.loadScripts(this).map(SpinnerItem(_)).toArray
+        val unibrushes = DrawFiles.loadUniBrushes(this).map(SpinnerItem(_)).toArray
         Log.i("main", s"got ${brushes.length} brushes, ${anims.length} anims, ${paints.length} paints, ${interpscripts.length} interpolation scripts")
 
         animshaders = anims
@@ -269,9 +272,25 @@ class MainActivity extends Activity with TypedActivity with AndroidImplicits {
             populatePicker(controls.animpicker, anims,  thread.setAnimShader _)
             populatePicker(controls.paintpicker, paints,  thread.setPointShader _)
             populatePicker(controls.interppicker, interpscripts,  thread.setInterpScript _)
+            populatePicker(controls.unipicker, unibrushes, loadUniBrush _)
           })
       }
     }
+  }
+
+  def loadUniBrush(unibrush: UniBrush) = {
+    for (thread <- textureThread) {
+      unibrush.brush.map(thread.setBrushTexture _)
+      unibrush.animshader.map(thread.setAnimShader _)
+      unibrush.pointshader.map(thread.setPointShader _)
+      unibrush.interpolator.map(thread.setInterpScript _)
+    }
+    Array(
+      controls.brushpicker -> unibrush.brush,
+      controls.animpicker -> unibrush.animshader,
+      controls.paintpicker -> unibrush.pointshader,
+      controls.interppicker -> unibrush.interpolator
+    ).map { case (picker, brushopt) => picker.control.setEnabled(brushopt.isEmpty) }
   }
 
   override def onCreateOptionsMenu(menu: Menu): Boolean = {
