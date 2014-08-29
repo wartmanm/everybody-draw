@@ -61,13 +61,13 @@ class MainActivity extends Activity with TypedActivity with AndroidImplicits {
   def createTextureThread(s: SurfaceTexture, x: Int, y: Int): Unit = {
     Log.i("main", "got surfacetexture");
     val thread = new TextureSurfaceThread(s, onTextureThreadStarted(x,y));
-    textureThread = Some(thread)
     thread.start()
     Log.i("main", "started thread");
   }
 
   val onTextureThreadStarted = (x: Int, y: Int) => (thread: TextureSurfaceThread) => this.runOnUiThread(() => {
       Log.i("main", "got handler")
+      textureThread = Some(thread)
       thread.beginGL(x, y, onTextureCreated _)
       thread.startFrames()
       Log.i("main", "sent begin_gl message")
@@ -126,6 +126,8 @@ class MainActivity extends Activity with TypedActivity with AndroidImplicits {
     contentframe.addView(content)
   }
   
+  // FIXME the texture thread might not be ready yet
+  // although, i guess onTextureCreated handles that case?
   override def onResume() = {
     super.onResume()
     textureThread.foreach(_.startFrames())
