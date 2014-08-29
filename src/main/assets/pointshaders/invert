@@ -15,5 +15,6 @@ void main() {
   float ir = 1.0 - old.r;
   float ig = 1.0 - old.g;
   float ib = 1.0 - old.b;
-  gl_FragColor = vec4(ir, ig, ib, alpha);
+  vec3 newcolor = vec3(ir, ig, ib) * alpha;
+  gl_FragColor = vec4(newcolor, alpha);
 }

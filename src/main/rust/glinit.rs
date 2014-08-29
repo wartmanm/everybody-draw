@@ -267,7 +267,7 @@ pub extern fn setup_graphics(w: i32, h: i32) -> bool {
 
     gl2::viewport(0, 0, w, h);
     gl2::disable(gl2::DEPTH_TEST);
-    gl2::blend_func(gl2::SRC_ALPHA, gl2::ONE_MINUS_SRC_ALPHA);
+    gl2::blend_func(gl2::ONE, gl2::ONE_MINUS_SRC_ALPHA);
     true
 }
 
@@ -277,7 +277,7 @@ pub extern fn draw_queued_points(matrix: *mut f32) {
     match (data.events.pointshader, data.events.brush, data.events.interpolator) {
         (Some(point_shader), Some(brush), Some(interpolator)) => {
             gl2::enable(gl2::BLEND);
-            gl2::blend_func(gl2::SRC_ALPHA, gl2::ONE_MINUS_SRC_ALPHA);
+            gl2::blend_func(gl2::ONE, gl2::ONE_MINUS_SRC_ALPHA);
             let (target, source) = get_texturetargets(data);
             // TODO: brush color selection
             let brushtarget = data.brushlayer.as_ref().unwrap_or(target);
