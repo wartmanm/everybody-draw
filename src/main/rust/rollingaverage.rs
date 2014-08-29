@@ -39,6 +39,5 @@ impl<T: Add<T,T> + Sub<T, T> + ::std::num::Zero + Div<f32, T> + Clone> RollingAv
         self.sum = ::std::num::zero::<T>();
         self.count = 0;
         self.pos = 0;
-        self.entries.clear();
     }
 }
