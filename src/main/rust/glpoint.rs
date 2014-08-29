@@ -40,6 +40,7 @@ pub struct RustStatics {
     currentPoints: SmallIntMap<PointStorage>,
     drawvec: Vec<ShaderPaintPoint>,
     pointCounter: i32,
+    point_count: i32,
 }
 
 static mut dataRef: DropFree<RustStatics> = DropFree(0 as *mut RustStatics);
@@ -55,6 +56,7 @@ fn do_path_init() -> () {
                 currentPoints: SmallIntMap::new(),
                 drawvec: Vec::new(),
                 pointCounter: 0,
+                point_count: 0,
             });
             logi("created statics");
         });
@@ -120,13 +122,7 @@ pub fn draw_path(framebuffer: GLuint, shader: &PointShader, interpolator: &LuaSc
         draw_arrays(POINTS, 0, pointvec.len() as i32);
         check_gl_error("draw_arrays");
     }
-    s.currentPoints.iter().all(|x: (uint, &PointStorage)| {
-        let (_, point) = x;
-        logi!("getting point info");
-        let isnone = point.info.is_none();
-        logi!("got point info: {}", isnone);
-        isnone
-    })
+    s.point_count == 0
 }
 
 #[no_mangle]
@@ -167,10 +163,12 @@ pub extern "C" fn next_point_from_lua(s: &mut RustStatics, points: &mut (ShaderP
                         oldpoint.info = None;
                         oldpoint.sizeavg.clear();
                         oldpoint.speedavg.clear();
+                        s.point_count -= 1;
                     },
                     (_, point::Point(p)) => {
                         let oldCounter = s.pointCounter;
                         s.pointCounter += 1;
+                        s.point_count += 1;
                         oldpoint.info = Some(ShaderPaintPoint {
                             pos: p.pos,
                             time: p.time,
