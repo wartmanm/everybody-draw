@@ -291,18 +291,18 @@ pub extern fn draw_queued_points(matrix: *mut f32) {
 #[no_mangle]
 pub extern fn load_texture(w: i32, h: i32, a_pixels: *const u8, format: i32) -> i32 {
     let formatenum: AndroidBitmapFormat = unsafe { mem::transmute(format) };
-    let aformat = match formatenum {
-        ANDROID_BITMAP_FORMAT_RGBA_8888 => Some(gltexture::RGBA),
-        ANDROID_BITMAP_FORMAT_A_8 => Some(gltexture::ALPHA),
+    let format_and_size = match formatenum {
+        ANDROID_BITMAP_FORMAT_RGBA_8888 => Some((gltexture::RGBA, 4)),
+        ANDROID_BITMAP_FORMAT_A_8 => Some((gltexture::ALPHA, 1)),
         _ => None,
     };
-    aformat.and_then(|texformat| {
+    format_and_size.and_then(|(texformat, size)| {
         logi!("setting brush texture for {:x}", a_pixels as uint);
         let pixelopt = unsafe { a_pixels.to_option() };
         // pixelvec has lifetime of a_pixels, not x
         // there must be some way around this
         unsafe {
-            pixelopt.map(|x| ::std::slice::raw::buf_as_slice(x, (w*h) as uint, |x| {
+            pixelopt.map(|x| ::std::slice::raw::buf_as_slice(x, (w*h*size) as uint, |x| {
                 mem::transmute(get_safe_data().events.load_brush(w, h, x, texformat))
             }))
         }
