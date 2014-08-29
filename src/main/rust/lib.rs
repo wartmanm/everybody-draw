@@ -15,6 +15,7 @@ pub mod log;
 
 pub mod macros;
 pub mod glcommon;
+pub mod rollingaverage;
 
 pub mod glpoint;
 pub mod activestate;
@@ -26,7 +27,6 @@ pub mod eglinit;
 pub mod copyshader;
 pub mod gltexture;
 pub mod point;
-pub mod rollingaverage;
 pub mod matrix;
 pub mod dropfree;
 pub mod drawevent;

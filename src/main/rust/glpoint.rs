@@ -22,17 +22,18 @@ use glcommon::check_gl_error;
 use gltexture::Texture;
 use point;
 use point::{ShaderPaintPoint, Coordinate, PointEntry, PointConsumer, PointProducer};
-use rollingaverage::RollingAverage;
 use dropfree::DropFree;
 use matrix::Matrix;
 use luascript::LuaScript;
 use activestate;
 
+rolling_average_count!(RollingAverage16, 16)
+
 /// lifetime storage for a pointer's past state
 struct PointStorage {
     info: Option<ShaderPaintPoint>,
-    sizeavg: RollingAverage<f32>,
-    speedavg: RollingAverage<f32>,
+    sizeavg: RollingAverage16<f32>,
+    speedavg: RollingAverage16<f32>,
 }
 
 pub struct RustStatics {
@@ -141,8 +142,8 @@ pub extern "C" fn next_point_from_lua(s: &mut RustStatics, points: &mut (ShaderP
                 if !currentPoints.contains_key(&(idx as uint)) {
                     currentPoints.insert(idx as uint, PointStorage {
                         info: None,
-                        sizeavg: RollingAverage::new(16),
-                        speedavg: RollingAverage::new(16),
+                        sizeavg: RollingAverage16::new(),
+                        speedavg: RollingAverage16::new(),
                     });
                 }
                 let oldpoint = currentPoints.find_mut(&(idx as uint)).unwrap();
