@@ -31,14 +31,8 @@ void draw_image(int w, int h, const char *pixels);
 
 void set_separate_brushlayer(char separate_layer);
 
-struct withpixels_tuple {
-  int x;
-  int y;
-  const char *pixels;
-};
-
-struct withpixels_tuple with_pixels();
-void release_pixels(const char *pixels);
+typedef void* (*pixel_callback)(int, int, const char*, void *env);
+void* with_pixels(pixel_callback callback, void *env);
 
 void egl_init(void *window);
 void egl_swap();

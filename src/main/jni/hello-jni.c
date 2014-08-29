@@ -78,7 +78,7 @@ static void nativeAppendMotionEvent(JNIEnv* env, jobject thiz, jobject evtobj) {
   jni_append_motion_event(evtptr);
 }
 
-static int shaderStrObjects(JNIEnv* env, jstring vec, jstring frag, int callback(const char* vec, const char* frag)) {
+static int shaderStrObjects(JNIEnv* env, jstring vec, jstring frag, int (*callback)(const char* vec, const char* frag)) {
   const char* vecstr = vec == NULL ? NULL : (*env)->GetStringUTFChars(env, vec, NULL);
   const char* fragstr = frag == NULL ? NULL : (*env)->GetStringUTFChars(env, frag, NULL);
   int ret = callback(vecstr, fragstr);
@@ -137,34 +137,33 @@ static void drawImage(JNIEnv* env, jobject thiz, jobject bitmap) {
   AndroidBitmap_unlockPixels(env, bitmap);
 }
 
+void* mycallback(int x, int y, const char *pixels, void *env_void) {
+  LOGI("in callback!");
+  JNIEnv *env = (JNIEnv*) env_void;
+  jclass bitmapclass = (*env)->FindClass(env, "android/graphics/Bitmap");
+  jclass configclass = (*env)->FindClass(env, "android/graphics/Bitmap$Config");
+  jfieldID argbfield = (*env)->GetStaticFieldID(env, configclass, "ARGB_8888", "Landroid/graphics/Bitmap$Config;");
+  jobject argb = (*env)->GetStaticObjectField(env, configclass, argbfield);
+  jmethodID createbitmap = (*env)->GetStaticMethodID(env, bitmapclass, "createBitmap", "(IILandroid/graphics/Bitmap$Config;)Landroid/graphics/Bitmap;");
+  jobject bitmap = (*env)->CallStaticObjectMethod(env, bitmapclass, createbitmap, x, y, argb);
+  LOGI("created bitmap");
+  void *outpixels;
+  AndroidBitmap_lockPixels(env, bitmap, &outpixels);
+  LOGI("locked pixels");
+  memcpy(outpixels, pixels, x*y*4);
+  LOGI("copied pixels");
+  AndroidBitmap_unlockPixels(env, bitmap);
+  LOGI("unlocked pixels");
+  jmethodID premult = (*env)->GetMethodID(env, bitmapclass, "setPremultiplied", "(Z)V");
+  (*env)->CallVoidMethod(env, bitmap, premult, JNI_TRUE);
+  LOGI("done with callback");
+  return bitmap;
+}
+
+//may return null!
 //TODO: store bitmap class data
 static jobject exportPixels(JNIEnv* env, jobject thiz) {
-    LOGI("in callback");
-    /*jbyteArray array = (*env)->NewByteArray(env, len);*/
-    /*(*env)->SetByteArrayRegion(env, array, 0, len, (jbyte const*)pixels);*/
-    /*return (void*)array;*/
-    struct withpixels_tuple pxls = with_pixels();
-    const char *pixels = pxls.pixels;
-    int x = pxls.x, y = pxls.y;
-    jclass bitmapclass = (*env)->FindClass(env, "android/graphics/Bitmap");
-    jclass configclass = (*env)->FindClass(env, "android/graphics/Bitmap$Config");
-    jfieldID argbfield = (*env)->GetStaticFieldID(env, configclass, "ARGB_8888", "Landroid/graphics/Bitmap$Config;");
-    jobject argb = (*env)->GetStaticObjectField(env, configclass, argbfield);
-    jmethodID createbitmap = (*env)->GetStaticMethodID(env, bitmapclass, "createBitmap", "(IILandroid/graphics/Bitmap$Config;)Landroid/graphics/Bitmap;");
-    jobject bitmap = (*env)->CallStaticObjectMethod(env, bitmapclass, createbitmap, x, y, argb);
-    LOGI("created bitmap");
-    void *outpixels;
-    AndroidBitmap_lockPixels(env, bitmap, &outpixels);
-    LOGI("locked pixels");
-    memcpy(outpixels, pixels, x*y*4);
-    LOGI("copied pixels");
-    AndroidBitmap_unlockPixels(env, bitmap);
-    LOGI("unlocked pixels");
-    release_pixels(pxls.pixels);
-    LOGI("released pixels");
-    jmethodID premult = (*env)->GetMethodID(env, bitmapclass, "setPremultiplied", "(Z)V");
-    (*env)->CallVoidMethod(env, bitmap, premult, JNI_TRUE);
-    return bitmap;
+  return (jobject) with_pixels(mycallback, env);
 }
 
 static void jniEglFinish(JNIEnv* env, jobject thiz) {

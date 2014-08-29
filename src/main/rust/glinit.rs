@@ -1,6 +1,6 @@
 extern crate opengles;
 use core::prelude::*;
-use core::mem;
+use core::{mem,fmt,ptr};
 
 use std::c_str::CString;
 
@@ -144,13 +144,13 @@ pub fn draw_image(w: i32, h: i32, pixels: *const u8) -> () {
 }
 
 #[no_mangle]
-pub unsafe fn with_pixels() -> (i32, i32, *const u8) {
+pub unsafe fn with_pixels(callback: unsafe extern "C" fn(i32, i32, *const u8, *mut ())-> *mut (), env: *mut ()) -> *mut () {
     logi("in with_pixels");
     let data = get_safe_data();
     let oldtarget = get_current_texturetarget(data);
     let (x,y) = oldtarget.texture.dimensions;
     let saveshader = Shader::new(None, Some(copyshader::noalpha_fragment_shader));
-    let pixels = saveshader.map(|shader| {
+    saveshader.map(|shader| {
         let newtarget = TextureTarget::new(x, y, gltexture::RGB);
         let matrix = [1f32,  0f32,  0f32,  0f32,
                       0f32, -1f32,  0f32,  0f32,
@@ -161,20 +161,12 @@ pub unsafe fn with_pixels() -> (i32, i32, *const u8) {
         let pixels = gl2::read_pixels(0, 0, x, y, gl2::RGBA, gl2::UNSIGNED_BYTE);
         check_gl_error("read_pixels");
         logi("gl2::read_pixels()");
-        pixels
-    }).unwrap_or(Vec::new()); // FIXME unsafe
-    let pixptr = pixels.as_ptr();
-    mem::forget(pixels);
-    logi!("returning pixels: {}", pixptr);
-    (x, y, pixptr)
-}
-
-// TODO: find out how to make C callbacks work and get rid of this
-#[no_mangle]
-pub unsafe fn release_pixels(vecptr: *mut u8) {
-    logi!("releasing pixels: {}", vecptr);
-    let pixels = Vec::from_raw_parts(1, 1, vecptr);
-    mem::drop(pixels);
+        let pixptr = pixels.as_ptr();
+        logi!("calling callback");
+        let result = callback(x, y, pixptr, env);
+        logi!("returning pixels: {}", pixptr);
+        result
+    }).unwrap_or(ptr::mut_null())
 }
 
 unsafe fn with_cstr_as_str<T>(ptr: *const i8, callback: |Option<&str>|->T)->T {
