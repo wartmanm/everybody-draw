@@ -10,31 +10,11 @@ use collections::{SmallIntMap, MutableSeq, MutableMap, Map};
 use point;
 use point::{PaintPoint, Coordinate, PointEntry, PointProducer};
 use dropfree::DropFree;
+use activestate;
 
 static AMOTION_EVENT_ACTION_POINTER_INDEX_SHIFT: uint = 8;
 
 // TODO: consider eliminating entirely and putting faith in ACTION_POINTER_UP/DOWN
-mod activestate {
-    #![allow(unused_variable, dead_code)]
-    static newmask: u8 = 0x01;
-    static oldmask: u8 = 0x02;
-
-    pub static starting: ActiveState = ActiveState(newmask);
-    pub static stopping: ActiveState  = ActiveState(oldmask);
-    pub static continuing: ActiveState  = ActiveState(newmask | oldmask);
-    pub static inactive: ActiveState = ActiveState(0);
-    #[deriving(Eq, PartialEq)]
-    pub struct ActiveState(u8);
-
-    impl ActiveState {
-        #[inline]
-        pub fn push(self, newstate: bool) -> ActiveState {
-            let ActiveState(state) = self;
-            ActiveState(((state << 1) & oldmask) | newstate as u8)
-        }
-    }
-}
-
 type Data = SmallIntMap<activestate::ActiveState>;
 
 static mut dataRef: DropFree<Data> = DropFree(0 as *mut Data) ;

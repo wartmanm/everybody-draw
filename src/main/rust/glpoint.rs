@@ -26,6 +26,7 @@ use rollingaverage::RollingAverage;
 use dropfree::DropFree;
 use matrix::Matrix;
 use luascript::LuaScript;
+use activestate;
 
 /// lifetime storage for a pointer's past state
 struct PointStorage {
@@ -41,6 +42,7 @@ pub struct RustStatics {
     drawvec: Vec<ShaderPaintPoint>,
     pointCounter: i32,
     point_count: i32,
+    pointer_state: activestate::ActiveState,
 }
 
 static mut dataRef: DropFree<RustStatics> = DropFree(0 as *mut RustStatics);
@@ -57,6 +59,7 @@ fn do_path_init() -> () {
                 drawvec: Vec::new(),
                 pointCounter: 0,
                 point_count: 0,
+                pointer_state: activestate::inactive,
             });
             logi("created statics");
         });
@@ -122,7 +125,8 @@ pub fn draw_path(framebuffer: GLuint, shader: &PointShader, interpolator: &LuaSc
         draw_arrays(POINTS, 0, pointvec.len() as i32);
         check_gl_error("draw_arrays");
     }
-    s.point_count == 0
+    s.pointer_state = s.pointer_state.push(s.point_count > 0);
+    s.pointer_state == activestate::stopping
 }
 
 #[no_mangle]

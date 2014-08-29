@@ -281,11 +281,11 @@ pub extern fn draw_queued_points(matrix: *mut f32) {
             let (target, source) = get_texturetargets(data);
             // TODO: brush color selection
             let brushtarget = data.brushlayer.as_ref().unwrap_or(target);
-            if draw_path(brushtarget.framebuffer, point_shader, interpolator, matrix, [1f32, 1f32, 0f32],
-                         brush, &source.texture) {
+            let should_copy = draw_path(brushtarget.framebuffer, point_shader, interpolator,
+                                        matrix, [1f32, 1f32, 0f32], brush, &source.texture);
+            if should_copy && data.brushlayer.is_some() {
                 match data.events.copyshader {
                     Some(copy_shader) => {
-                        logi!("copying brush layer down");
                         let copymatrix = matrix::identity.as_slice();
                         perform_copy(target.framebuffer, &brushtarget.texture, copy_shader, copymatrix);
                         gl2::bind_framebuffer(gl2::FRAMEBUFFER, brushtarget.framebuffer);
