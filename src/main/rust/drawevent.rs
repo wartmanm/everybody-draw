@@ -18,7 +18,7 @@ use glstore::{ShaderInitValues, BrushInitValues, LuaInitValues};
 use gltexture::{Texture, PixelFormat};
 use pointshader::PointShader;
 use copyshader::CopyShader;
-use std::to_string::ToString;
+use collections::str::StrAllocating;
 use luascript::LuaScript;
 
 enum DrawEvent {
@@ -62,7 +62,7 @@ impl<'a> Events<'a> {
 
     // FIXME: let glstore deal with optionalness
     pub fn load_copyshader(&mut self, vert: Option<&str>, frag: Option<&str>) -> DrawObjectIndex<Option<CopyShader>> {
-        let initargs = (vert.map(|x|x.to_string()), frag.map(|x|x.to_string()));
+        let initargs = (vert.map(|x|x.into_string()), frag.map(|x|x.into_string()));
         let initopt: ShaderInit<CopyShader> = CachedInit::new(initargs);
         self.copyshaders.push_object(initopt)
     }
@@ -80,7 +80,7 @@ impl<'a> Events<'a> {
         shader
     }
     pub fn load_pointshader(&mut self, vert: Option<&str>, frag: Option<&str>) -> DrawObjectIndex<Option<PointShader>> {
-        let initargs = (vert.map(|x|x.to_string()), frag.map(|x|x.to_string()));
+        let initargs = (vert.map(|x|x.into_string()), frag.map(|x|x.into_string()));
         let initopt: ShaderInit<PointShader> = CachedInit::new(initargs);
         self.pointshaders.push_object(initopt)
     }
@@ -102,7 +102,7 @@ impl<'a> Events<'a> {
         brush
     }
     pub fn load_interpolator(&mut self, script: Option<&str>) -> DrawObjectIndex<Option<LuaScript>> {
-        let initopt: LuaInit = CachedInit::new(script.map(|x|x.to_string()));
+        let initopt: LuaInit = CachedInit::new(script.map(|x|x.into_string()));
         self.luascripts.push_object(initopt)
     }
 
