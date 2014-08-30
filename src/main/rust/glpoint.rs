@@ -27,6 +27,8 @@ use matrix::Matrix;
 use luascript::LuaScript;
 use activestate;
 
+use alloc::boxed::Box;
+
 rolling_average_count!(RollingAverage16, 16)
 
 /// lifetime storage for a pointer's past state
@@ -76,6 +78,14 @@ pub extern fn create_motion_event_handler() -> (*mut MotionEventConsumer, *mut M
         let producerptr: *mut MotionEventProducer = mem::transmute(producer) ;
         (handlerptr, producerptr)
     }
+}
+
+#[no_mangle]
+pub unsafe extern fn destroy_motion_event_handler(consumer: *mut MotionEventConsumer, producer: *mut MotionEventProducer) {
+    let handler: Box<MotionEventConsumer> = mem::transmute(consumer);
+    let producer: Box<MotionEventProducer> = mem::transmute(producer);
+    mem::drop(handler);
+    mem::drop(producer);
 }
 
 #[no_mangle]

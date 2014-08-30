@@ -16,6 +16,7 @@ GLInit setup_graphics(int w, int h);
 void render_frame(GLInit data);
 void deinit_gl(GLInit data);
 struct MotionEventHandlerPair create_motion_event_handler();
+void destroy_motion_event_handler(MotionEventConsumer consumer, MotionEventProducer producer);
 
 void jni_append_motion_event(MotionEventProducer h, AInputEvent* evt);
 void draw_queued_points(GLInit data, MotionEventConsumer handler, float *matrix);

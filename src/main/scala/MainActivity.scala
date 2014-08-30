@@ -61,39 +61,37 @@ class MainActivity extends Activity with TypedActivity with AndroidImplicits {
   @native protected def nativeAppendMotionEvent(handler: MotionEventProducer, m: MotionEvent): Unit
 
   // TODO: actually clean up
-  lazy val handlers = MotionEventHandlerPair.init()
+  var handlers: Option[MotionEventHandlerPair] = None
 
-  def createTextureThread(s: SurfaceTexture, x: Int, y: Int): Unit = {
+  def createTextureThread(handlers: MotionEventHandlerPair)(s: SurfaceTexture, x: Int, y: Int): Unit = {
     Log.i("main", "got surfacetexture");
-    val thread = new TextureSurfaceThread(s, handlers.consumer, onTextureThreadStarted(x,y));
+    val thread = new TextureSurfaceThread(s, handlers.consumer, onTextureThreadStarted(x,y, handlers.producer));
     thread.start()
     Log.i("main", "started thread");
   }
 
-  val onTextureThreadStarted = (x: Int, y: Int) => (thread: TextureSurfaceThread) => this.runOnUiThread(() => {
+  val onTextureThreadStarted = (x: Int, y: Int, producer: MotionEventProducer) => (thread: TextureSurfaceThread) => this.runOnUiThread(() => {
       Log.i("main", "got handler")
       textureThread = Some(thread)
-      thread.beginGL(x, y, onTextureCreated _)
+      thread.beginGL(x, y, onTextureCreated(thread, producer) _)
       thread.startFrames()
       Log.i("main", "sent begin_gl message")
       ()
     })
 
   // runs on gl thread
-  def onTextureCreated() = {
-    textureThread.foreach(thread => {
-        thread.initScreen(savedBitmap)
-        savedBitmap = None
-        thread.startFrames()
-      })
+  def onTextureCreated(thread: TextureSurfaceThread, producer: MotionEventProducer)() = {
+    thread.initScreen(savedBitmap)
+    savedBitmap = None
+    thread.startFrames()
     populatePickers()
-    content.setOnTouchListener(createViewTouchListener())
+    content.setOnTouchListener(createViewTouchListener(producer))
     Log.i("main", "set ontouch listener")
   }
 
-  def createViewTouchListener() = new View.OnTouchListener() {
+  def createViewTouchListener(producer: MotionEventProducer) = new View.OnTouchListener() {
     override def onTouch(v: View, evt: MotionEvent) = {
-      nativeAppendMotionEvent(handlers.producer, evt)
+      nativeAppendMotionEvent(producer, evt)
       true
     }
   }
@@ -101,6 +99,7 @@ class MainActivity extends Activity with TypedActivity with AndroidImplicits {
   override def onCreate(bundle: Bundle) {
     Log.i("main", "oncreate")
     System.loadLibrary("gl-stuff")
+    handlers = Some(MotionEventHandlerPair.init())
 
     super.onCreate(bundle)
     setContentView(R.layout.activity_main)
@@ -127,8 +126,11 @@ class MainActivity extends Activity with TypedActivity with AndroidImplicits {
   override def onStart() = {
     Log.i("main", "onStart")
     super.onStart()
-    content.setSurfaceTextureListener(new TextureListener(this))
-    contentframe.addView(content)
+    handlers.foreach(h => {
+        content.setSurfaceTextureListener(new TextureListener(createTextureThread(h) _))
+        contentframe.addView(content)
+      })
+
   }
   
   // FIXME the texture thread might not be ready yet
@@ -174,6 +176,8 @@ class MainActivity extends Activity with TypedActivity with AndroidImplicits {
 
   override protected def onDestroy() = {
     super.onDestroy()
+    handlers.foreach(MotionEventHandlerPair.destroy _)
+    handlers = None
   }
 
   private def prepareForSave() = {
@@ -356,10 +360,10 @@ object MainActivity {
     final val ACTIVITY_CHOOSE_IMAGE = 0x1;
   }
 
-  class TextureListener(parent: MainActivity) extends TextureView.SurfaceTextureListener {
+  class TextureListener(callback: (SurfaceTexture, Int, Int)=>Unit) extends TextureView.SurfaceTextureListener {
 
     def onSurfaceTextureAvailable(st: android.graphics.SurfaceTexture,  w: Int, h: Int): Unit = {
-      parent.createTextureThread(st, w, h);
+      callback(st, w, h)
     }
     def onSurfaceTextureDestroyed(st: android.graphics.SurfaceTexture): Boolean = {
       Log.i("main", "got onsurfacetexturedestroyed callback!")

@@ -54,24 +54,19 @@ static void nativeUpdateGL( JNIEnv* env, jobject thiz, int data)
 
 static jobject initMotionEventHandler(JNIEnv *env, jobject thiz) {
   struct MotionEventHandlerPair pairdata = create_motion_event_handler();
-
-  if ((*env)->ExceptionOccurred(env) != NULL) {
-    LOGI("exception before findclass!");
-    (*env)->ExceptionDescribe(env);
-  }
   jclass pairclass = (*env)->FindClass(env, "com/github/wartman4404/gldraw/MotionEventHandlerPair");
-  LOGI("got class: 0x%x", (unsigned int) pairclass);
-  if ((*env)->ExceptionOccurred(env) != NULL) {
-    LOGI("exception before findmethod!");
-    (*env)->ExceptionDescribe(env);
-  }
   jmethodID constructor = (*env)->GetMethodID(env, pairclass, "<init>", "(II)V");
-  if ((*env)->ExceptionOccurred(env) != NULL) {
-    LOGI("exception before newobject!");
-    (*env)->ExceptionDescribe(env);
-  }
   jobject pairobj = (*env)->NewObject(env, pairclass, constructor, (int)pairdata.consumer, (int)pairdata.producer);
   return pairobj;
+}
+
+static void destroyMotionEventHandler(JNIEnv *env, jobject thiz, jobject pairobj) {
+  jclass pairclass = (*env)->FindClass(env, "com/github/wartman4404/gldraw/MotionEventHandlerPair");
+  jfieldID consumerid = (*env)->GetFieldID(env, pairclass, "consumer", "I");
+  jfieldID producerid = (*env)->GetFieldID(env, pairclass, "producer", "I");
+  MotionEventConsumer consumer = (MotionEventConsumer) (*env)->GetIntField(env, pairobj, consumerid);
+  MotionEventProducer producer = (MotionEventProducer) (*env)->GetIntField(env, pairobj, producerid);
+  destroy_motion_event_handler(consumer, producer);
 }
 
 static void nativeAppendMotionEvent(JNIEnv* env, jobject thiz, int handler, jobject evtobj) {
@@ -216,10 +211,6 @@ jint JNI_OnLoad(JavaVM* vm, void* reserved) {
   (*env)->RegisterNatives(env, mainactivityclass, mainmethods, sizeof(mainmethods)/sizeof(JNINativeMethod));
   JNINativeMethod texturemethods[] = {
     {
-      .name = "finishGL",
-      .signature = "(I)V",
-      .fnPtr = finishGL,
-    }, {
       .name = "nativeUpdateGL",
       .signature = "(I)V",
       .fnPtr = nativeUpdateGL,
@@ -325,7 +316,11 @@ jint JNI_OnLoad(JavaVM* vm, void* reserved) {
       .name = "initGL",
       .signature = "(II)I",
       .fnPtr = initGL,
-    },
+    }, {
+      .name = "destroy",
+      .signature = "(I)V",
+      .fnPtr = finishGL,
+    }
   };
   jclass glinitstatic = (*env)->FindClass(env, "com/github/wartman4404/gldraw/GLInit$");
   (*env)->RegisterNatives(env, glinitstatic, glinitstaticmethods, sizeof(glinitstaticmethods)/sizeof(JNINativeMethod));
@@ -335,7 +330,11 @@ jint JNI_OnLoad(JavaVM* vm, void* reserved) {
       .name = "init",
       .signature = "()Lcom/github/wartman4404/gldraw/MotionEventHandlerPair;",
       .fnPtr = initMotionEventHandler,
-    },
+    }, {
+      .name = "destroy",
+      .signature = "(Lcom/github/wartman4404/gldraw/MotionEventHandlerPair;)V",
+      .fnPtr = destroyMotionEventHandler,
+    }
   };
   jclass motioneventhandlerpairstatic = (*env)->FindClass(env, "com/github/wartman4404/gldraw/MotionEventHandlerPair$");
   (*env)->RegisterNatives(env, motioneventhandlerpairstatic, motioneventhandlerstaticmethods, sizeof(motioneventhandlerstaticmethods)/sizeof(JNINativeMethod));

@@ -64,6 +64,7 @@ object GLInit {
   def fromMessage(m: Message) = {
     new GLInit(m.arg1)
   }
+  @native def destroy(data: GLInit): Unit
 }
 
 case class MotionEventHandlerPair(
@@ -72,4 +73,5 @@ case class MotionEventHandlerPair(
 
 object MotionEventHandlerPair {
   @native def init(): MotionEventHandlerPair
+  @native def destroy(m: MotionEventHandlerPair): Unit
 }

@@ -18,7 +18,6 @@ extends Thread with Handler.Callback with AndroidImplicits {
   private var outputShader: Option[CopyShader] = None
   var glinit: Option[GLInit] = None
 
-  @native protected def finishGL(data: GLInit): Unit
   @native protected def nativeUpdateGL(data: GLInit): Unit
   @native protected def nativeDrawQueuedPoints(data: GLInit, handler: MotionEventHandler, transformMatrix: Array[Float]): Unit
   @native protected def nativeClearFramebuffer(data: GLInit): Unit
@@ -52,7 +51,7 @@ extends Thread with Handler.Callback with AndroidImplicits {
         }
       }
       case MSG_END_GL => {
-        glinit.foreach(finishGL _)
+        glinit.foreach(GLInit.destroy _)
         glinit = None
         eglHelper.finish()
         Looper.myLooper().quit()
