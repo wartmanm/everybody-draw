@@ -67,11 +67,11 @@ object General {
   )
 
   lazy val debugSettings = Seq (
-    scalacOptions ++= Seq("-Ywarn-dead-code", "-Ywarn-unused", "-Ywarn-unused-import", "-Ywarn-adapted-args", "-Ywarn-inaccessible", "-Ywarn-infer-any", "-Ywarn-nullary-override", "-Ywarn-nullary-unit", "-Ymacro-debug-lite")
+    scalacOptions ++= Seq("-Ywarn-dead-code", "-Ywarn-unused", "-Ywarn-unused-import", "-Ywarn-adapted-args", "-Ywarn-inaccessible", "-Ywarn-infer-any", "-Ywarn-nullary-override", "-Ywarn-nullary-unit")
   )
   
   lazy val excessiveDebugSettings = Seq (
-    scalacOptions ++= Seq("-Ywarn-value-discard")
+    scalacOptions ++= Seq("-Ywarn-value-discard", "-Ymacro-debug-lite")
   )
 
   val settings = Defaults.defaultSettings ++ Seq (
