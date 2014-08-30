@@ -28,7 +28,6 @@ pub mod copyshader;
 pub mod gltexture;
 pub mod point;
 pub mod matrix;
-pub mod dropfree;
 pub mod drawevent;
 pub mod glstore;
 pub mod luascript;

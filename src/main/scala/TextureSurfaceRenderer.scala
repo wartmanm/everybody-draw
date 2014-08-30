@@ -6,7 +6,7 @@ import android.os.{Handler, Looper, Message, SystemClock}
 import android.util.Log
 import android.graphics.Bitmap
 
-class TextureSurfaceThread(surface: SurfaceTexture, handlerCallback: (TextureSurfaceThread)=>Unit)
+class TextureSurfaceThread(surface: SurfaceTexture, private var motionHandler: MotionEventHandler, handlerCallback: (TextureSurfaceThread)=>Unit)
 extends Thread with Handler.Callback with AndroidImplicits {
   import TextureSurfaceThread.Constants._
 
@@ -16,20 +16,20 @@ extends Thread with Handler.Callback with AndroidImplicits {
   private val matrix = new Array[Float](16)
   private var eglHelper: EGLHelper = null
   private var outputShader: Option[CopyShader] = None
+  var glinit: GLInit = 0.asInstanceOf[GLInit]
 
-  @native protected def initGL(w: Int, h: Int): Unit
-  @native protected def finishGL(): Unit
-  @native protected def nativeUpdateGL(): Unit
-  @native protected def nativeDrawQueuedPoints(transformMatrix: Array[Float]): Unit
-  @native protected def nativeClearFramebuffer(): Unit
-  @native protected def drawImage(bitmap: Bitmap): Unit
-  @native protected def nativeSetAnimShader(shader: CopyShader): Boolean
-  @native protected def nativeSetCopyShader(shader: CopyShader): Boolean
-  @native protected def nativeSetPointShader(shader: PointShader): Boolean
-  @native protected def nativeSetBrushTexture(t: Texture): Unit
-  @native protected def exportPixels(): Bitmap
-  @native protected def nativeSetInterpolator(script: LuaScript): Unit
-  @native protected def nativeSetSeparateBrushlayer(separatelayer: Boolean): Unit
+  @native protected def finishGL(data: GLInit): Unit
+  @native protected def nativeUpdateGL(data: GLInit): Unit
+  @native protected def nativeDrawQueuedPoints(data: GLInit, handler: MotionEventHandler, transformMatrix: Array[Float]): Unit
+  @native protected def nativeClearFramebuffer(data: GLInit): Unit
+  @native protected def drawImage(data: GLInit, bitmap: Bitmap): Unit
+  @native protected def nativeSetAnimShader(data: GLInit, shader: CopyShader): Boolean
+  @native protected def nativeSetCopyShader(data: GLInit, shader: CopyShader): Boolean
+  @native protected def nativeSetPointShader(data: GLInit, shader: PointShader): Boolean
+  @native protected def nativeSetBrushTexture(data: GLInit, t: Texture): Unit
+  @native protected def exportPixels(data: GLInit): Bitmap
+  @native protected def nativeSetInterpolator(data: GLInit, script: LuaScript): Unit
+  @native protected def nativeSetSeparateBrushlayer(data: GLInit, separatelayer: Boolean): Unit
 
   override def run() = {
     Looper.prepare()
@@ -50,7 +50,7 @@ extends Thread with Handler.Callback with AndroidImplicits {
         }
       }
       case MSG_END_GL => {
-        finishGL()
+        finishGL(glinit)
         eglHelper.finish()
         Looper.myLooper().quit()
       }
@@ -59,7 +59,7 @@ extends Thread with Handler.Callback with AndroidImplicits {
         eglHelper = new EGLHelper()
         eglHelper.init(surface)
         Log.i("tst", "egl inited");
-        initGL(msg.arg1, msg.arg2)
+        glinit = GLInit(msg.arg1, msg.arg2)
         android.opengl.Matrix.orthoM(matrix, 0,
           0, msg.arg1,
           msg.arg2, 0,
@@ -100,18 +100,18 @@ extends Thread with Handler.Callback with AndroidImplicits {
     initOutputShader()
     Log.i("tst", s"drawing bitmap: ${bitmap}")
     bitmap.foreach(b => {
-        drawImage(b)
+        drawImage(glinit, b)
         b.recycle()
       })
   }
 
   def clearScreen() = runHere {
-    nativeClearFramebuffer()
+    nativeClearFramebuffer(glinit)
   }
 
   // callback runs on gl thread
   def getBitmap(cb: (Bitmap)=>Any) = runHere {
-    cb(exportPixels())
+    cb(exportPixels(glinit))
   }
 
   def getBitmapSynchronized() = {
@@ -131,22 +131,22 @@ extends Thread with Handler.Callback with AndroidImplicits {
     handler.obtainMessage(MSG_END_GL).sendToTarget()
   }
 
-  def drawBitmap(bitmap: Bitmap) = runHere { drawImage(bitmap) }
+  def drawBitmap(bitmap: Bitmap) = runHere { drawImage(glinit, bitmap) }
 
   // private
   private def initOutputShader() = {
-    outputShader = CopyShader(null, null)
+    outputShader = CopyShader(glinit, null, null)
     outputShader.map((x) => {
-        nativeSetCopyShader(x)
+        nativeSetCopyShader(glinit, x)
       })
   }
 
   private def drawQueuedPoints() = {
-    nativeDrawQueuedPoints(matrix)
+    nativeDrawQueuedPoints(glinit, motionHandler, matrix)
   }
 
   private def updateGL() {
-    nativeUpdateGL()
+    nativeUpdateGL(glinit)
   }
 
   // no consumers??
@@ -165,17 +165,17 @@ extends Thread with Handler.Callback with AndroidImplicits {
   def setBrushTexture(texture: Texture) = {
     Log.i("tst", s"setting brush texture to ${texture}")
     runHere {
-      nativeSetBrushTexture(texture)
+      nativeSetBrushTexture(glinit, texture)
     }
   }
 
   // only set values, could maybe run on main thread
-  def setAnimShader(shader: CopyShader) = runHere { nativeSetAnimShader(shader) }
-  def setPointShader(shader: PointShader) = runHere { nativeSetPointShader(shader) }
-  def setInterpScript(script: LuaScript) = runHere { nativeSetInterpolator(script) }
-  def setSeparateBrushlayer(separatelayer: Boolean) = runHere { nativeSetSeparateBrushlayer(separatelayer) }
+  def setAnimShader(shader: CopyShader) = runHere { nativeSetAnimShader(glinit, shader) }
+  def setPointShader(shader: PointShader) = runHere { nativeSetPointShader(glinit, shader) }
+  def setInterpScript(script: LuaScript) = runHere { nativeSetInterpolator(glinit, script) }
+  def setSeparateBrushlayer(separatelayer: Boolean) = runHere { nativeSetSeparateBrushlayer(glinit, separatelayer) }
   //unused
-  def setCopyShader(shader: CopyShader) = runHere { nativeSetCopyShader(shader) }
+  def setCopyShader(shader: CopyShader) = runHere { nativeSetCopyShader(glinit, shader) }
 }
 
 object TextureSurfaceThread {

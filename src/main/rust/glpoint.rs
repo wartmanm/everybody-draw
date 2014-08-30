@@ -2,7 +2,7 @@
 use core::prelude::*;
 use core::mem;
 
-use std::sync::{Once, ONCE_INIT, spsc_queue};
+use std::sync::spsc_queue;
 
 use collections::vec::Vec;
 use collections::SmallIntMap;
@@ -12,6 +12,7 @@ use collections::Mutable;
 use collections::Map;
 
 use log::logi;
+use motionevent;
 use motionevent::append_motion_event;
 use android::input::AInputEvent;
 
@@ -22,7 +23,6 @@ use glcommon::check_gl_error;
 use gltexture::Texture;
 use point;
 use point::{ShaderPaintPoint, Coordinate, PointEntry, PointConsumer, PointProducer};
-use dropfree::DropFree;
 use matrix::Matrix;
 use luascript::LuaScript;
 use activestate;
@@ -36,47 +36,53 @@ struct PointStorage {
     speedavg: RollingAverage16<f32>,
 }
 
-pub struct RustStatics {
+#[allow(ctypes)]
+pub struct MotionEventConsumer {
     consumer: PointConsumer,
-    producer: PointProducer,
     currentPoints: SmallIntMap<PointStorage>,
     drawvec: Vec<ShaderPaintPoint>,
     pointCounter: i32,
     point_count: i32,
-    pointer_state: activestate::ActiveState,
+    all_pointer_state: activestate::ActiveState,
 }
 
-static mut dataRef: DropFree<RustStatics> = DropFree(0 as *mut RustStatics);
-static mut pathinit: Once = ONCE_INIT;
+pub struct MotionEventProducer {
+    pointer_data: motionevent::Data,
+    producer: PointProducer,
+}
 
-fn do_path_init() -> () {
+fn get_safe_data<'a, T>(data: *mut T) -> &'a mut T {
+    unsafe { &mut *data }
+}
+
+#[no_mangle]
+pub extern fn create_motion_event_handler() -> (*mut MotionEventConsumer, *mut MotionEventProducer) {
+    let (consumer, producer) = spsc_queue::queue::<PointEntry>(0);
+    let handler = box MotionEventConsumer {
+        consumer: consumer,
+        currentPoints: SmallIntMap::new(),
+        drawvec: Vec::new(),
+        pointCounter: 0,
+        point_count: 0,
+        all_pointer_state: activestate::inactive,
+    };
+    let producer = box MotionEventProducer {
+        producer: producer,
+        pointer_data: motionevent::Data::new(),
+    };
+    logi("created statics");
     unsafe {
-        pathinit.doit(|| {
-            let (consumer, producer) = spsc_queue::queue::<PointEntry>(0);
-            dataRef = DropFree::new(RustStatics {
-                consumer: consumer,
-                producer: producer,
-                currentPoints: SmallIntMap::new(),
-                drawvec: Vec::new(),
-                pointCounter: 0,
-                point_count: 0,
-                pointer_state: activestate::inactive,
-            });
-            logi("created statics");
-        });
+        let handlerptr: *mut MotionEventConsumer = mem::transmute(handler) ;
+        let producerptr: *mut MotionEventProducer = mem::transmute(producer) ;
+        (handlerptr, producerptr)
     }
-}
-
-fn get_statics<'a>() -> &'a mut RustStatics {
-    do_path_init();
-    unsafe { dataRef.get_mut() }
 }
 
 #[no_mangle]
 //FIXME: needs meaningful name
-pub extern fn jni_append_motion_event(evt: *const AInputEvent) {
-    let s = get_statics();
-    append_motion_event(evt, &mut s.producer);
+pub extern fn jni_append_motion_event(s: *mut MotionEventProducer, evt: *const AInputEvent) {
+    let s = get_safe_data(s);
+    append_motion_event(&mut s.pointer_data, evt, &mut s.producer);
 }
 
 fn manhattan_distance(a: Coordinate, b: Coordinate) -> f32 {
@@ -111,8 +117,8 @@ fn append_points(a: ShaderPaintPoint, b: ShaderPaintPoint, c: &mut Vec<ShaderPai
     }
 }
 
-pub fn draw_path(framebuffer: GLuint, shader: &PointShader, interpolator: &LuaScript, matrix: *mut f32, color: [f32, ..3], brush: &Texture, backBuffer: &Texture) -> bool {
-    let s = get_statics();
+pub fn draw_path(s: *mut MotionEventConsumer, framebuffer: GLuint, shader: &PointShader, interpolator: &LuaScript, matrix: *mut f32, color: [f32, ..3], brush: &Texture, backBuffer: &Texture) -> bool {
+    let s = get_safe_data(s);
     s.drawvec.clear();
 
     interpolator.prep();
@@ -126,12 +132,12 @@ pub fn draw_path(framebuffer: GLuint, shader: &PointShader, interpolator: &LuaSc
         draw_arrays(POINTS, 0, pointvec.len() as i32);
         check_gl_error("draw_arrays");
     }
-    s.pointer_state = s.pointer_state.push(s.point_count > 0);
-    s.pointer_state == activestate::stopping
+    s.all_pointer_state = s.all_pointer_state.push(s.point_count > 0);
+    s.all_pointer_state == activestate::stopping
 }
 
 #[no_mangle]
-pub extern "C" fn next_point_from_lua(s: &mut RustStatics, points: &mut (ShaderPaintPoint, ShaderPaintPoint)) -> bool {
+pub extern "C" fn next_point_from_lua(s: &mut MotionEventConsumer, points: &mut (ShaderPaintPoint, ShaderPaintPoint)) -> bool {
     let ref mut queue = s.consumer;
     let ref mut currentPoints = s.currentPoints;
     loop {
@@ -193,7 +199,7 @@ pub extern "C" fn next_point_from_lua(s: &mut RustStatics, points: &mut (ShaderP
     }
 }
 
-fn run_lua_shader(dimensions: (i32, i32), statics: &mut RustStatics) {
+fn run_lua_shader(dimensions: (i32, i32), statics: &mut MotionEventConsumer) {
     let (x,y) = dimensions;
     unsafe {
         doInterpolateLua(x, y, statics);
@@ -202,12 +208,13 @@ fn run_lua_shader(dimensions: (i32, i32), statics: &mut RustStatics) {
 
 
 #[allow(non_snake_case_functions)]
+#[allow(ctypes)]
 extern "C" {
-    pub fn doInterpolateLua(x: i32, y: i32, statics: *mut RustStatics);
+    pub fn doInterpolateLua(x: i32, y: i32, statics: *mut MotionEventConsumer);
 }
 
 #[no_mangle]
-pub unsafe extern "C" fn pushrustvec(statics: &mut RustStatics, point: *const ShaderPaintPoint) {
+pub unsafe extern "C" fn pushrustvec(statics: &mut MotionEventConsumer, point: *const ShaderPaintPoint) {
     statics.drawvec.push(*point);
 }
 

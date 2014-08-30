@@ -4,35 +4,42 @@
 #include <android/native_window_jni.h>
 #include "lua/lua.h"
 
-int setup_graphics(int w, int h);
-void render_frame();
-void deinit_gl();
-void jni_append_motion_event(AInputEvent* evt);
-void draw_queued_points(float *matrix);
+typedef void* GLInit;
+typedef void* MotionEventConsumer;
+typedef void* MotionEventProducer;
+struct MotionEventHandlerPair {
+  MotionEventConsumer consumer;
+  MotionEventProducer producer;
+};
 
-void set_anim_shader(int shader);
-void set_copy_shader(int shader);
-void set_point_shader(int shader);
-void set_interpolator(int script);
+GLInit setup_graphics(int w, int h);
+void render_frame(GLInit data);
+void deinit_gl(GLInit data);
+struct MotionEventHandlerPair create_motion_event_handler();
 
-void set_brush_texture(int texture);
-int load_texture(int width, int height, const char *pixels, int format);
+void jni_append_motion_event(MotionEventProducer h, AInputEvent* evt);
+void draw_queued_points(GLInit data, MotionEventConsumer handler, float *matrix);
 
-void clear_buffer();
+void set_anim_shader(GLInit data, int shader);
+void set_copy_shader(GLInit data, int shader);
+void set_point_shader(GLInit data, int shader);
+void set_interpolator(GLInit data, int script);
 
-int compile_point_shader(const char *vec, const char *frag);
-int compile_copy_shader(const char *vec, const char *frag);
-int compile_luascript(const char *script);
+void set_brush_texture(GLInit data, int texture);
+int load_texture(GLInit data, int width, int height, const char *pixels, int format);
 
-void deinit_copy_shader(const void *shader);
-void deinit_point_shader(const void *shader);
+void clear_buffer(GLInit data);
 
-void draw_image(int w, int h, const char *pixels);
+int compile_point_shader(GLInit data, const char *vec, const char *frag);
+int compile_copy_shader(GLInit data, const char *vec, const char *frag);
+int compile_luascript(GLInit data, const char *script);
 
-void set_separate_brushlayer(char separate_layer);
+void draw_image(GLInit data, int w, int h, const char *pixels);
+
+void set_separate_brushlayer(GLInit data, char separate_layer);
 
 typedef void* (*pixel_callback)(int, int, const char*, void *env);
-void* with_pixels(pixel_callback callback, void *env);
+void* with_pixels(GLInit data, pixel_callback callback, void *env);
 
 void egl_init(void *window);
 void egl_swap();

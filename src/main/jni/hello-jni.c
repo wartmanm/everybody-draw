@@ -3,22 +3,6 @@
 //
 // TODO: fix signatures on e.g. nativeSetAnimShader
 
-/*
- * Copyright (C) 2009 The Android Open Source Project
- *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *      http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
- *
- */
 #include <stdio.h>
 #include <string.h>
 #include <jni.h>
@@ -42,98 +26,106 @@ struct JavaPointerClass {
 static jclass motionclass;
 static jfieldID motionEvent_nativePtrField;
 
-/* This is a trivial JNI example where we use a native method
- * to return a new VM String. See the corresponding Java source
- * file located at:
- *
- *   apps/samples/hello-jni/project/src/com/example/hellojni/HelloJni.java
- */;
-static void initGL( JNIEnv* env, jobject thiz, jint w, jint h )
+static int initGL( JNIEnv* env, jobject thiz, jint w, jint h )
 {
   LOGI("trying init! got args %d, %d\n", w, h);
-  setup_graphics(w, h);
+  GLInit graphics = setup_graphics(w, h);
   LOGI("all good!\n");
+  return (int) graphics;
 }
 
-static void nativeDrawQueuedPoints( JNIEnv* env, jobject thiz, jfloatArray javaMatrix)
+static void nativeDrawQueuedPoints( JNIEnv* env, jobject thiz, int data, int handler, jfloatArray javaMatrix)
 {
   float matrix[16];
   (*env)->GetFloatArrayRegion(env, javaMatrix, 0, 16, matrix);
-  draw_queued_points(matrix);
+  draw_queued_points((GLInit)data, (MotionEventConsumer) handler, matrix);
 }
 
-static void finishGL( JNIEnv* env, jobject thiz )
+static void finishGL( JNIEnv* env, jobject thiz, int data)
 {
-  deinit_gl();
+  deinit_gl((GLInit) data);
   LOGI("finish good!\n");
 }
 
-static void nativeUpdateGL( JNIEnv* env, jobject thiz)
+static void nativeUpdateGL( JNIEnv* env, jobject thiz, int data)
 {
-  render_frame();
+  render_frame((GLInit) data);
 }
 
-static void nativeAppendMotionEvent(JNIEnv* env, jobject thiz, jobject evtobj) {
+static jobject initMotionEventHandler(JNIEnv *env, jobject thiz) {
+  struct MotionEventHandlerPair pairdata = create_motion_event_handler();
+
+  jclass pairclass = (*env)->FindClass(env, "com/github/wartman4404/gldraw/MotionEventHandlerPair");
+  jfieldID consumerfield = (*env)->GetFieldID(env, pairclass, "consumer", "I");
+  jfieldID producerfield = (*env)->GetFieldID(env, pairclass, "producer", "I");
+  jmethodID constructor = (*env)->GetMethodID(env, pairclass, "<init>", "()V");
+  jobject pairobj = (*env)->NewObject(env, pairclass, constructor);
+  (*env)->SetIntField(env, pairobj, consumerfield, (int)pairdata.consumer);
+  (*env)->SetIntField(env, pairobj, producerfield, (int)pairdata.producer);
+  return pairobj;
+}
+
+static void nativeAppendMotionEvent(JNIEnv* env, jobject thiz, int handler, jobject evtobj) {
   AInputEvent *evtptr = (AInputEvent*) (*env)->GetIntField(env, evtobj, motionEvent_nativePtrField);
-  jni_append_motion_event(evtptr);
+  jni_append_motion_event((MotionEventConsumer)handler, evtptr);
 }
 
-static int shaderStrObjects(JNIEnv* env, jstring vec, jstring frag, int (*callback)(const char* vec, const char* frag)) {
+static int shaderStrObjects(JNIEnv* env, GLInit data, jstring vec, jstring frag, int (*callback)(GLInit data, const char* vec, const char* frag)) {
   const char* vecstr = vec == NULL ? NULL : (*env)->GetStringUTFChars(env, vec, NULL);
   const char* fragstr = frag == NULL ? NULL : (*env)->GetStringUTFChars(env, frag, NULL);
-  int ret = callback(vecstr, fragstr);
+  int ret = callback(data, vecstr, fragstr);
   if (vecstr != NULL) (*env)->ReleaseStringUTFChars(env, vec, vecstr);
   if (fragstr != NULL) (*env)->ReleaseStringUTFChars(env, frag, fragstr);
   return ret;
 }
 
-static void setAnimShader(JNIEnv* env, jobject thiz, jint shader) {
-  set_anim_shader(shader);
+static void setAnimShader(JNIEnv* env, jobject thiz, GLInit data, jint shader) {
+  set_anim_shader(data, shader);
 }
-static void setCopyShader(JNIEnv* env, jobject thiz, jint shader) {
-  set_copy_shader(shader);
+static void setCopyShader(JNIEnv* env, jobject thiz, GLInit data, jint shader) {
+  set_copy_shader(data, shader);
 }
-static void setPointShader(JNIEnv* env, jobject thiz, jint shader) {
-  set_point_shader(shader);
-}
-
-static void setBrushTexture(JNIEnv* env, jobject thiz, jint texture) {
-  set_brush_texture(texture);
+static void setPointShader(JNIEnv* env, jobject thiz, GLInit data, jint shader) {
+  set_point_shader(data, shader);
 }
 
-static jint createTexture(JNIEnv* env, jobject thiz, jobject bitmap) {
+static void setBrushTexture(JNIEnv* env, jobject thiz, GLInit data, jint texture) {
+  set_brush_texture(data, texture);
+}
+
+static jint createTexture(JNIEnv* env, jobject thiz, int data, jobject bitmap) {
   // TODO: ensure rgba_8888 format and throw error
   // TODO: or alpha8?
   AndroidBitmapInfo info;
   AndroidBitmap_getInfo(env, bitmap, &info);
   void *pixels;
   AndroidBitmap_lockPixels(env, bitmap, &pixels);
-  int texture = load_texture(info.width, info.height, pixels, info.format);
+  int texture = load_texture((GLInit) data, info.width, info.height, pixels, info.format);
   AndroidBitmap_unlockPixels(env, bitmap);
   return texture;
 }
 
-static void clearFramebuffer(JNIEnv* env, jobject thiz) {
-  clear_buffer();
+static void clearFramebuffer(JNIEnv* env, jobject thiz, int data) {
+  clear_buffer((GLInit) data);
 }
 
-static jint compileCopyShader(JNIEnv* env, jobject thiz, jstring vec, jstring frag) {
-  int shader = shaderStrObjects(env, vec, frag, compile_copy_shader);
+static jint compileCopyShader(JNIEnv* env, jobject thiz, int data, jstring vec, jstring frag) {
+  int shader = shaderStrObjects(env, (GLInit)data, vec, frag, compile_copy_shader);
   return shader;
 }
 
-static jint compilePointShader(JNIEnv* env, jobject thiz, jstring vec, jstring frag) {
-  int shader = shaderStrObjects(env, vec, frag, compile_point_shader);
+static jint compilePointShader(JNIEnv* env, jobject thiz, int data, jstring vec, jstring frag) {
+  int shader = shaderStrObjects(env, (GLInit)data, vec, frag, compile_point_shader);
   return shader;
 }
 
-static void drawImage(JNIEnv* env, jobject thiz, jobject bitmap) {
+static void drawImage(JNIEnv* env, jobject thiz, int data, jobject bitmap) {
   // TODO: ensure rgba_8888 format and throw error
   AndroidBitmapInfo info;
   AndroidBitmap_getInfo(env, bitmap, &info);
   void *pixels;
   AndroidBitmap_lockPixels(env, bitmap, &pixels);
-  draw_image(info.width, info.height, pixels);
+  draw_image((GLInit) data, info.width, info.height, pixels);
   AndroidBitmap_unlockPixels(env, bitmap);
 }
 
@@ -162,12 +154,12 @@ void* mycallback(int x, int y, const char *pixels, void *env_void) {
 
 //may return null!
 //TODO: store bitmap class data
-static jobject exportPixels(JNIEnv* env, jobject thiz) {
-  return (jobject) with_pixels(mycallback, env);
+static jobject exportPixels(JNIEnv* env, jobject thiz, int data) {
+  return (jobject) with_pixels((GLInit)data, mycallback, env);
 }
 
-static void jniSetSeparateBrushlayer(JNIEnv* env, jobject thiz, jboolean separatelayer) {
-  set_separate_brushlayer(separatelayer);
+static void jniSetSeparateBrushlayer(JNIEnv* env, jobject thiz, int data, jboolean separatelayer) {
+  set_separate_brushlayer((GLInit)data, separatelayer);
 }
 
 static void jniEglFinish(JNIEnv* env, jobject thiz) {
@@ -185,15 +177,15 @@ static void jniLuaInit(JNIEnv* env, jobject thiz) {
 }
 static void jniLuaFinish(JNIEnv* env, jobject thiz) {
 }
-static int jniLuaCompileScript(JNIEnv* env, jobject thiz, jstring script) {
+static int jniLuaCompileScript(JNIEnv* env, jobject thiz, int data, jstring script) {
   const char* scriptchars = script == NULL ? NULL : (*env)->GetStringUTFChars(env, script, NULL);
-  int scriptid = compile_luascript(scriptchars);
+  int scriptid = compile_luascript((GLInit) data, scriptchars);
   if (scriptchars != NULL) (*env)->ReleaseStringUTFChars(env, script, scriptchars);
   return scriptid;
 }
 
-static void jniLuaSetInterpolator(JNIEnv* env, jobject thiz, jint scriptid) {
-  set_interpolator(scriptid);
+static void jniLuaSetInterpolator(JNIEnv* env, jobject thiz, int data, jint scriptid) {
+  set_interpolator((GLInit) data, scriptid);
 }
 
 jint JNI_OnLoad(JavaVM* vm, void* reserved) {
@@ -215,56 +207,52 @@ jint JNI_OnLoad(JavaVM* vm, void* reserved) {
   (*env)->RegisterNatives(env, mainactivityclass, mainmethods, sizeof(mainmethods)/sizeof(JNINativeMethod));
   JNINativeMethod texturemethods[] = {
     {
-      .name = "initGL",
-      .signature = "(II)V",
-      .fnPtr = initGL,
-    }, {
       .name = "finishGL",
-      .signature = "()V",
+      .signature = "(I)V",
       .fnPtr = finishGL,
     }, {
       .name = "nativeUpdateGL",
-      .signature = "()V",
+      .signature = "(I)V",
       .fnPtr = nativeUpdateGL,
     }, {
       .name = "nativeDrawQueuedPoints",
-      .signature = "([F)V",
+      .signature = "(II[F)V",
       .fnPtr = nativeDrawQueuedPoints,
     }, {
       .name = "nativeClearFramebuffer",
-      .signature = "()V",
+      .signature = "(I)V",
       .fnPtr = clearFramebuffer,
     }, {
       .name = "drawImage",
-      .signature = "(Landroid/graphics/Bitmap;)V",
+      .signature = "(ILandroid/graphics/Bitmap;)V",
       .fnPtr = drawImage,
     }, {
       .name = "nativeSetAnimShader",
-      .signature = "(I)Z",
+      .signature = "(II)Z",
       .fnPtr = setAnimShader,
     }, {
       .name = "nativeSetCopyShader",
-      .signature = "(I)Z",
+      .signature = "(II)Z",
       .fnPtr = setCopyShader,
     }, {
       .name = "nativeSetPointShader",
-      .signature = "(I)Z",
+      .signature = "(II)Z",
       .fnPtr = setPointShader,
     }, {
       .name = "nativeSetBrushTexture",
-      .signature = "(I)V",
+      .signature = "(II)V",
       .fnPtr = setBrushTexture,
     }, {
       .name = "exportPixels",
-      .signature = "()Landroid/graphics/Bitmap;",
+      .signature = "(I)Landroid/graphics/Bitmap;",
       .fnPtr = exportPixels,
     }, {
       .name = "nativeSetInterpolator",
-      .signature = "(I)V",
+      .signature = "(II)V",
       .fnPtr = jniLuaSetInterpolator,
     }, {
       .name = "nativeSetSeparateBrushlayer",
-      .signature = "(Z)V",
+      .signature = "(IZ)V",
       .fnPtr = jniSetSeparateBrushlayer,
     },
   };
@@ -273,21 +261,21 @@ jint JNI_OnLoad(JavaVM* vm, void* reserved) {
   JNINativeMethod pointshaderstaticmethods[] = {
     {
       .name = "compile",
-      .signature = "(Ljava/lang/String;Ljava/lang/String;)I",
+      .signature = "(ILjava/lang/String;Ljava/lang/String;)I",
       .fnPtr = compilePointShader,
     },
   };
   JNINativeMethod copyshaderstaticmethods[] = {
     {
       .name = "compile",
-      .signature = "(Ljava/lang/String;Ljava/lang/String;)I",
+      .signature = "(ILjava/lang/String;Ljava/lang/String;)I",
       .fnPtr = compileCopyShader,
     },
   };
   JNINativeMethod texturestaticmethods[] = {
     {
       .name = "init",
-      .signature = "(Landroid/graphics/Bitmap;)I",
+      .signature = "(ILandroid/graphics/Bitmap;)I",
       .fnPtr = createTexture,
     },
   };
@@ -316,15 +304,32 @@ jint JNI_OnLoad(JavaVM* vm, void* reserved) {
   JNINativeMethod luastaticmethods[] = {
     {
       .name = "init",
-      .signature = "(Ljava/lang/String;)I",
+      .signature = "(ILjava/lang/String;)I",
       .fnPtr = jniLuaCompileScript,
     }
   };
   jclass luastatic = (*env)->FindClass(env, "com/github/wartman4404/gldraw/LuaScript$");
   (*env)->RegisterNatives(env, luastatic, luastaticmethods, sizeof(luastaticmethods)/sizeof(JNINativeMethod));
 
-  /*jclass luahelper = (*env)->FindClass(env, "com/github/wartman4404/gldraw/LuaHelper$");*/
-  /*(*env)->RegisterNatives(env, luahelper, luahelpermethods, sizeof(luahelpermethods)/sizeof(JNINativeMethod));*/
+  JNINativeMethod glinitstaticmethods[] = {
+    {
+      .name = "initGL",
+      .signature = "(II)I",
+      .fnPtr = initGL,
+    },
+  };
+  jclass glinitstatic = (*env)->FindClass(env, "com/github/wartman4404/gldraw/GLInit$");
+  (*env)->RegisterNatives(env, glinitstatic, glinitstaticmethods, sizeof(glinitstaticmethods)/sizeof(JNINativeMethod));
+
+  JNINativeMethod motioneventhandlerstaticmethods[] = {
+    {
+      .name = "init",
+      .signature = "()Lcom/github/wartman4404/gldraw/MotionEventHandlerPair;",
+      .fnPtr = initMotionEventHandler,
+    },
+  };
+  jclass motioneventhandlerpairstatic = (*env)->FindClass(env, "com/github/wartman4404/gldraw/MotionEventHandlerPair$");
+  (*env)->RegisterNatives(env, motioneventhandlerpairstatic, motioneventhandlerstaticmethods, sizeof(motioneventhandlerstaticmethods)/sizeof(JNINativeMethod));
 
   return JNI_VERSION_1_2;
 }

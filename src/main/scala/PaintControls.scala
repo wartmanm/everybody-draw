@@ -5,7 +5,7 @@ import android.widget.{AdapterView, Adapter}
 
 import java.io.{InputStream, OutputStream, OutputStreamWriter, BufferedWriter}
 
-import UniBrush.UniBrush
+import unibrush.UniBrush
 
 class PaintControls(inbrushpicker: AdapterView[Adapter], inanimpicker: AdapterView[Adapter], inpaintpicker: AdapterView[Adapter], ininterppicker: AdapterView[Adapter], inunipicker: AdapterView[Adapter]) {
   import PaintControls._

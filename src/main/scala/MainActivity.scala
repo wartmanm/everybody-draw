@@ -22,7 +22,7 @@ import com.ipaulpro.afilechooser.utils.FileUtils
 
 import PaintControls.SpinnerItem
 import PaintControls.NamedPicker
-import UniBrush.UniBrush
+import unibrush.UniBrush
 
 import resource._
 
@@ -58,11 +58,14 @@ class MainActivity extends Activity with TypedActivity with AndroidImplicits {
 
   lazy val saveThread = ExecutionContext.fromExecutor(Executors.newSingleThreadExecutor())
 
-  @native protected def nativeAppendMotionEvent(m: MotionEvent): Unit
+  @native protected def nativeAppendMotionEvent(handler: MotionEventProducer, m: MotionEvent): Unit
+
+  // TODO: actually clean up
+  lazy val handlers = MotionEventHandlerPair.init()
 
   def createTextureThread(s: SurfaceTexture, x: Int, y: Int): Unit = {
     Log.i("main", "got surfacetexture");
-    val thread = new TextureSurfaceThread(s, onTextureThreadStarted(x,y));
+    val thread = new TextureSurfaceThread(s, handlers.consumer, onTextureThreadStarted(x,y));
     thread.start()
     Log.i("main", "started thread");
   }
@@ -90,7 +93,7 @@ class MainActivity extends Activity with TypedActivity with AndroidImplicits {
 
   def createViewTouchListener() = new View.OnTouchListener() {
     override def onTouch(v: View, evt: MotionEvent) = {
-      nativeAppendMotionEvent(evt)
+      nativeAppendMotionEvent(handlers.producer, evt)
       true
     }
   }
@@ -256,11 +259,11 @@ class MainActivity extends Activity with TypedActivity with AndroidImplicits {
       thread.runHere {
         // TODO: is it really necessary to load every single shader, right now?
         // not that it's not nice to know which ones compiled
-        val brushes = DrawFiles.loadBrushes(this).map(SpinnerItem(_)).toArray
-        val anims = DrawFiles.loadAnimShaders(this).map(SpinnerItem(_)).toArray
-        val paints = DrawFiles.loadPointShaders(this).map(SpinnerItem(_)).toArray
-        val interpscripts = DrawFiles.loadScripts(this).map(SpinnerItem(_)).toArray
-        val unibrushes = DrawFiles.loadUniBrushes(this).map(SpinnerItem(_)).toArray
+        val brushes = DrawFiles.loadBrushes(this, thread.glinit).map(SpinnerItem(_)).toArray
+        val anims = DrawFiles.loadAnimShaders(this, thread.glinit).map(SpinnerItem(_)).toArray
+        val paints = DrawFiles.loadPointShaders(this, thread.glinit).map(SpinnerItem(_)).toArray
+        val interpscripts = DrawFiles.loadScripts(this, thread.glinit).map(SpinnerItem(_)).toArray
+        val unibrushes = DrawFiles.loadUniBrushes(this, thread.glinit).map(SpinnerItem(_)).toArray
         Log.i("main", s"got ${brushes.length} brushes, ${anims.length} anims, ${paints.length} paints, ${interpscripts.length} interpolation scripts")
 
         animshaders = anims

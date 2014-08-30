@@ -1,6 +1,6 @@
 extern crate opengles;
 use core::prelude::*;
-use core::{mem,fmt,ptr};
+use core::{mem,ptr};
 
 use std::c_str::CString;
 
@@ -10,7 +10,7 @@ use opengles::gl2;
 use opengles::gl2::{GLuint, GLenum, GLubyte};
 
 use glcommon::{Shader, check_gl_error};
-use glpoint::draw_path;
+use glpoint::{MotionEventConsumer, draw_path};
 use pointshader::PointShader;
 use copyshader;
 use copyshader::*;
@@ -18,12 +18,11 @@ use gltexture;
 use gltexture::Texture;
 use matrix;
 use eglinit;
-use dropfree::DropFree;
 use drawevent::Events;
 use glstore::DrawObjectIndex;
 use luascript::LuaScript;
 
-use collections::vec::Vec;
+use alloc::boxed::Box;
 
 
 static drawIndexes: [GLubyte, ..6] = [
@@ -70,22 +69,13 @@ impl Drop for TextureTarget {
 }
 
 /// struct for static storage of data that stays on rust side
-struct Data<'a> {
+pub struct Data<'a> {
     #[allow(dead_code)]
     dimensions: (i32, i32),
     events: Events<'a>,
     targets: [TextureTarget, ..2],
     current_target: uint,
     brushlayer: Option<TextureTarget>,
-}
-
-/// right now this doesn't require a mutex because it's only used to communicate with GL, which
-/// only happens on the single GL thread - EGL is complicated enough without trading off threads and
-/// contexts.
-// TODO: be future-proof, add one anyway
-static mut dataRef: DropFree<Data<'static>> = DropFree(0 as *mut Data);
-fn get_safe_data<'a>() -> &'a mut Data<'a> {
-    unsafe { mem::transmute(dataRef.get_mut()) }
 }
 
 fn print_gl_string(name: &str, s: GLenum) {
@@ -114,9 +104,9 @@ fn perform_copy(destFramebuffer: GLuint, sourceTexture: &Texture, shader: &CopyS
 }
 
 #[no_mangle]
-pub fn draw_image(w: i32, h: i32, pixels: *const u8) -> () {
+pub fn draw_image(data: *mut Data, w: i32, h: i32, pixels: *const u8) -> () {
     logi("drawing image...");
-    let data = get_safe_data();
+    let data = get_safe_data(data);
     let target = get_current_texturetarget(data);
     let (tw, th) = target.texture.dimensions;
     let heightratio = th as f32 / h as f32;
@@ -144,9 +134,9 @@ pub fn draw_image(w: i32, h: i32, pixels: *const u8) -> () {
 }
 
 #[no_mangle]
-pub unsafe fn with_pixels(callback: unsafe extern "C" fn(i32, i32, *const u8, *mut ())-> *mut (), env: *mut ()) -> *mut () {
+pub unsafe fn with_pixels(data: *mut Data, callback: unsafe extern "C" fn(i32, i32, *const u8, *mut ())-> *mut (), env: *mut ()) -> *mut () {
     logi("in with_pixels");
-    let data = get_safe_data();
+    let data = get_safe_data(data);
     let oldtarget = get_current_texturetarget(data);
     let (x,y) = oldtarget.texture.dimensions;
     let saveshader = Shader::new(None, Some(copyshader::noalpha_fragment_shader));
@@ -185,55 +175,55 @@ unsafe fn compile_shader<T>(vec: *const i8, frag: *const i8,
 }
 
 #[no_mangle]
-pub unsafe fn compile_copy_shader(vert: *const i8, frag: *const i8) -> DrawObjectIndex<Option<CopyShader>> {
-    let shader = compile_shader(vert, frag, |v,f|get_safe_data().events.load_copyshader(v,f));
+pub unsafe fn compile_copy_shader(data: *mut Data, vert: *const i8, frag: *const i8) -> DrawObjectIndex<Option<CopyShader>> {
+    let shader = compile_shader(vert, frag, |v,f|get_safe_data(data).events.load_copyshader(v,f));
     shader
 }
 
 #[no_mangle]
-pub unsafe fn compile_point_shader(vert: *const i8, frag: *const i8) -> DrawObjectIndex<Option<PointShader>> {
-    let shader = compile_shader(vert, frag, |v,f|get_safe_data().events.load_pointshader(v,f));
+pub unsafe fn compile_point_shader(data: *mut Data, vert: *const i8, frag: *const i8) -> DrawObjectIndex<Option<PointShader>> {
+    let shader = compile_shader(vert, frag, |v,f|get_safe_data(data).events.load_pointshader(v,f));
     shader
 }
 
 #[no_mangle]
-pub unsafe fn compile_luascript(luachars: *const i8) -> DrawObjectIndex<Option<LuaScript>> {
+pub unsafe fn compile_luascript(data: *mut Data, luachars: *const i8) -> DrawObjectIndex<Option<LuaScript>> {
     let script = with_cstr_as_str(luachars, |luastr| {
-        get_safe_data().events.load_interpolator(luastr)
+        get_safe_data(data).events.load_interpolator(luastr)
     });
     script
 }
 
 // TODO: make an enum for these with a scala counterpart
 #[no_mangle]
-pub unsafe fn set_copy_shader(shader: DrawObjectIndex<Option<CopyShader>>) -> () {
+pub unsafe fn set_copy_shader(data: *mut Data, shader: DrawObjectIndex<Option<CopyShader>>) -> () {
     logi("setting copy shader");
-    get_safe_data().events.use_copyshader(shader);
+    get_safe_data(data).events.use_copyshader(shader);
 }
 
 // these can also be null to unset the shader
 // TODO: document better from scala side
 #[no_mangle]
-pub unsafe fn set_anim_shader(shader: DrawObjectIndex<Option<CopyShader>>) -> () {
+pub unsafe fn set_anim_shader(data: *mut Data, shader: DrawObjectIndex<Option<CopyShader>>) -> () {
     logi("setting anim shader");
-    get_safe_data().events.use_animshader(shader);
+    get_safe_data(data).events.use_animshader(shader);
 }
 
 #[no_mangle]
-pub unsafe fn set_point_shader(shader: DrawObjectIndex<Option<PointShader>>) -> () {
+pub unsafe fn set_point_shader(data: *mut Data, shader: DrawObjectIndex<Option<PointShader>>) -> () {
     logi("setting point shader");
-    get_safe_data().events.use_pointshader(shader);
+    get_safe_data(data).events.use_pointshader(shader);
 }
 
 #[no_mangle]
-pub unsafe fn set_interpolator(interpolator: DrawObjectIndex<Option<LuaScript>>) -> () {
+pub unsafe fn set_interpolator(data: *mut Data, interpolator: DrawObjectIndex<Option<LuaScript>>) -> () {
     logi("setting interpolator");
-    get_safe_data().events.use_interpolator(interpolator);
+    get_safe_data(data).events.use_interpolator(interpolator);
 }
 
 #[no_mangle]
-pub unsafe fn set_separate_brushlayer(separate_layer: bool) -> () {
-    let data = get_safe_data();
+pub unsafe fn set_separate_brushlayer(data: *mut Data, separate_layer: bool) -> () {
+    let data = get_safe_data(data);
     match (data.brushlayer.as_ref(), separate_layer) {
         (_, false) => {
             data.brushlayer = None;
@@ -247,33 +237,38 @@ pub unsafe fn set_separate_brushlayer(separate_layer: bool) -> () {
 }
 
 #[no_mangle]
-pub extern fn setup_graphics(w: i32, h: i32) -> bool {
+pub extern fn setup_graphics<'a>(w: i32, h: i32) -> Option<*mut Data<'a>> {
     print_gl_string("Version", gl2::VERSION);
     print_gl_string("Vendor", gl2::VENDOR);
     print_gl_string("Renderer", gl2::RENDERER);
     print_gl_string("Extensions", gl2::EXTENSIONS);
 
     logi!("setupGraphics({},{})", w, h);
-    unsafe {
-        let targets = [TextureTarget::new(w, h, gltexture::RGBA), TextureTarget::new(w, h, gltexture::RGBA)];
-        dataRef = DropFree::new(Data {
-            dimensions: (w, h),
-            events: Events::new(),
-            targets: targets,
-            current_target: 0,
-            brushlayer: None,
-        });
-    }
+    let targets = [TextureTarget::new(w, h, gltexture::RGBA), TextureTarget::new(w, h, gltexture::RGBA)];
+    let data = box Data {
+        dimensions: (w, h),
+        events: Events::new(),
+        targets: targets,
+        current_target: 0,
+        brushlayer: None,
+    };
 
     gl2::viewport(0, 0, w, h);
     gl2::disable(gl2::DEPTH_TEST);
     gl2::blend_func(gl2::ONE, gl2::ONE_MINUS_SRC_ALPHA);
-    true
+    unsafe {
+        let dataptr: *mut Data = mem::transmute(data);
+        Some(dataptr)
+    }
+}
+
+fn get_safe_data(data: *mut Data) -> &mut Data {
+    unsafe { &mut *data }
 }
 
 #[no_mangle]
-pub extern fn draw_queued_points(matrix: *mut f32) {
-    let data = get_safe_data();
+pub extern fn draw_queued_points(data: *mut Data, handler: *mut MotionEventConsumer, matrix: *mut f32) {
+    let data = get_safe_data(data);
     match (data.events.pointshader, data.events.brush, data.events.interpolator) {
         (Some(point_shader), Some(brush), Some(interpolator)) => {
             gl2::enable(gl2::BLEND);
@@ -281,7 +276,7 @@ pub extern fn draw_queued_points(matrix: *mut f32) {
             let (target, source) = get_texturetargets(data);
             // TODO: brush color selection
             let brushtarget = data.brushlayer.as_ref().unwrap_or(target);
-            let should_copy = draw_path(brushtarget.framebuffer, point_shader, interpolator,
+            let should_copy = draw_path(handler, brushtarget.framebuffer, point_shader, interpolator,
                                         matrix, [1f32, 1f32, 0f32], brush, &source.texture);
             if should_copy && data.brushlayer.is_some() {
                 match data.events.copyshader {
@@ -304,7 +299,8 @@ pub extern fn draw_queued_points(matrix: *mut f32) {
 }
 
 #[no_mangle]
-pub extern fn load_texture(w: i32, h: i32, a_pixels: *const u8, format: i32) -> i32 {
+pub extern fn load_texture(data: *mut Data, w: i32, h: i32, a_pixels: *const u8, format: i32) -> i32 {
+    let data = get_safe_data(data);
     let formatenum: AndroidBitmapFormat = unsafe { mem::transmute(format) };
     let format_and_size = match formatenum {
         ANDROID_BITMAP_FORMAT_RGBA_8888 => Some((gltexture::RGBA, 4)),
@@ -318,20 +314,20 @@ pub extern fn load_texture(w: i32, h: i32, a_pixels: *const u8, format: i32) -> 
         // there must be some way around this
         unsafe {
             pixelopt.map(|x| ::std::slice::raw::buf_as_slice(x, (w*h*size) as uint, |x| {
-                mem::transmute(get_safe_data().events.load_brush(w, h, x, texformat))
+                mem::transmute(data.events.load_brush(w, h, x, texformat))
             }))
         }
     }).unwrap_or(-1)
 }
 
 #[no_mangle]
-pub extern fn set_brush_texture(texture: i32) {
-    get_safe_data().events.use_brush(unsafe { mem::transmute(texture) });
+pub extern fn set_brush_texture(data: *mut Data, texture: i32) {
+    get_safe_data(data).events.use_brush(unsafe { mem::transmute(texture) });
 }
 
 #[no_mangle]
-pub extern fn clear_buffer() {
-    let data = get_safe_data();
+pub extern fn clear_buffer(data: *mut Data) {
+    let data = get_safe_data(data);
     for target in data.targets.iter() {
         gl2::bind_framebuffer(gl2::FRAMEBUFFER, target.framebuffer);
         gl2::clear_color(0f32, 0f32, 0f32, 0f32);
@@ -342,8 +338,8 @@ pub extern fn clear_buffer() {
 }
 
 #[no_mangle]
-pub extern fn render_frame() {
-    let data = get_safe_data();
+pub extern fn render_frame(data: *mut Data) {
+    let data = get_safe_data(data);
     match (data.events.copyshader, data.events.animshader) {
         (Some(copy_shader), Some(anim_shader)) => {
             data.current_target = data.current_target ^ 1;
@@ -368,7 +364,8 @@ pub extern fn render_frame() {
 }
 
 #[no_mangle]
-pub extern fn deinit_gl() {
-    unsafe { dataRef.destroy(); }
+pub unsafe extern fn deinit_gl(data: *mut Data) {
+    let data: Box<Data> = mem::transmute(data);
+    mem::drop(data);
     gl2::finish();
 }
