@@ -1,13 +1,19 @@
 package com.github.wartman4404.gldraw
 import android.graphics.Bitmap
+import android.os.Message
 
 class CopyShader private (private val nativePtr: Int) extends AnyVal
 class PointShader private (private val nativePtr: Int) extends AnyVal
 class Texture private (private val nativePtr: Int) extends AnyVal
 class LuaScript private (private val nativePtr: Int) extends AnyVal
-class GLInit private (private val nativePtr: Int) extends AnyVal
 class MotionEventHandler private (private val nativePtr: Int) extends AnyVal
 class MotionEventProducer private (private val nativePtr: Int) extends AnyVal
+class GLInit private (private val nativePtr: Int) extends AnyVal {
+  def toMessage(m: Message) = {
+    m.arg1 = nativePtr
+    m
+  }
+}
 
 trait Shader[T] {
   def apply(data: GLInit, vec: String, frag: String): Option[T]
@@ -53,6 +59,10 @@ object GLInit {
   @native def initGL(width: Int, height: Int): Int;
   def apply(width: Int, height: Int): GLInit = {
     new GLInit(initGL(width, height))
+  }
+  // helper for texturesurfacethread
+  def fromMessage(m: Message) = {
+    new GLInit(m.arg1)
   }
 }
 

@@ -98,6 +98,12 @@ object General {
         apklib("com.github.iPaulPro" % "aFileChooser" % "0.1" changing() ),
         "com.jsuereth" %% "scala-arm" % "1.5-SNAPSHOT",
         "io.spray" %%  "spray-json" % "1.2.7-A" changing()
+      ),
+      proguardOptions ++= Seq(
+        """-keepclassmembers class com.github.wartman4404.gldraw.MotionEventHandlerPair {
+          <fields>;
+          <init>(int, int);
+        }"""
       )
     )
 }

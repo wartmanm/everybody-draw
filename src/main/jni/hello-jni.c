@@ -55,13 +55,22 @@ static void nativeUpdateGL( JNIEnv* env, jobject thiz, int data)
 static jobject initMotionEventHandler(JNIEnv *env, jobject thiz) {
   struct MotionEventHandlerPair pairdata = create_motion_event_handler();
 
+  if ((*env)->ExceptionOccurred(env) != NULL) {
+    LOGI("exception before findclass!");
+    (*env)->ExceptionDescribe(env);
+  }
   jclass pairclass = (*env)->FindClass(env, "com/github/wartman4404/gldraw/MotionEventHandlerPair");
-  jfieldID consumerfield = (*env)->GetFieldID(env, pairclass, "consumer", "I");
-  jfieldID producerfield = (*env)->GetFieldID(env, pairclass, "producer", "I");
-  jmethodID constructor = (*env)->GetMethodID(env, pairclass, "<init>", "()V");
-  jobject pairobj = (*env)->NewObject(env, pairclass, constructor);
-  (*env)->SetIntField(env, pairobj, consumerfield, (int)pairdata.consumer);
-  (*env)->SetIntField(env, pairobj, producerfield, (int)pairdata.producer);
+  LOGI("got class: 0x%x", (unsigned int) pairclass);
+  if ((*env)->ExceptionOccurred(env) != NULL) {
+    LOGI("exception before findmethod!");
+    (*env)->ExceptionDescribe(env);
+  }
+  jmethodID constructor = (*env)->GetMethodID(env, pairclass, "<init>", "(II)V");
+  if ((*env)->ExceptionOccurred(env) != NULL) {
+    LOGI("exception before newobject!");
+    (*env)->ExceptionDescribe(env);
+  }
+  jobject pairobj = (*env)->NewObject(env, pairclass, constructor, (int)pairdata.consumer, (int)pairdata.producer);
   return pairobj;
 }
 
@@ -199,7 +208,7 @@ jint JNI_OnLoad(JavaVM* vm, void* reserved) {
   JNINativeMethod mainmethods[] = {
     { 
       .name = "nativeAppendMotionEvent",
-      .signature = "(Landroid/view/MotionEvent;)V",
+      .signature = "(ILandroid/view/MotionEvent;)V",
       .fnPtr = nativeAppendMotionEvent,
     },
   };

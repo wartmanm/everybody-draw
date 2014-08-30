@@ -237,7 +237,7 @@ pub unsafe fn set_separate_brushlayer(data: *mut Data, separate_layer: bool) -> 
 }
 
 #[no_mangle]
-pub extern fn setup_graphics<'a>(w: i32, h: i32) -> Option<*mut Data<'a>> {
+pub extern fn setup_graphics<'a>(w: i32, h: i32) -> *mut Data<'a> {
     print_gl_string("Version", gl2::VERSION);
     print_gl_string("Vendor", gl2::VENDOR);
     print_gl_string("Renderer", gl2::RENDERER);
@@ -258,7 +258,7 @@ pub extern fn setup_graphics<'a>(w: i32, h: i32) -> Option<*mut Data<'a>> {
     gl2::blend_func(gl2::ONE, gl2::ONE_MINUS_SRC_ALPHA);
     unsafe {
         let dataptr: *mut Data = mem::transmute(data);
-        Some(dataptr)
+        dataptr
     }
 }
 

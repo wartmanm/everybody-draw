@@ -255,15 +255,17 @@ class MainActivity extends Activity with TypedActivity with AndroidImplicits {
   }
 
   def populatePickers() = {
-    for (thread <- textureThread) {
+    for (
+      thread <- textureThread;
+      gl <- thread.glinit) {
       thread.runHere {
         // TODO: is it really necessary to load every single shader, right now?
         // not that it's not nice to know which ones compiled
-        val brushes = DrawFiles.loadBrushes(this, thread.glinit).map(SpinnerItem(_)).toArray
-        val anims = DrawFiles.loadAnimShaders(this, thread.glinit).map(SpinnerItem(_)).toArray
-        val paints = DrawFiles.loadPointShaders(this, thread.glinit).map(SpinnerItem(_)).toArray
-        val interpscripts = DrawFiles.loadScripts(this, thread.glinit).map(SpinnerItem(_)).toArray
-        val unibrushes = DrawFiles.loadUniBrushes(this, thread.glinit).map(SpinnerItem(_)).toArray
+        val brushes = DrawFiles.loadBrushes(this, gl).map(SpinnerItem(_)).toArray
+        val anims = DrawFiles.loadAnimShaders(this, gl).map(SpinnerItem(_)).toArray
+        val paints = DrawFiles.loadPointShaders(this, gl).map(SpinnerItem(_)).toArray
+        val interpscripts = DrawFiles.loadScripts(this, gl).map(SpinnerItem(_)).toArray
+        val unibrushes = DrawFiles.loadUniBrushes(this, gl).map(SpinnerItem(_)).toArray
         Log.i("main", s"got ${brushes.length} brushes, ${anims.length} anims, ${paints.length} paints, ${interpscripts.length} interpolation scripts")
 
         animshaders = anims

@@ -16,7 +16,7 @@ extends Thread with Handler.Callback with AndroidImplicits {
   private val matrix = new Array[Float](16)
   private var eglHelper: EGLHelper = null
   private var outputShader: Option[CopyShader] = None
-  var glinit: GLInit = 0.asInstanceOf[GLInit]
+  var glinit: Option[GLInit] = None
 
   @native protected def finishGL(data: GLInit): Unit
   @native protected def nativeUpdateGL(data: GLInit): Unit
@@ -44,13 +44,16 @@ extends Thread with Handler.Callback with AndroidImplicits {
       case MSG_NEW_FRAME => {
         if (running.get()){
           val next = SystemClock.uptimeMillis() + 1000 / targetFramerate
-          drawQueuedPoints()
-          updateGL()
-          handler.sendEmptyMessageAtTime(MSG_NEW_FRAME, next)
+          val gl: GLInit = GLInit.fromMessage(msg)
+          drawQueuedPoints(gl)
+          updateGL(gl)
+          val newmessage = gl.toMessage(handler.obtainMessage(MSG_NEW_FRAME))
+          handler.sendMessageAtTime(newmessage, next)
         }
       }
       case MSG_END_GL => {
-        finishGL(glinit)
+        glinit.foreach(finishGL _)
+        glinit = None
         eglHelper.finish()
         Looper.myLooper().quit()
       }
@@ -59,7 +62,9 @@ extends Thread with Handler.Callback with AndroidImplicits {
         eglHelper = new EGLHelper()
         eglHelper.init(surface)
         Log.i("tst", "egl inited");
-        glinit = GLInit(msg.arg1, msg.arg2)
+        val gl = GLInit(msg.arg1, msg.arg2)
+        glinit = Some(gl)
+        initOutputShader(gl)
         android.opengl.Matrix.orthoM(matrix, 0,
           0, msg.arg1,
           msg.arg2, 0,
@@ -71,7 +76,7 @@ extends Thread with Handler.Callback with AndroidImplicits {
           matrix(8), matrix(9), matrix(10), matrix(11),
           matrix(12), matrix(13), matrix(14), matrix(15)))
         Log.i("tst", "gl inited");
-        updateGL()
+        updateGL(gl)
         msg.obj.asInstanceOf[()=>Unit]()
       }
     }
@@ -83,8 +88,15 @@ extends Thread with Handler.Callback with AndroidImplicits {
   }
   
   def startFrames() = {
-    this.running.set(true)
-    handler.obtainMessage(MSG_NEW_FRAME).sendToTarget()
+    glinit match {
+      case Some(gl) => {
+        this.running.set(true)
+        gl.toMessage(handler.obtainMessage(MSG_NEW_FRAME)).sendToTarget()
+      }
+      case None => {
+        Log.e("tst", "unable to start frames, no gl inited!")
+      }
+    }
   }
 
   def stopFrames() = {
@@ -97,21 +109,21 @@ extends Thread with Handler.Callback with AndroidImplicits {
 
   def initScreen(bitmap: Option[Bitmap]) = runHere {
     Log.i("tst", "initing output shader")
-    initOutputShader()
     Log.i("tst", s"drawing bitmap: ${bitmap}")
-    bitmap.foreach(b => {
-        drawImage(glinit, b)
-        b.recycle()
-      })
+    for (b <- bitmap;
+         g <- glinit) {
+         drawImage(g, b)
+         b.recycle()
+    }
   }
 
   def clearScreen() = runHere {
-    nativeClearFramebuffer(glinit)
+    glinit.foreach(nativeClearFramebuffer _)
   }
 
   // callback runs on gl thread
   def getBitmap(cb: (Bitmap)=>Any) = runHere {
-    cb(exportPixels(glinit))
+    glinit.foreach(g => cb(exportPixels(g)))
   }
 
   def getBitmapSynchronized() = {
@@ -131,22 +143,22 @@ extends Thread with Handler.Callback with AndroidImplicits {
     handler.obtainMessage(MSG_END_GL).sendToTarget()
   }
 
-  def drawBitmap(bitmap: Bitmap) = runHere { drawImage(glinit, bitmap) }
+  def drawBitmap(bitmap: Bitmap) = runHere { glinit.foreach(drawImage(_, bitmap)) }
 
   // private
-  private def initOutputShader() = {
-    outputShader = CopyShader(glinit, null, null)
+  private def initOutputShader(g: GLInit) = {
+    outputShader = CopyShader(g, null, null)
     outputShader.map((x) => {
-        nativeSetCopyShader(glinit, x)
+        nativeSetCopyShader(g, x)
       })
   }
 
-  private def drawQueuedPoints() = {
-    nativeDrawQueuedPoints(glinit, motionHandler, matrix)
+  private def drawQueuedPoints(g: GLInit) = {
+    nativeDrawQueuedPoints(g, motionHandler, matrix)
   }
 
-  private def updateGL() {
-    nativeUpdateGL(glinit)
+  private def updateGL(g: GLInit) {
+    nativeUpdateGL(g)
   }
 
   // no consumers??
@@ -162,20 +174,20 @@ extends Thread with Handler.Callback with AndroidImplicits {
     constructor(vec, frag)
   }
 
-  def setBrushTexture(texture: Texture) = {
+  def setBrushTexture(texture: Texture) = for (gl <- glinit) {
     Log.i("tst", s"setting brush texture to ${texture}")
     runHere {
-      nativeSetBrushTexture(glinit, texture)
+      nativeSetBrushTexture(gl, texture)
     }
   }
 
   // only set values, could maybe run on main thread
-  def setAnimShader(shader: CopyShader) = runHere { nativeSetAnimShader(glinit, shader) }
-  def setPointShader(shader: PointShader) = runHere { nativeSetPointShader(glinit, shader) }
-  def setInterpScript(script: LuaScript) = runHere { nativeSetInterpolator(glinit, script) }
-  def setSeparateBrushlayer(separatelayer: Boolean) = runHere { nativeSetSeparateBrushlayer(glinit, separatelayer) }
+  def setAnimShader(shader: CopyShader) = for (gl <- glinit) { runHere { nativeSetAnimShader(gl, shader) } }
+  def setPointShader(shader: PointShader) = for (gl <- glinit) { runHere { nativeSetPointShader(gl, shader) } }
+  def setInterpScript(script: LuaScript) = for (gl <- glinit) { runHere { nativeSetInterpolator(gl, script) } }
+  def setSeparateBrushlayer(separatelayer: Boolean) = for (gl <- glinit) { runHere { nativeSetSeparateBrushlayer(gl, separatelayer) } }
   //unused
-  def setCopyShader(shader: CopyShader) = runHere { nativeSetCopyShader(glinit, shader) }
+  def setCopyShader(shader: CopyShader) = for (gl <- glinit) { runHere { nativeSetCopyShader(gl, shader) } }
 }
 
 object TextureSurfaceThread {
