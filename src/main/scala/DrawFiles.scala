@@ -14,7 +14,7 @@ object DrawFiles {
   type MaybeReader[T] = (MaybeRead[T])=>Option[T]
   def allfiles[T](c: Context, path: String): Array[(String, ManagedResource[InputStream])] = {
     val builtins = c.getAssets().list(path).map(path ++ "/" ++ _)
-    val userdirs = c.getExternalFilesDirs(path)
+    val userdirs = c.getExternalFilesDirs(path).flatMap(Option(_)) // some paths may be null??
     val userfiles = userdirs.flatMap(_.listFiles())
     val builtinOpeners = builtins.map(path => {
         basename(path) -> withAssetStream[Option[T]](c, path)
@@ -88,7 +88,7 @@ object DrawFiles {
   }
 
   def loadUniBrushes(c: Context): Seq[(String, UniBrush.UniBrush)] = {
-    val userdirs = c.getExternalFilesDirs("unibrushes")
+    val userdirs = c.getExternalFilesDirs("unibrushes").flatMap(Option(_))
     userdirs.flatMap(_.listFiles())
     .filter(dir => dir.isDirectory() && new File(dir, "brush.json").isFile())
     .flatMap(dir => {
