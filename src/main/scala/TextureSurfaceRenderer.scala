@@ -102,6 +102,7 @@ extends Thread with Handler.Callback with AndroidImplicits {
     this.running.set(false)
   }
 
+  // TODO: check if we're already on the gl thread
   def runHere(fn: => Unit) = {
     handler.post(() => { fn; () })
   }

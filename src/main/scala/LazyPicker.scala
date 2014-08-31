@@ -3,15 +3,14 @@ import android.view._
 import android.widget._
 import android.content.Context
 
-class LazyPicker[T](context: Context, content: Seq[(String, (Unit)=>Option[T])]) extends BaseAdapter {
-  import LazyPicker._
+class LazyPicker[T](context: Context, thread: TextureSurfaceThread, content: Seq[(String, (Unit)=>Option[T])]) extends BaseAdapter {
   val inflater = LayoutInflater.from(context)
   val lazified: Seq[(String, LoadedState[T])] = content.map { case (k, v) => (k, new LoadedState(v)) }
   case class Holder(nameView: TextView)
 
   override def getCount = lazified.size
   override def getViewTypeCount() = 1
-  override def getItem(pos: Int): Option[T] = lazified(pos)._2.value
+  override def getItem(pos: Int) = lazified(pos)
   override def getItemViewType(position: Int) = 0
   override def getItemId(position: Int) = position
   override def getView(position: Int, convertView: View, parent: ViewGroup): View = {
@@ -29,19 +28,19 @@ class LazyPicker[T](context: Context, content: Seq[(String, (Unit)=>Option[T])])
     holder.nameView.setText(item._1)
     view
   }
-  def getState(pos: Int) = {
-    lazified(pos)._2.value
+  def getState(pos: Int, cb: (Option[T])=>Any) = {
+    lazified(pos)._2.get(cb)
   }
-}
-object LazyPicker {
+  //DANGER: runs callback on gl thread
   class LoadedState[T](var loader: (Unit)=>Option[T]) {
-    lazy val value = loader(())
-    //var loaded: Boolean = false
-    //var value: T = null
-    //def get() = {
-      //if (loaded) {
-      //}
-    //}
+    def get(cb: (Option[T])=>Any) = {
+      thread.runHere {
+        _value = loader(())
+        cb(_value)
+      }
+    }
+
+    private var _value: Option[T] = None
   }
 }
 
