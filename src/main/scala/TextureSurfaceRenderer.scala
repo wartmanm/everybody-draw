@@ -138,7 +138,7 @@ extends Thread with Handler.Callback with AndroidImplicits {
     bitmap
   }
 
-  def cleanupGL(copyShaders: Array[CopyShader], pointShaders: Array[PointShader]) = {
+  def cleanupGL() = {
     handler.obtainMessage(MSG_END_GL).sendToTarget()
   }
 

@@ -51,8 +51,6 @@ class MainActivity extends Activity with TypedActivity with AndroidImplicits {
 
   var textureThread: Option[TextureSurfaceThread] = None
   var outputShader: Option[CopyShader] = None
-  var paintshaders: Array[SpinnerItem[PointShader]] = Array()
-  var animshaders: Array[SpinnerItem[CopyShader]] = Array()
 
   private var savedBitmap: Option[Bitmap] = None
 
@@ -246,12 +244,12 @@ class MainActivity extends Activity with TypedActivity with AndroidImplicits {
     }
   }
 
-  def populatePicker[U, T <: SpinnerItem[U]](picker: NamedPicker[U], arr: Array[T], cb: (U)=>Unit) = {
+  def populatePicker[U, T <: SpinnerItem[(Unit)=>Option[U]]](picker: NamedPicker[U], arr: Array[T], cb: (U)=>Unit) = {
     val adapter: Adapter = new ArrayAdapter(this, android.R.layout.simple_dropdown_item_1line, arr)
     picker.control.setAdapter(adapter)
     picker.control.setOnItemSelectedListener(new AdapterView.OnItemSelectedListener() {
         override def onItemSelected(parent: AdapterView[_], view: View, pos: Int, id: Long) = {
-          cb(arr(pos).item)
+          loadAndSet(cb)(arr(pos).item)
         }
         override def onNothingSelected(parent: AdapterView[_]) = { }
       })
@@ -272,9 +270,6 @@ class MainActivity extends Activity with TypedActivity with AndroidImplicits {
         val unibrushes = DrawFiles.loadUniBrushes(this, gl).map(SpinnerItem(_)).toArray
         Log.i("main", s"got ${brushes.length} brushes, ${anims.length} anims, ${paints.length} paints, ${interpscripts.length} interpolation scripts")
 
-        animshaders = anims
-        paintshaders = paints
-
         MainActivity.this.runOnUiThread(() => {
             // TODO: make hardcoded shaders accessible a better way
             populatePicker(controls.brushpicker, brushes,  thread.setBrushTexture _)
@@ -286,6 +281,15 @@ class MainActivity extends Activity with TypedActivity with AndroidImplicits {
       }
     }
   }
+
+  //TODO: caching, seriously!
+  def loadAndSet[T](setter: (T)=>Unit): ((Unit)=>Option[T])=>Unit = (t: (Unit)=>Option[T]) => {
+    t(()) match {
+      case Some(value) => setter(value)
+      case None => Toast.makeText(this, "unable to load item!", Toast.LENGTH_LONG)
+    }
+  }
+    
 
   def loadUniBrushItem[T](setter: (T)=>Unit, item: Option[T], picker: NamedPicker[T]) = {
     val (setting, enablePicker) = item.map((_, false)).getOrElse {
@@ -313,7 +317,7 @@ class MainActivity extends Activity with TypedActivity with AndroidImplicits {
 
   def finishEGLCleanup() {
     textureThread.foreach(thread => {
-        thread.cleanupGL(animshaders.map(_.item), paintshaders.map(_.item))
+        thread.cleanupGL()
       })
   }
 
