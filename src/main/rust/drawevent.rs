@@ -20,6 +20,7 @@ use pointshader::PointShader;
 use copyshader::CopyShader;
 use collections::str::StrAllocating;
 use luascript::LuaScript;
+use log::logi;
 
 enum DrawEvent {
     UseAnimShader(DrawObjectIndex<Option<CopyShader>>),
@@ -59,13 +60,17 @@ impl<'a> Events<'a> {
         }
     }
 
-
     // FIXME: let glstore deal with optionalness
-    pub fn load_copyshader(&mut self, vert: Option<&str>, frag: Option<&str>) -> DrawObjectIndex<Option<CopyShader>> {
+    pub fn load_copyshader(&mut self, vert: Option<&str>, frag: Option<&str>) -> Option<DrawObjectIndex<Option<CopyShader>>> {
         let initargs = (vert.map(|x|x.into_string()), frag.map(|x|x.into_string()));
         let initopt: ShaderInit<CopyShader> = CachedInit::new(initargs);
-        self.copyshaders.push_object(initopt)
+        if initopt.get().is_some() {
+            Some(self.copyshaders.push_object(initopt))
+        } else {
+            None
+        }
     }
+
     pub fn use_copyshader(&'a mut self, idx: DrawObjectIndex<Option<CopyShader>>) -> Option<&CopyShader> {
         self.eventlist.push(UseCopyShader(idx));
         let shader = self.copyshaders.get_object(idx).as_ref();
@@ -79,10 +84,14 @@ impl<'a> Events<'a> {
         self.animshader = shader;
         shader
     }
-    pub fn load_pointshader(&mut self, vert: Option<&str>, frag: Option<&str>) -> DrawObjectIndex<Option<PointShader>> {
+    pub fn load_pointshader(&mut self, vert: Option<&str>, frag: Option<&str>) -> Option<DrawObjectIndex<Option<PointShader>>> {
         let initargs = (vert.map(|x|x.into_string()), frag.map(|x|x.into_string()));
         let initopt: ShaderInit<PointShader> = CachedInit::new(initargs);
-        self.pointshaders.push_object(initopt)
+        if initopt.get().is_some() {
+            Some(self.pointshaders.push_object(initopt))
+        } else {
+            None
+        }
     }
     pub fn use_pointshader(&'a mut self, idx: DrawObjectIndex<Option<PointShader>>) -> Option<&PointShader> {
         self.eventlist.push(UsePointShader(idx));
@@ -101,9 +110,13 @@ impl<'a> Events<'a> {
         self.brush = Some(brush);
         brush
     }
-    pub fn load_interpolator(&mut self, script: Option<&str>) -> DrawObjectIndex<Option<LuaScript>> {
+    pub fn load_interpolator(&mut self, script: Option<&str>) -> Option<DrawObjectIndex<Option<LuaScript>>> {
         let initopt: LuaInit = CachedInit::new(script.map(|x|x.into_string()));
-        self.luascripts.push_object(initopt)
+        if initopt.get().is_some() {
+            Some(self.luascripts.push_object(initopt))
+        } else {
+            None
+        }
     }
 
     pub fn use_interpolator(&'a mut self, idx: DrawObjectIndex<Option<LuaScript>>) -> Option<&LuaScript> {
