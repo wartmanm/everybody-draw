@@ -20,7 +20,6 @@ import scala.collection.mutable
 
 import com.ipaulpro.afilechooser.utils.FileUtils
 
-import PaintControls.SpinnerItem
 import PaintControls.NamedPicker
 import unibrush.UniBrush
 
@@ -244,12 +243,12 @@ class MainActivity extends Activity with TypedActivity with AndroidImplicits {
     }
   }
 
-  def populatePicker[U, T <: SpinnerItem[(Unit)=>Option[U]]](picker: NamedPicker[U], arr: Array[T], cb: (U)=>Unit) = {
-    val adapter: Adapter = new ArrayAdapter(this, android.R.layout.simple_dropdown_item_1line, arr)
+  def populatePicker[U, T <: (String, (Unit)=>Option[U])](picker: NamedPicker[U], arr: Array[T], cb: (U)=>Unit) = {
+    val adapter = new LazyPicker(this, arr)
     picker.control.setAdapter(adapter)
     picker.control.setOnItemSelectedListener(new AdapterView.OnItemSelectedListener() {
         override def onItemSelected(parent: AdapterView[_], view: View, pos: Int, id: Long) = {
-          loadAndSet(cb)(arr(pos).item)
+          loadAndSet(cb, adapter.getState(pos))
         }
         override def onNothingSelected(parent: AdapterView[_]) = { }
       })
@@ -263,11 +262,11 @@ class MainActivity extends Activity with TypedActivity with AndroidImplicits {
       thread.runHere {
         // TODO: is it really necessary to load every single shader, right now?
         // not that it's not nice to know which ones compiled
-        val brushes = DrawFiles.loadBrushes(this, gl).map(SpinnerItem(_)).toArray
-        val anims = DrawFiles.loadAnimShaders(this, gl).map(SpinnerItem(_)).toArray
-        val paints = DrawFiles.loadPointShaders(this, gl).map(SpinnerItem(_)).toArray
-        val interpscripts = DrawFiles.loadScripts(this, gl).map(SpinnerItem(_)).toArray
-        val unibrushes = DrawFiles.loadUniBrushes(this, gl).map(SpinnerItem(_)).toArray
+        val brushes = DrawFiles.loadBrushes(this, gl).toArray
+        val anims = DrawFiles.loadAnimShaders(this, gl).toArray
+        val paints = DrawFiles.loadPointShaders(this, gl).toArray
+        val interpscripts = DrawFiles.loadScripts(this, gl).toArray
+        val unibrushes = DrawFiles.loadUniBrushes(this, gl).toArray
         Log.i("main", s"got ${brushes.length} brushes, ${anims.length} anims, ${paints.length} paints, ${interpscripts.length} interpolation scripts")
 
         MainActivity.this.runOnUiThread(() => {
@@ -283,8 +282,8 @@ class MainActivity extends Activity with TypedActivity with AndroidImplicits {
   }
 
   //TODO: caching, seriously!
-  def loadAndSet[T](setter: (T)=>Unit): ((Unit)=>Option[T])=>Unit = (t: (Unit)=>Option[T]) => {
-    t(()) match {
+  def loadAndSet[T](setter: (T)=>Unit, value: Option[T]) = {
+    value match {
       case Some(value) => setter(value)
       case None => Toast.makeText(this, "unable to load item!", Toast.LENGTH_LONG)
     }
@@ -292,10 +291,9 @@ class MainActivity extends Activity with TypedActivity with AndroidImplicits {
     
 
   def loadUniBrushItem[T](setter: (T)=>Unit, item: Option[T], picker: NamedPicker[T]) = {
-    val (setting, enablePicker) = item.map((_, false)).getOrElse {
-      (picker.control.getSelectedItem().asInstanceOf[SpinnerItem[T]].item, true)
-    }
-    setter(setting)
+    val setting = item.orElse(picker.control.getSelectedItem().asInstanceOf[Option[T]])
+    val enablePicker = item.isEmpty
+    setting.map(setter)
     picker.control.setEnabled(enablePicker)
   }
 
