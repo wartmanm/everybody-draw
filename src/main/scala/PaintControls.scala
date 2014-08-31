@@ -16,7 +16,7 @@ class PaintControls(inbrushpicker: AdapterView[Adapter], inanimpicker: AdapterVi
   val interppicker = NamedPicker[LuaScript]("interp", ininterppicker)
   val unipicker = NamedPicker[UniBrush]("unib", inunipicker)
 
-  val namedPickers = Array(animpicker, brushpicker, paintpicker, interppicker)
+  val namedPickers = Array(animpicker, brushpicker, paintpicker, interppicker, unipicker)
 
   def restoreState() = namedPickers.map(_.restoreState())
   def updateState() = namedPickers.map(_.updateState())
