@@ -3,35 +3,28 @@ use core::prelude::*;
 use log::logi;
 use android::input::*;
 
-use std::sync::{Once, ONCE_INIT};
-
 use collections::{SmallIntMap, MutableSeq, MutableMap, Map};
 
 use point;
 use point::{PaintPoint, Coordinate, PointEntry, PointProducer};
-use dropfree::DropFree;
 use activestate;
 
 static AMOTION_EVENT_ACTION_POINTER_INDEX_SHIFT: uint = 8;
 
 // TODO: consider eliminating entirely and putting faith in ACTION_POINTER_UP/DOWN
-type Data = SmallIntMap<activestate::ActiveState>;
-
-static mut dataRef: DropFree<Data> = DropFree(0 as *mut Data) ;
-fn get_safe_data<'a>() -> &'a mut Data {
-    do_data_init();
-    unsafe { dataRef.get_mut() }
+type PointerState = SmallIntMap<activestate::ActiveState>;
+pub struct Data {
+    pointer_states: PointerState,
 }
 
-static mut datainit: Once = ONCE_INIT;
-fn do_data_init() {
-    unsafe {
-        datainit.doit(|| dataRef = DropFree::new(SmallIntMap::new()) );
+impl Data {
+    pub fn new() -> Data {
+        Data { pointer_states: SmallIntMap::new() }
     }
 }
 
-pub fn append_motion_event(evt: *const AInputEvent, queue: &mut PointProducer) -> () {
-    let active = get_safe_data();
+pub fn append_motion_event(data: &mut Data, evt: *const AInputEvent, queue: &mut PointProducer) -> () {
+    let active = &mut data.pointer_states;
     for (_, state) in active.mut_iter() {
         *state = state.push(false);
     }
@@ -76,7 +69,7 @@ pub fn append_motion_event(evt: *const AInputEvent, queue: &mut PointProducer) -
     }
 }
 
-fn push_moves(queue: &mut PointProducer, active: &mut Data, evt: *const AInputEvent) {
+fn push_moves(queue: &mut PointProducer, active: &mut PointerState, evt: *const AInputEvent) {
     let ptrcount = unsafe { AMotionEvent_getPointerCount(evt) };
     let historycount = unsafe { AMotionEvent_getHistorySize(evt) };
     for ptr in range(0, ptrcount) {
@@ -90,7 +83,7 @@ fn push_moves(queue: &mut PointProducer, active: &mut Data, evt: *const AInputEv
     push_stops(queue, active);
 }
 
-fn make_active(queue: &mut PointProducer, active: &mut Data, id: i32, newstate: bool) {
+fn make_active(queue: &mut PointProducer, active: &mut PointerState, id: i32, newstate: bool) {
     let updated = active.find(&(id as uint)).unwrap_or(&activestate::inactive).push(newstate);
     active.insert(id as uint, updated);
     if updated == activestate::stopping {
@@ -120,7 +113,7 @@ fn push_current_point(queue: &mut PointProducer, evt: *const AInputEvent, id: i3
     })});
 }
 
-fn push_stops(queue: &mut PointProducer, active: &mut Data) {
+fn push_stops(queue: &mut PointProducer, active: &mut PointerState) {
     for (idx, active) in active.mut_iter() {
         if *active == activestate::stopping {
             queue.push(PointEntry { index: idx as i32, entry: point::Stop });

@@ -22,7 +22,7 @@ import com.ipaulpro.afilechooser.utils.FileUtils
 
 import PaintControls.SpinnerItem
 import PaintControls.NamedPicker
-import UniBrush.UniBrush
+import unibrush.UniBrush
 
 import resource._
 
@@ -58,39 +58,40 @@ class MainActivity extends Activity with TypedActivity with AndroidImplicits {
 
   lazy val saveThread = ExecutionContext.fromExecutor(Executors.newSingleThreadExecutor())
 
-  @native protected def nativeAppendMotionEvent(m: MotionEvent): Unit
+  @native protected def nativeAppendMotionEvent(handler: MotionEventProducer, m: MotionEvent): Unit
 
-  def createTextureThread(s: SurfaceTexture, x: Int, y: Int): Unit = {
+  // TODO: actually clean up
+  var handlers: Option[MotionEventHandlerPair] = None
+
+  def createTextureThread(handlers: MotionEventHandlerPair)(s: SurfaceTexture, x: Int, y: Int): Unit = {
     Log.i("main", "got surfacetexture");
-    val thread = new TextureSurfaceThread(s, onTextureThreadStarted(x,y));
+    val thread = new TextureSurfaceThread(s, handlers.consumer, onTextureThreadStarted(x,y, handlers.producer));
     thread.start()
     Log.i("main", "started thread");
   }
 
-  val onTextureThreadStarted = (x: Int, y: Int) => (thread: TextureSurfaceThread) => this.runOnUiThread(() => {
+  val onTextureThreadStarted = (x: Int, y: Int, producer: MotionEventProducer) => (thread: TextureSurfaceThread) => this.runOnUiThread(() => {
       Log.i("main", "got handler")
       textureThread = Some(thread)
-      thread.beginGL(x, y, onTextureCreated _)
+      thread.beginGL(x, y, onTextureCreated(thread, producer) _)
       thread.startFrames()
       Log.i("main", "sent begin_gl message")
       ()
     })
 
   // runs on gl thread
-  def onTextureCreated() = {
-    textureThread.foreach(thread => {
-        thread.initScreen(savedBitmap)
-        savedBitmap = None
-        thread.startFrames()
-      })
+  def onTextureCreated(thread: TextureSurfaceThread, producer: MotionEventProducer)() = {
+    thread.initScreen(savedBitmap)
+    savedBitmap = None
+    thread.startFrames()
     populatePickers()
-    content.setOnTouchListener(createViewTouchListener())
+    content.setOnTouchListener(createViewTouchListener(producer))
     Log.i("main", "set ontouch listener")
   }
 
-  def createViewTouchListener() = new View.OnTouchListener() {
+  def createViewTouchListener(producer: MotionEventProducer) = new View.OnTouchListener() {
     override def onTouch(v: View, evt: MotionEvent) = {
-      nativeAppendMotionEvent(evt)
+      nativeAppendMotionEvent(producer, evt)
       true
     }
   }
@@ -98,6 +99,7 @@ class MainActivity extends Activity with TypedActivity with AndroidImplicits {
   override def onCreate(bundle: Bundle) {
     Log.i("main", "oncreate")
     System.loadLibrary("gl-stuff")
+    handlers = Some(MotionEventHandlerPair.init())
 
     super.onCreate(bundle)
     setContentView(R.layout.activity_main)
@@ -124,8 +126,11 @@ class MainActivity extends Activity with TypedActivity with AndroidImplicits {
   override def onStart() = {
     Log.i("main", "onStart")
     super.onStart()
-    content.setSurfaceTextureListener(new TextureListener(this))
-    contentframe.addView(content)
+    handlers.foreach(h => {
+        content.setSurfaceTextureListener(new TextureListener(createTextureThread(h) _))
+        contentframe.addView(content)
+      })
+
   }
   
   // FIXME the texture thread might not be ready yet
@@ -171,6 +176,8 @@ class MainActivity extends Activity with TypedActivity with AndroidImplicits {
 
   override protected def onDestroy() = {
     super.onDestroy()
+    handlers.foreach(MotionEventHandlerPair.destroy _)
+    handlers = None
   }
 
   private def prepareForSave() = {
@@ -252,15 +259,17 @@ class MainActivity extends Activity with TypedActivity with AndroidImplicits {
   }
 
   def populatePickers() = {
-    for (thread <- textureThread) {
+    for (
+      thread <- textureThread;
+      gl <- thread.glinit) {
       thread.runHere {
         // TODO: is it really necessary to load every single shader, right now?
         // not that it's not nice to know which ones compiled
-        val brushes = DrawFiles.loadBrushes(this).map(SpinnerItem(_)).toArray
-        val anims = DrawFiles.loadAnimShaders(this).map(SpinnerItem(_)).toArray
-        val paints = DrawFiles.loadPointShaders(this).map(SpinnerItem(_)).toArray
-        val interpscripts = DrawFiles.loadScripts(this).map(SpinnerItem(_)).toArray
-        val unibrushes = DrawFiles.loadUniBrushes(this).map(SpinnerItem(_)).toArray
+        val brushes = DrawFiles.loadBrushes(this, gl).map(SpinnerItem(_)).toArray
+        val anims = DrawFiles.loadAnimShaders(this, gl).map(SpinnerItem(_)).toArray
+        val paints = DrawFiles.loadPointShaders(this, gl).map(SpinnerItem(_)).toArray
+        val interpscripts = DrawFiles.loadScripts(this, gl).map(SpinnerItem(_)).toArray
+        val unibrushes = DrawFiles.loadUniBrushes(this, gl).map(SpinnerItem(_)).toArray
         Log.i("main", s"got ${brushes.length} brushes, ${anims.length} anims, ${paints.length} paints, ${interpscripts.length} interpolation scripts")
 
         animshaders = anims
@@ -351,10 +360,10 @@ object MainActivity {
     final val ACTIVITY_CHOOSE_IMAGE = 0x1;
   }
 
-  class TextureListener(parent: MainActivity) extends TextureView.SurfaceTextureListener {
+  class TextureListener(callback: (SurfaceTexture, Int, Int)=>Unit) extends TextureView.SurfaceTextureListener {
 
     def onSurfaceTextureAvailable(st: android.graphics.SurfaceTexture,  w: Int, h: Int): Unit = {
-      parent.createTextureThread(st, w, h);
+      callback(st, w, h)
     }
     def onSurfaceTextureDestroyed(st: android.graphics.SurfaceTexture): Boolean = {
       Log.i("main", "got onsurfacetexturedestroyed callback!")
