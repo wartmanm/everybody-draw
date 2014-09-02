@@ -267,7 +267,7 @@ pub extern fn setup_graphics(w: i32, h: i32) -> bool {
 
     gl2::viewport(0, 0, w, h);
     gl2::disable(gl2::DEPTH_TEST);
-    gl2::blend_func(gl2::SRC_ALPHA, gl2::ONE_MINUS_SRC_ALPHA);
+    gl2::blend_func(gl2::ONE, gl2::ONE_MINUS_SRC_ALPHA);
     true
 }
 
@@ -277,12 +277,27 @@ pub extern fn draw_queued_points(matrix: *mut f32) {
     match (data.events.pointshader, data.events.brush, data.events.interpolator) {
         (Some(point_shader), Some(brush), Some(interpolator)) => {
             gl2::enable(gl2::BLEND);
-            gl2::blend_func(gl2::SRC_ALPHA, gl2::ONE_MINUS_SRC_ALPHA);
+            gl2::blend_func(gl2::ONE, gl2::ONE_MINUS_SRC_ALPHA);
             let (target, source) = get_texturetargets(data);
             // TODO: brush color selection
             let brushtarget = data.brushlayer.as_ref().unwrap_or(target);
-            draw_path(brushtarget.framebuffer, point_shader, interpolator, matrix, [1f32, 1f32, 0f32],
-                      brush, &source.texture);
+            let should_copy = draw_path(brushtarget.framebuffer, point_shader, interpolator,
+                                        matrix, [1f32, 1f32, 0f32], brush, &source.texture);
+            if should_copy && data.brushlayer.is_some() {
+                match data.events.copyshader {
+                    Some(copy_shader) => {
+                        let copymatrix = matrix::identity.as_slice();
+                        perform_copy(target.framebuffer, &brushtarget.texture, copy_shader, copymatrix);
+                        gl2::bind_framebuffer(gl2::FRAMEBUFFER, brushtarget.framebuffer);
+                        gl2::clear_color(0f32, 0f32, 0f32, 0f32);
+                        gl2::clear(gl2::COLOR_BUFFER_BIT);
+                        logi!("copied brush layer down");
+                    },
+                    None => {
+                        logi!("not copying brush layer");
+                    }
+                }
+            }
         },
         _ => { }
     }
@@ -338,9 +353,12 @@ pub extern fn render_frame() {
             perform_copy(target.framebuffer, &source.texture, anim_shader, copymatrix);
             perform_copy(0 as GLuint, &target.texture, copy_shader, copymatrix);
             match data.brushlayer.as_ref() {
-                Some(ref brushtarget) => perform_copy(0 as GLuint, &brushtarget.texture, copy_shader, copymatrix),
+                Some(ref brushtarget) => {
+                    gl2::enable(gl2::BLEND);
+                    perform_copy(0 as GLuint, &brushtarget.texture, copy_shader, copymatrix);
+                },
                 None => { },
-            };
+            }
             eglinit::egl_swap();
         },
         (x, y) => {

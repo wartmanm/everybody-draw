@@ -22,16 +22,18 @@ use glcommon::check_gl_error;
 use gltexture::Texture;
 use point;
 use point::{ShaderPaintPoint, Coordinate, PointEntry, PointConsumer, PointProducer};
-use rollingaverage::RollingAverage;
 use dropfree::DropFree;
 use matrix::Matrix;
 use luascript::LuaScript;
+use activestate;
+
+rolling_average_count!(RollingAverage16, 16)
 
 /// lifetime storage for a pointer's past state
 struct PointStorage {
     info: Option<ShaderPaintPoint>,
-    sizeavg: RollingAverage<f32>,
-    speedavg: RollingAverage<f32>,
+    sizeavg: RollingAverage16<f32>,
+    speedavg: RollingAverage16<f32>,
 }
 
 pub struct RustStatics {
@@ -40,6 +42,8 @@ pub struct RustStatics {
     currentPoints: SmallIntMap<PointStorage>,
     drawvec: Vec<ShaderPaintPoint>,
     pointCounter: i32,
+    point_count: i32,
+    pointer_state: activestate::ActiveState,
 }
 
 static mut dataRef: DropFree<RustStatics> = DropFree(0 as *mut RustStatics);
@@ -55,6 +59,8 @@ fn do_path_init() -> () {
                 currentPoints: SmallIntMap::new(),
                 drawvec: Vec::new(),
                 pointCounter: 0,
+                point_count: 0,
+                pointer_state: activestate::inactive,
             });
             logi("created statics");
         });
@@ -105,7 +111,7 @@ fn append_points(a: ShaderPaintPoint, b: ShaderPaintPoint, c: &mut Vec<ShaderPai
     }
 }
 
-pub fn draw_path(framebuffer: GLuint, shader: &PointShader, interpolator: &LuaScript, matrix: *mut f32, color: [f32, ..3], brush: &Texture, backBuffer: &Texture) -> () {
+pub fn draw_path(framebuffer: GLuint, shader: &PointShader, interpolator: &LuaScript, matrix: *mut f32, color: [f32, ..3], brush: &Texture, backBuffer: &Texture) -> bool {
     let s = get_statics();
     s.drawvec.clear();
 
@@ -120,6 +126,8 @@ pub fn draw_path(framebuffer: GLuint, shader: &PointShader, interpolator: &LuaSc
         draw_arrays(POINTS, 0, pointvec.len() as i32);
         check_gl_error("draw_arrays");
     }
+    s.pointer_state = s.pointer_state.push(s.point_count > 0);
+    s.pointer_state == activestate::stopping
 }
 
 #[no_mangle]
@@ -134,8 +142,8 @@ pub extern "C" fn next_point_from_lua(s: &mut RustStatics, points: &mut (ShaderP
                 if !currentPoints.contains_key(&(idx as uint)) {
                     currentPoints.insert(idx as uint, PointStorage {
                         info: None,
-                        sizeavg: RollingAverage::new(16),
-                        speedavg: RollingAverage::new(16),
+                        sizeavg: RollingAverage16::new(),
+                        speedavg: RollingAverage16::new(),
                     });
                 }
                 let oldpoint = currentPoints.find_mut(&(idx as uint)).unwrap();
@@ -158,10 +166,14 @@ pub extern "C" fn next_point_from_lua(s: &mut RustStatics, points: &mut (ShaderP
                     },
                     (_, point::Stop) => {
                         oldpoint.info = None;
+                        oldpoint.sizeavg.clear();
+                        oldpoint.speedavg.clear();
+                        s.point_count -= 1;
                     },
                     (_, point::Point(p)) => {
                         let oldCounter = s.pointCounter;
                         s.pointCounter += 1;
+                        s.point_count += 1;
                         oldpoint.info = Some(ShaderPaintPoint {
                             pos: p.pos,
                             time: p.time,

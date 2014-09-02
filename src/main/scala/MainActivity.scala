@@ -22,6 +22,7 @@ import com.ipaulpro.afilechooser.utils.FileUtils
 
 import PaintControls.SpinnerItem
 import PaintControls.NamedPicker
+import UniBrush.UniBrush
 
 import resource._
 
@@ -41,7 +42,8 @@ class MainActivity extends Activity with TypedActivity with AndroidImplicits {
     inbrushpicker = findView(TR.brushpicker).asInstanceOf[AdapterView[Adapter]],
     inanimpicker = findView(TR.animpicker).asInstanceOf[AdapterView[Adapter]],
     inpaintpicker = findView(TR.paintpicker).asInstanceOf[AdapterView[Adapter]],
-    ininterppicker = findView(TR.interppicker).asInstanceOf[AdapterView[Adapter]])
+    ininterppicker = findView(TR.interppicker).asInstanceOf[AdapterView[Adapter]],
+    inunipicker = findView(TR.unipicker).asInstanceOf[AdapterView[Adapter]])
 
   lazy val clearbutton = findView(TR.clearbutton)
   lazy val loadbutton = findView(TR.loadbutton)
@@ -258,6 +260,7 @@ class MainActivity extends Activity with TypedActivity with AndroidImplicits {
         val anims = DrawFiles.loadAnimShaders(this).map(SpinnerItem(_)).toArray
         val paints = DrawFiles.loadPointShaders(this).map(SpinnerItem(_)).toArray
         val interpscripts = DrawFiles.loadScripts(this).map(SpinnerItem(_)).toArray
+        val unibrushes = DrawFiles.loadUniBrushes(this).map(SpinnerItem(_)).toArray
         Log.i("main", s"got ${brushes.length} brushes, ${anims.length} anims, ${paints.length} paints, ${interpscripts.length} interpolation scripts")
 
         animshaders = anims
@@ -269,8 +272,28 @@ class MainActivity extends Activity with TypedActivity with AndroidImplicits {
             populatePicker(controls.animpicker, anims,  thread.setAnimShader _)
             populatePicker(controls.paintpicker, paints,  thread.setPointShader _)
             populatePicker(controls.interppicker, interpscripts,  thread.setInterpScript _)
+            populatePicker(controls.unipicker, unibrushes, loadUniBrush _)
           })
       }
+    }
+  }
+
+  def loadUniBrushItem[T](setter: (T)=>Unit, item: Option[T], picker: NamedPicker[T]) = {
+    val (setting, enablePicker) = item.map((_, false)).getOrElse {
+      (picker.control.getSelectedItem().asInstanceOf[SpinnerItem[T]].item, true)
+    }
+    setter(setting)
+    picker.control.setEnabled(enablePicker)
+  }
+
+  def loadUniBrush(unibrush: UniBrush) = {
+    for (thread <- textureThread) {
+      // TODO: don't load when nothing changed; perform load from texturethread side
+      loadUniBrushItem(thread.setBrushTexture, unibrush.brush, controls.brushpicker)
+      loadUniBrushItem(thread.setAnimShader, unibrush.animshader, controls.animpicker)
+      loadUniBrushItem(thread.setPointShader, unibrush.pointshader, controls.paintpicker)
+      loadUniBrushItem(thread.setInterpScript, unibrush.interpolator, controls.interppicker)
+      thread.setSeparateBrushlayer(unibrush.separatelayer)
     }
   }
 

@@ -166,6 +166,10 @@ static jobject exportPixels(JNIEnv* env, jobject thiz) {
   return (jobject) with_pixels(mycallback, env);
 }
 
+static void jniSetSeparateBrushlayer(JNIEnv* env, jobject thiz, jboolean separatelayer) {
+  set_separate_brushlayer(separatelayer);
+}
+
 static void jniEglFinish(JNIEnv* env, jobject thiz) {
   egl_finish();
 }
@@ -258,7 +262,11 @@ jint JNI_OnLoad(JavaVM* vm, void* reserved) {
       .name = "nativeSetInterpolator",
       .signature = "(I)V",
       .fnPtr = jniLuaSetInterpolator,
-    }
+    }, {
+      .name = "nativeSetSeparateBrushlayer",
+      .signature = "(Z)V",
+      .fnPtr = jniSetSeparateBrushlayer,
+    },
   };
   jclass textureclass = (*env)->FindClass(env, "com/github/wartman4404/gldraw/TextureSurfaceThread");
   (*env)->RegisterNatives(env, textureclass, texturemethods, sizeof(texturemethods)/sizeof(JNINativeMethod));

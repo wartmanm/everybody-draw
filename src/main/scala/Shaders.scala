@@ -6,7 +6,11 @@ class PointShader private (private val nativePtr: Int) extends AnyVal
 class Texture private (private val nativePtr: Int) extends AnyVal
 class LuaScript private (private val nativePtr: Int) extends AnyVal
 
-object CopyShader {
+trait Shader[T] {
+  def apply(vec: String, frag: String): Option[T]
+}
+
+object CopyShader extends Shader[CopyShader] {
   @native def compile(vec: String, frag: String): Int
   def apply(vec: String, frag: String): Option[CopyShader] = {
     compile(vec, frag) match {
@@ -15,7 +19,7 @@ object CopyShader {
     }
   }
 }
-object PointShader {
+object PointShader extends Shader[PointShader] {
   @native def compile(vec: String, frag: String): Int;
   def apply(vec: String, frag: String): Option[PointShader] = {
     compile(vec, frag) match {

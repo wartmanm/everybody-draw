@@ -47,7 +47,7 @@ static default_fragment_shader: &'static str =
         float ctime = clamp(time, 0.0, 1.0);
         float csize = clamp(size, 0.0, 1.0);
         float alpha = texture2D(texture, gl_PointCoord).a;
-        gl_FragColor = vec4(color, alpha);
+        gl_FragColor = vec4(color * alpha, alpha);
     }";
 
 pub struct PointShader {

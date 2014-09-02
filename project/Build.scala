@@ -71,11 +71,12 @@ object General {
   )
   
   lazy val excessiveDebugSettings = Seq (
-    scalacOptions ++= Seq("-Ywarn-value-discard")
+    scalacOptions ++= Seq("-Ywarn-value-discard", "-Ymacro-debug-lite")
   )
 
   val settings = Defaults.defaultSettings ++ Seq (
     resolvers += "Local Maven Repository" at "file://"+Path.userHome.absolutePath+"/.m2/repository",
+    resolvers += "spray" at "http://repo.spray.io/",
     name := "everybodydraw",
     version := "0.1",
     versionCode := 0,
@@ -95,7 +96,8 @@ object General {
       useTypedResources := true,
       libraryDependencies ++= Seq(
         apklib("com.github.iPaulPro" % "aFileChooser" % "0.1" changing() ),
-        "com.jsuereth" %% "scala-arm" % "1.5-SNAPSHOT"
+        "com.jsuereth" %% "scala-arm" % "1.5-SNAPSHOT",
+        "io.spray" %%  "spray-json" % "1.2.7-A" changing()
       )
     )
 }
