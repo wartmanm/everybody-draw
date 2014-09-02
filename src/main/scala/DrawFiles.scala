@@ -13,18 +13,18 @@ import unibrush.UniBrush
 object DrawFiles {
   type MaybeRead[T] = (InputStream)=>Option[T]
   type MaybeReader[T] = (MaybeRead[T])=>Option[T]
-  def allfiles[T](c: Context, path: String): Array[(String, ManagedResource[InputStream])] = {
+  def allfiles[T](c: Context, path: String): Array[(String, (Unit)=>ManagedResource[InputStream])] = {
     val builtins = c.getAssets().list(path).map(path ++ "/" ++ _)
     val userdirs = c.getExternalFilesDirs(path).flatMap(Option(_)) // some paths may be null??
     val userfiles = userdirs.flatMap(_.listFiles())
     val builtinOpeners = builtins.map(path => {
-        basename(path) -> withAssetStream[Option[T]](c, path)
-    })
+        basename(path) -> ((_: Unit)=>withAssetStream[Option[T]](c, path))
+      })
 
-  val fileOpeners = userfiles.map(file => {
-      file.getName() -> withFileStream[Option[T]](file)
-    })
-  (builtinOpeners ++ fileOpeners)
+    val fileOpeners = userfiles.map(file => {
+        file.getName() -> ((_: Unit)=>withFileStream[Option[T]](file))
+      })
+    (builtinOpeners ++ fileOpeners)
   }
 
   def withAssetStream[T](c: Context, path: String) = {
@@ -40,10 +40,17 @@ object DrawFiles {
     s.substring(s.lastIndexOf("/") + 1)
   }
 
-  def withFilename[T](reader: MaybeRead[T]) = {
-    val a = (kv: (String, ManagedResource[InputStream])) => {
+  def useInputStream[T](reader: (InputStream)=>Option[T]) = {
+    val out: (ManagedResource[InputStream])=>Option[T] = (m: ManagedResource[InputStream]) => {
+      m.map(reader).opt.flatten
+    }
+    out
+  }
+
+def withFilename[T](reader: MaybeRead[T]): ((String, (Unit)=>ManagedResource[InputStream]))=>(String, (Unit)=>Option[T]) = {
+    val a = (kv: (String, (Unit)=>ManagedResource[InputStream])) => {
       val (k, v) = kv
-      for (stream <- v) yield reader(stream).map(k -> _)
+      k -> useInputStream(reader).compose(v)
     }
     a
   }
@@ -59,44 +66,43 @@ object DrawFiles {
       })
   }
 
-  def loadBrushes(c: Context, data: GLInit) = {
+  def loadBrushes(c: Context, data: GLInit): Array[(String, (Unit)=>Option[Texture])] = {
     val decoder = decodeBitmap(Bitmap.Config.ALPHA_8) _
     val toTexture = (ob: Option[Bitmap]) => ob.map(Texture(data, _))
     val filenamed = withFilename[Texture](toTexture.compose(decoder))
-    val files = allfiles[Texture](c, "brushes")
-    files.map(filenamed).flatMap(_.opt).flatten
+    val files: Array[(String, (Unit)=>ManagedResource[InputStream])] = allfiles[Texture](c, "brushes")
+    files.map(filenamed)
   }
 
   // TODO: make these safe
-  def loadPointShaders(c: Context, data: GLInit) = {
-    val defaultShader = PointShader(data, null, null).map(("Default Paint", _))
-    defaultShader.toSeq ++ allfiles[PointShader](c, "pointshaders").map(withFilename(readShader(PointShader(data, _, _)) _)).flatMap(_.opt).flatten.toSeq
+  def loadPointShaders(c: Context, data: GLInit): Seq[(String, (Unit)=>Option[PointShader])] = {
+    val defaultShader = PointShader(data, null, null).map(x => ("Default Paint", (_: Unit) => Some(x)))
+    defaultShader.toSeq ++ allfiles[PointShader](c, "pointshaders").map(withFilename(readShader(PointShader(data, _, _)) _))
   }
 
-  def loadAnimShaders(c: Context, data: GLInit): Seq[(String, CopyShader)] = {
-    val defaultShader = CopyShader(data, null, null).map(("Default Animation", _))
+  def loadAnimShaders(c: Context, data: GLInit): Seq[(String, (Unit)=>Option[CopyShader])] = {
+    val defaultShader = CopyShader(data, null, null).map(x => ("Default Animation", (_: Unit) => Some(x)))
     val decoded = readShader(CopyShader(data, _, _)) _
     val filenamed = withFilename[CopyShader](decoded)
     val files = allfiles[CopyShader](c, "animshaders")
-    val shaders = files.map(filenamed).flatMap(_.opt).flatten
+    val shaders: Seq[(String, (Unit)=>Option[CopyShader])] = files.map(filenamed)
     defaultShader.toSeq ++ shaders
   }
 
-  def loadScripts(c: Context, data: GLInit): Seq[(String, LuaScript)] = {
-    val defaultScript = LuaScript(data, null).map(("Default Interpolator", _))
-    val filenamed = withFilename((LuaScript.apply(data, _: String)).compose(readStream _))
-    defaultScript.toSeq ++ allfiles[String](c, "interpolators").map(filenamed).flatMap(_.opt).flatten.toSeq
+  def loadScripts(c: Context, data: GLInit): Seq[(String, (Unit)=>Option[LuaScript])] = {
+    val defaultScript = LuaScript(data, null).map(x => ("Default Interpolator", (_: Unit) => Some(x)))
+    val filenamed = withFilename((LuaScript(data, _: String)).compose(readStream _))
+    defaultScript.toSeq ++ allfiles[String](c, "interpolators").map(filenamed)
   }
 
-  def loadUniBrushes(c: Context, data: GLInit): Seq[(String, UniBrush)] = {
+  def loadUniBrushes(c: Context, data: GLInit): Seq[(String, (Unit)=>Option[UniBrush])] = {
     val userdirs = c.getExternalFilesDirs("unibrushes").flatMap(Option(_))
     userdirs.flatMap(_.listFiles())
     .filter(dir => dir.isDirectory() && new File(dir, "brush.json").isFile())
-    .flatMap(dir => {
+    .map(dir => (dir.getName(), (_: Unit) => {
         withFileStream(new File(dir, "brush.json")).map(readStream _).opt
         .flatMap(src => UniBrush.compile(data, src, dir.getAbsolutePath()))
-        .map(dir.getName() -> _)
-      })
+      }))
   }
 
   def halfShaderPair(shader: String) = {

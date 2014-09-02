@@ -177,13 +177,13 @@ unsafe fn compile_shader<T>(vec: *const i8, frag: *const i8,
 #[no_mangle]
 pub unsafe fn compile_copy_shader(data: *mut Data, vert: *const i8, frag: *const i8) -> DrawObjectIndex<Option<CopyShader>> {
     let shader = compile_shader(vert, frag, |v,f|get_safe_data(data).events.load_copyshader(v,f));
-    shader
+    shader.unwrap_or(mem::transmute(-1i))
 }
 
 #[no_mangle]
 pub unsafe fn compile_point_shader(data: *mut Data, vert: *const i8, frag: *const i8) -> DrawObjectIndex<Option<PointShader>> {
     let shader = compile_shader(vert, frag, |v,f|get_safe_data(data).events.load_pointshader(v,f));
-    shader
+    shader.unwrap_or(mem::transmute(-1i))
 }
 
 #[no_mangle]
@@ -191,7 +191,7 @@ pub unsafe fn compile_luascript(data: *mut Data, luachars: *const i8) -> DrawObj
     let script = with_cstr_as_str(luachars, |luastr| {
         get_safe_data(data).events.load_interpolator(luastr)
     });
-    script
+    script.unwrap_or(mem::transmute(-1i))
 }
 
 // TODO: make an enum for these with a scala counterpart

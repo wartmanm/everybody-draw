@@ -1,4 +1,6 @@
 use core::prelude::*;
+use core::fmt;
+use core::fmt::Show;
 
 use opengles::gl2;
 use opengles::gl2::GLuint;
@@ -49,5 +51,11 @@ impl Drop for Texture {
     fn drop(&mut self) {
         gl2::delete_textures([self.texture].as_slice());
         logi!("deleted {} texture", self.dimensions);
+    }
+}
+
+impl Show for Texture {
+    fn fmt(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
+        write!(formatter, "texture 0x{:x}, dimensions {}", self.texture, self.dimensions)
     }
 }
