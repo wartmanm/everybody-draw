@@ -23,20 +23,20 @@ use luascript::LuaScript;
 use log::logi;
 
 enum DrawEvent {
-    UseAnimShader(DrawObjectIndex<Option<CopyShader>>),
-    UseCopyShader(DrawObjectIndex<Option<CopyShader>>),
-    UsePointShader(DrawObjectIndex<Option<PointShader>>),
+    UseAnimShader(DrawObjectIndex<CopyShader>),
+    UseCopyShader(DrawObjectIndex<CopyShader>),
+    UsePointShader(DrawObjectIndex<PointShader>),
     UseBrush(DrawObjectIndex<Texture>),
-    UseInterpolator(DrawObjectIndex<Option<LuaScript>>),
+    UseInterpolator(DrawObjectIndex<LuaScript>),
     Point(PointEntry),
 }
 
 pub struct Events<'a> {
     eventlist: Vec<DrawEvent>,
-    pointshaders: DrawObjectList<Option<PointShader>, ShaderInitValues>,
-    copyshaders: DrawObjectList<Option<CopyShader>, ShaderInitValues>,
+    pointshaders: DrawObjectList<PointShader, ShaderInitValues>,
+    copyshaders: DrawObjectList<CopyShader, ShaderInitValues>,
     textures: DrawObjectList<Texture, BrushInitValues>,
-    luascripts: DrawObjectList<Option<LuaScript>, LuaInitValues>,
+    luascripts: DrawObjectList<LuaScript, LuaInitValues>,
     pub pointshader: Option<&'a PointShader>,
     pub animshader: Option<&'a CopyShader>,
     pub copyshader: Option<&'a CopyShader>,
@@ -61,47 +61,39 @@ impl<'a> Events<'a> {
     }
 
     // FIXME: let glstore deal with optionalness
-    pub fn load_copyshader(&mut self, vert: Option<&str>, frag: Option<&str>) -> Option<DrawObjectIndex<Option<CopyShader>>> {
+    pub fn load_copyshader(&mut self, vert: Option<&str>, frag: Option<&str>) -> Option<DrawObjectIndex<CopyShader>> {
         let initargs = (vert.map(|x|x.into_string()), frag.map(|x|x.into_string()));
-        let initopt: ShaderInit<CopyShader> = CachedInit::new(initargs);
-        if initopt.get().is_some() {
-            Some(self.copyshaders.push_object(initopt))
-        } else {
-            None
-        }
+        let initopt: Option<ShaderInit<CopyShader>> = CachedInit::new(initargs);
+        initopt.map(|x| self.copyshaders.push_object(x))
     }
 
-    pub fn use_copyshader(&'a mut self, idx: DrawObjectIndex<Option<CopyShader>>) -> Option<&CopyShader> {
+    pub fn use_copyshader(&'a mut self, idx: DrawObjectIndex<CopyShader>) -> &CopyShader {
         self.eventlist.push(UseCopyShader(idx));
-        let shader = self.copyshaders.get_object(idx).as_ref();
-        self.copyshader = shader;
+        let shader = self.copyshaders.get_object(idx);
+        self.copyshader = Some(shader);
         shader
     }
 
-    pub fn use_animshader(&'a mut self, idx: DrawObjectIndex<Option<CopyShader>>) -> Option<&CopyShader> {
+    pub fn use_animshader(&'a mut self, idx: DrawObjectIndex<CopyShader>) -> &CopyShader {
         self.eventlist.push(UseAnimShader(idx));
-        let shader = self.copyshaders.get_object(idx).as_ref();
-        self.animshader = shader;
+        let shader = self.copyshaders.get_object(idx);
+        self.animshader = Some(shader);
         shader
     }
-    pub fn load_pointshader(&mut self, vert: Option<&str>, frag: Option<&str>) -> Option<DrawObjectIndex<Option<PointShader>>> {
+    pub fn load_pointshader(&mut self, vert: Option<&str>, frag: Option<&str>) -> Option<DrawObjectIndex<PointShader>> {
         let initargs = (vert.map(|x|x.into_string()), frag.map(|x|x.into_string()));
-        let initopt: ShaderInit<PointShader> = CachedInit::new(initargs);
-        if initopt.get().is_some() {
-            Some(self.pointshaders.push_object(initopt))
-        } else {
-            None
-        }
+        let initopt: Option<ShaderInit<PointShader>> = CachedInit::new(initargs);
+        initopt.map(|x| self.pointshaders.push_object(x))
     }
-    pub fn use_pointshader(&'a mut self, idx: DrawObjectIndex<Option<PointShader>>) -> Option<&PointShader> {
+    pub fn use_pointshader(&'a mut self, idx: DrawObjectIndex<PointShader>) -> &PointShader {
         self.eventlist.push(UsePointShader(idx));
-        let shader = self.pointshaders.get_object(idx).as_ref();
-        self.pointshader = shader;
+        let shader = self.pointshaders.get_object(idx);
+        self.pointshader = Some(shader);
         shader
     }
     pub fn load_brush(&mut self, w: i32, h: i32, pixels: &[u8], format: PixelFormat) -> DrawObjectIndex<Texture> {
         let ownedpixels = pixels.to_vec();
-        let init: BrushInit = CachedInit::new((format, (w, h), ownedpixels));
+        let init: BrushInit = CachedInit::safe_new((format, (w, h), ownedpixels));
         self.textures.push_object(init)
     }
     pub fn use_brush(&'a mut self, idx: DrawObjectIndex<Texture>) -> &Texture {
@@ -110,19 +102,15 @@ impl<'a> Events<'a> {
         self.brush = Some(brush);
         brush
     }
-    pub fn load_interpolator(&mut self, script: Option<&str>) -> Option<DrawObjectIndex<Option<LuaScript>>> {
-        let initopt: LuaInit = CachedInit::new(script.map(|x|x.into_string()));
-        if initopt.get().is_some() {
-            Some(self.luascripts.push_object(initopt))
-        } else {
-            None
-        }
+    pub fn load_interpolator(&mut self, script: Option<&str>) -> Option<DrawObjectIndex<LuaScript>> {
+        let initopt: Option<LuaInit> = CachedInit::new(script.map(|x|x.into_string()));
+        initopt.map(|x| self.luascripts.push_object(x))
     }
 
-    pub fn use_interpolator(&'a mut self, idx: DrawObjectIndex<Option<LuaScript>>) -> Option<&LuaScript> {
+    pub fn use_interpolator(&'a mut self, idx: DrawObjectIndex<LuaScript>) -> &LuaScript {
         self.eventlist.push(UseInterpolator(idx));
-        let interpolator = self.luascripts.get_object(idx).as_ref();
-        self.interpolator = interpolator;
+        let interpolator = self.luascripts.get_object(idx);
+        self.interpolator = Some(interpolator);
         interpolator
     }
 

@@ -175,19 +175,19 @@ unsafe fn compile_shader<T>(vec: *const i8, frag: *const i8,
 }
 
 #[no_mangle]
-pub unsafe fn compile_copy_shader(data: *mut Data, vert: *const i8, frag: *const i8) -> DrawObjectIndex<Option<CopyShader>> {
+pub unsafe fn compile_copy_shader(data: *mut Data, vert: *const i8, frag: *const i8) -> DrawObjectIndex<CopyShader> {
     let shader = compile_shader(vert, frag, |v,f|get_safe_data(data).events.load_copyshader(v,f));
     shader.unwrap_or(mem::transmute(-1i))
 }
 
 #[no_mangle]
-pub unsafe fn compile_point_shader(data: *mut Data, vert: *const i8, frag: *const i8) -> DrawObjectIndex<Option<PointShader>> {
+pub unsafe fn compile_point_shader(data: *mut Data, vert: *const i8, frag: *const i8) -> DrawObjectIndex<PointShader> {
     let shader = compile_shader(vert, frag, |v,f|get_safe_data(data).events.load_pointshader(v,f));
     shader.unwrap_or(mem::transmute(-1i))
 }
 
 #[no_mangle]
-pub unsafe fn compile_luascript(data: *mut Data, luachars: *const i8) -> DrawObjectIndex<Option<LuaScript>> {
+pub unsafe fn compile_luascript(data: *mut Data, luachars: *const i8) -> DrawObjectIndex<LuaScript> {
     let script = with_cstr_as_str(luachars, |luastr| {
         get_safe_data(data).events.load_interpolator(luastr)
     });
@@ -196,7 +196,7 @@ pub unsafe fn compile_luascript(data: *mut Data, luachars: *const i8) -> DrawObj
 
 // TODO: make an enum for these with a scala counterpart
 #[no_mangle]
-pub unsafe fn set_copy_shader(data: *mut Data, shader: DrawObjectIndex<Option<CopyShader>>) -> () {
+pub unsafe fn set_copy_shader(data: *mut Data, shader: DrawObjectIndex<CopyShader>) -> () {
     logi("setting copy shader");
     get_safe_data(data).events.use_copyshader(shader);
 }
@@ -204,19 +204,19 @@ pub unsafe fn set_copy_shader(data: *mut Data, shader: DrawObjectIndex<Option<Co
 // these can also be null to unset the shader
 // TODO: document better from scala side
 #[no_mangle]
-pub unsafe fn set_anim_shader(data: *mut Data, shader: DrawObjectIndex<Option<CopyShader>>) -> () {
+pub unsafe fn set_anim_shader(data: *mut Data, shader: DrawObjectIndex<CopyShader>) -> () {
     logi("setting anim shader");
     get_safe_data(data).events.use_animshader(shader);
 }
 
 #[no_mangle]
-pub unsafe fn set_point_shader(data: *mut Data, shader: DrawObjectIndex<Option<PointShader>>) -> () {
+pub unsafe fn set_point_shader(data: *mut Data, shader: DrawObjectIndex<PointShader>) -> () {
     logi("setting point shader");
     get_safe_data(data).events.use_pointshader(shader);
 }
 
 #[no_mangle]
-pub unsafe fn set_interpolator(data: *mut Data, interpolator: DrawObjectIndex<Option<LuaScript>>) -> () {
+pub unsafe fn set_interpolator(data: *mut Data, interpolator: DrawObjectIndex<LuaScript>) -> () {
     logi("setting interpolator");
     get_safe_data(data).events.use_interpolator(interpolator);
 }

@@ -27,10 +27,10 @@ pub struct DrawObjectIndex<T>(i32);
 
 pub type ShaderInitValues = (Option<String>, Option<String>);
 pub type BrushInitValues = (PixelFormat, (i32, i32), Vec<u8>);
-pub type ShaderInit<T> = CachedInit<Option<T>, ShaderInitValues>;
+pub type ShaderInit<T> = CachedInit<T, ShaderInitValues>;
 pub type BrushInit = CachedInit<Texture, BrushInitValues>;
 pub type LuaInitValues = Option<String>;
-pub type LuaInit = CachedInit<Option<LuaScript>, LuaInitValues>;
+pub type LuaInit = CachedInit<LuaScript, LuaInitValues>;
 
 pub struct CachedInit<T, Init> {
     value: UnsafeCell<Option<T>>,
@@ -40,23 +40,38 @@ pub struct CachedInit<T, Init> {
 pub trait InitFromCache<Init> {
     fn init(&Init) -> Self;
 }
+pub trait MaybeInitFromCache<Init> {
+    fn maybe_init(&Init) -> Option<Self>;
+}
 
-impl<T: InitFromCache<Init>, Init> CachedInit<T, Init> {
+impl<T: MaybeInitFromCache<Init>, Init> CachedInit<T, Init> {
     pub fn get(&self) -> &T {
         match unsafe { &*self.value.get() } {
             &Some(ref x) => x,
             &None => {
-                let value: T = InitFromCache::init(&self.init);
-                unsafe { *self.value.get() = Some(value); }
+                let value: Option<T> = MaybeInitFromCache::maybe_init(&self.init);
+                unsafe { *self.value.get() = Some(value).unwrap(); }
                 self.get()
             }
         }
     }
+    pub fn new(init: Init) -> Option<CachedInit<T, Init>> {
+        let value: Option<T> = MaybeInitFromCache::maybe_init(&init);
+        match value {
+            Some(v) => Some(CachedInit { value: UnsafeCell::new(Some(v)), init: init }),
+            None => None
+        }
+    }
 }
 
-impl<T, Init> CachedInit<T, Init> {
-    pub fn new(init: Init) -> CachedInit<T, Init> {
-        CachedInit { value: UnsafeCell::new(None), init: init }
+trait RunInit<T, Init> {
+    fn get_inited(&Init) -> Option<T>;
+}
+
+impl<T: InitFromCache<Init>, Init> CachedInit<T, Init> {
+    pub fn safe_new(init: Init) -> CachedInit<T, Init> {
+        let value: T = InitFromCache::init(&init);
+        CachedInit { value: UnsafeCell::new(Some(value)), init: init }
     }
 }
 
@@ -68,11 +83,17 @@ fn _init_copy_shader<T: Shader>(value: &(Option<String>, Option<String>)) -> Opt
     let (vertopt, fragopt) = (vert.as_ref().map(|x|x.as_slice()), frag.as_ref().map(|x|x.as_slice()));
     Shader::new(fragopt, vertopt)
 }
-impl InitFromCache<ShaderInitValues> for Option<CopyShader> {
-    fn init(value: &(Option<String>, Option<String>)) -> Option<CopyShader> { _init_copy_shader(value) }
+impl MaybeInitFromCache<ShaderInitValues> for CopyShader {
+    fn maybe_init(value: &(Option<String>, Option<String>)) -> Option<CopyShader> { _init_copy_shader(value) }
 }
-impl InitFromCache<ShaderInitValues> for Option<PointShader> {
-    fn init(value: &(Option<String>, Option<String>)) -> Option<PointShader> { _init_copy_shader(value) }
+impl MaybeInitFromCache<ShaderInitValues> for PointShader {
+    fn maybe_init(value: &(Option<String>, Option<String>)) -> Option<PointShader> { _init_copy_shader(value) }
+}
+// TODO: use this as the impl for all InitFromCache<Init>
+impl MaybeInitFromCache<BrushInitValues> for Texture {
+    fn maybe_init(value: &BrushInitValues) -> Option<Texture> {
+        Some(InitFromCache::init(value))
+    }
 }
 
 impl InitFromCache<BrushInitValues> for Texture {
@@ -82,13 +103,13 @@ impl InitFromCache<BrushInitValues> for Texture {
     }
 }
 
-impl InitFromCache<LuaInitValues> for Option<LuaScript> {
-    fn init(value: &Option<String>) -> Option<LuaScript> {
+impl MaybeInitFromCache<LuaInitValues> for LuaScript {
+    fn maybe_init(value: &Option<String>) -> Option<LuaScript> {
         LuaScript::new(value.as_ref().map(|x|x.as_slice()))
     }
 }
 
-impl<T: InitFromCache<Init>, Init> DrawObjectList<T, Init> {
+impl<T: MaybeInitFromCache<Init>, Init> DrawObjectList<T, Init> {
     pub fn new() -> DrawObjectList<T, Init> {
         DrawObjectList {
             list: Vec::new()
