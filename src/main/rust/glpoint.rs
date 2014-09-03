@@ -26,6 +26,7 @@ use point::{ShaderPaintPoint, Coordinate, PointEntry, PointConsumer, PointProduc
 use matrix::Matrix;
 use luascript::LuaScript;
 use activestate;
+use drawevent::Events;
 
 use alloc::boxed::Box;
 
@@ -90,7 +91,7 @@ pub unsafe extern fn destroy_motion_event_handler(consumer: *mut MotionEventCons
 
 #[no_mangle]
 //FIXME: needs meaningful name
-pub extern fn jni_append_motion_event(s: *mut MotionEventProducer, evt: *const AInputEvent) {
+pub extern fn jni_append_motion_event(s: &mut MotionEventProducer, evt: *const AInputEvent) {
     let s = get_safe_data(s);
     append_motion_event(&mut s.pointer_data, evt, &mut s.producer);
 }
@@ -127,12 +128,12 @@ fn append_points(a: ShaderPaintPoint, b: ShaderPaintPoint, c: &mut Vec<ShaderPai
     }
 }
 
-pub fn draw_path(s: *mut MotionEventConsumer, framebuffer: GLuint, shader: &PointShader, interpolator: &LuaScript, matrix: *mut f32, color: [f32, ..3], brush: &Texture, backBuffer: &Texture) -> bool {
+pub fn draw_path(s: *mut MotionEventConsumer, framebuffer: GLuint, shader: &PointShader, interpolator: &LuaScript, matrix: *mut f32, color: [f32, ..3], brush: &Texture, backBuffer: &Texture, events: &mut Events) -> bool {
     let s = get_safe_data(s);
     s.drawvec.clear();
 
     interpolator.prep();
-    run_lua_shader(backBuffer.dimensions, s);
+    run_lua_shader(backBuffer.dimensions, (s, events));
 
     let ref mut pointvec = s.drawvec;
     if pointvec.len() > 0 {
@@ -147,12 +148,15 @@ pub fn draw_path(s: *mut MotionEventConsumer, framebuffer: GLuint, shader: &Poin
 }
 
 #[no_mangle]
-pub extern "C" fn next_point_from_lua(s: &mut MotionEventConsumer, points: &mut (ShaderPaintPoint, ShaderPaintPoint)) -> bool {
+pub extern "C" fn next_point_from_lua(se: &mut (&mut MotionEventConsumer, &mut Events), points: &mut (ShaderPaintPoint, ShaderPaintPoint)) -> bool {
+    let (ref mut s, ref mut e) = *se;
+    //let (ref mut s, ref mut e) = se;
     let ref mut queue = s.consumer;
     let ref mut currentPoints = s.currentPoints;
     loop {
         match queue.pop() {
             Some(point) => {
+                e.pushpoint(point);
                 let idx = point.index;
                 let newpoint = point.entry;
                 if !currentPoints.contains_key(&(idx as uint)) {
@@ -209,10 +213,10 @@ pub extern "C" fn next_point_from_lua(s: &mut MotionEventConsumer, points: &mut 
     }
 }
 
-fn run_lua_shader(dimensions: (i32, i32), statics: &mut MotionEventConsumer) {
+fn run_lua_shader(dimensions: (i32, i32), mut statics: (&mut MotionEventConsumer, &mut Events)) {
     let (x,y) = dimensions;
     unsafe {
-        doInterpolateLua(x, y, statics);
+        doInterpolateLua(x, y, &mut statics);
     }
 }
 
@@ -220,7 +224,7 @@ fn run_lua_shader(dimensions: (i32, i32), statics: &mut MotionEventConsumer) {
 #[allow(non_snake_case_functions)]
 #[allow(ctypes)]
 extern "C" {
-    pub fn doInterpolateLua(x: i32, y: i32, statics: *mut MotionEventConsumer);
+    pub fn doInterpolateLua(x: i32, y: i32, statics: *mut (&mut MotionEventConsumer, &mut Events));
 }
 
 #[no_mangle]

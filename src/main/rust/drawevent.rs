@@ -29,6 +29,7 @@ enum DrawEvent {
     UseBrush(DrawObjectIndex<Texture>),
     UseInterpolator(DrawObjectIndex<LuaScript>),
     Point(PointEntry),
+    Frame,
 }
 
 pub struct Events<'a> {
@@ -116,6 +117,9 @@ impl<'a> Events<'a> {
 
     pub fn pushpoint(&mut self, event: PointEntry) {
         self.eventlist.push(Point(event));
+    }
+    pub fn pushframe(&mut self) {
+        self.eventlist.push(Frame);
     }
     pub fn clear(&mut self) {
         self.eventlist.clear();

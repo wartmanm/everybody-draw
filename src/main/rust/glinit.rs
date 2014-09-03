@@ -73,9 +73,13 @@ pub struct Data<'a> {
     #[allow(dead_code)]
     dimensions: (i32, i32),
     events: Events<'a>,
-    targets: [TextureTarget, ..2],
-    current_target: uint,
+    targetdata: TargetData,
     brushlayer: Option<TextureTarget>,
+}
+
+pub struct TargetData {
+    targets: [TextureTarget, ..2],
+    current_target: u8,
 }
 
 fn print_gl_string(name: &str, s: GLenum) {
@@ -83,15 +87,15 @@ fn print_gl_string(name: &str, s: GLenum) {
     logi!("GL {} = {}\n", name, glstr);
 }
 
-fn get_current_texturetarget<'a>(data: &'a Data) -> &'a TextureTarget {
-    &data.targets[data.current_target]
+fn get_current_texturetarget<'a>(data: &'a TargetData) -> &'a TextureTarget {
+    &data.targets[data.current_target as uint]
 }
 
-fn get_current_texturesource<'a> (data: &'a Data) -> &'a TextureTarget {
-    &data.targets[data.current_target ^ 1]
+fn get_current_texturesource<'a> (data: &'a TargetData) -> &'a TextureTarget {
+    &data.targets[(data.current_target ^ 1) as uint]
 }
 
-fn get_texturetargets<'a> (data: &'a Data) -> (&'a TextureTarget, &'a TextureTarget) {
+fn get_texturetargets<'a> (data: &'a TargetData) -> (&'a TextureTarget, &'a TextureTarget) {
     (get_current_texturetarget(data), get_current_texturesource(data))
 }
 
@@ -107,7 +111,7 @@ fn perform_copy(destFramebuffer: GLuint, sourceTexture: &Texture, shader: &CopyS
 pub fn draw_image(data: *mut Data, w: i32, h: i32, pixels: *const u8) -> () {
     logi("drawing image...");
     let data = get_safe_data(data);
-    let target = get_current_texturetarget(data);
+    let target = get_current_texturetarget(&data.targetdata);
     let (tw, th) = target.texture.dimensions;
     let heightratio = th as f32 / h as f32;
     let widthratio = tw as f32 / w as f32;
@@ -137,7 +141,7 @@ pub fn draw_image(data: *mut Data, w: i32, h: i32, pixels: *const u8) -> () {
 pub unsafe fn with_pixels(data: *mut Data, callback: unsafe extern "C" fn(i32, i32, *const u8, *mut ())-> *mut (), env: *mut ()) -> *mut () {
     logi("in with_pixels");
     let data = get_safe_data(data);
-    let oldtarget = get_current_texturetarget(data);
+    let oldtarget = get_current_texturetarget(&data.targetdata);
     let (x,y) = oldtarget.texture.dimensions;
     let saveshader = Shader::new(None, Some(copyshader::noalpha_fragment_shader));
     saveshader.map(|shader| {
@@ -248,8 +252,10 @@ pub extern fn setup_graphics<'a>(w: i32, h: i32) -> *mut Data<'a> {
     let data = box Data {
         dimensions: (w, h),
         events: Events::new(),
-        targets: targets,
-        current_target: 0,
+        targetdata: TargetData {
+            targets: targets,
+            current_target: 0,
+        },
         brushlayer: None,
     };
 
@@ -273,11 +279,11 @@ pub extern fn draw_queued_points(data: *mut Data, handler: *mut MotionEventConsu
         (Some(point_shader), Some(brush), Some(interpolator)) => {
             gl2::enable(gl2::BLEND);
             gl2::blend_func(gl2::ONE, gl2::ONE_MINUS_SRC_ALPHA);
-            let (target, source) = get_texturetargets(data);
+            let (target, source) = get_texturetargets(&data.targetdata);
             // TODO: brush color selection
             let brushtarget = data.brushlayer.as_ref().unwrap_or(target);
             let should_copy = draw_path(handler, brushtarget.framebuffer, point_shader, interpolator,
-                                        matrix, [1f32, 1f32, 0f32], brush, &source.texture);
+                                        matrix, [1f32, 1f32, 0f32], brush, &source.texture, &mut data.events);
             if should_copy && data.brushlayer.is_some() {
                 match data.events.copyshader {
                     Some(copy_shader) => {
@@ -328,7 +334,7 @@ pub extern fn set_brush_texture(data: *mut Data, texture: i32) {
 #[no_mangle]
 pub extern fn clear_buffer(data: *mut Data) {
     let data = get_safe_data(data);
-    for target in data.targets.iter() {
+    for target in data.targetdata.targets.iter() {
         gl2::bind_framebuffer(gl2::FRAMEBUFFER, target.framebuffer);
         gl2::clear_color(0f32, 0f32, 0f32, 0f32);
         gl2::clear(gl2::COLOR_BUFFER_BIT);
@@ -342,10 +348,11 @@ pub extern fn render_frame(data: *mut Data) {
     let data = get_safe_data(data);
     match (data.events.copyshader, data.events.animshader) {
         (Some(copy_shader), Some(anim_shader)) => {
-            data.current_target = data.current_target ^ 1;
+            data.events.pushframe();
+            data.targetdata.current_target = data.targetdata.current_target ^ 1;
             let copymatrix = matrix::identity.as_slice();
             gl2::disable(gl2::BLEND);
-            let (target, source) = get_texturetargets(data);
+            let (target, source) = get_texturetargets(&data.targetdata);
             perform_copy(target.framebuffer, &source.texture, anim_shader, copymatrix);
             perform_copy(0 as GLuint, &target.texture, copy_shader, copymatrix);
             match data.brushlayer.as_ref() {
