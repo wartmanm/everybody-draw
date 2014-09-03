@@ -24,6 +24,13 @@ pub struct DrawObjectList<T, Init> {
 }
 
 pub struct DrawObjectIndex<T>(i32);
+impl<T> PartialEq for DrawObjectIndex<T> {
+    fn eq(&self, other: &DrawObjectIndex<T>) -> bool {
+        let (DrawObjectIndex(a), DrawObjectIndex(b)) = (*self, *other);
+        a == b
+    }
+}
+
 
 pub type ShaderInitValues = (Option<String>, Option<String>);
 pub type BrushInitValues = (PixelFormat, (i32, i32), Vec<u8>);

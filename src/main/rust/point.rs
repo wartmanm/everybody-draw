@@ -1,7 +1,7 @@
 // TODO: more meaningful names
 use std::sync::spsc_queue;
 
-#[deriving(Clone, Show)]
+#[deriving(Clone, Show, PartialEq)]
 #[repr(C)]
 pub struct Coordinate {
     pub x: f32,
@@ -9,7 +9,7 @@ pub struct Coordinate {
 }
 
 /// Holds data from motionevent entries.
-#[deriving(Clone, Show)]
+#[deriving(Clone, Show, PartialEq)]
 #[repr(C)]
 pub struct PaintPoint {
     pub pos: Coordinate,
@@ -36,12 +36,14 @@ pub struct ShaderPaintPoint {
 /// this enables us to use raw motionevent pointer ids, which get recycled regularly
 /// it's arguably simpler than ensuring each pointer gets a unique queue for its entire
 /// lifetime and maintaining an up-to-date pointer id -> queue mapping
+#[deriving(PartialEq)]
 pub enum PointInfo {
     Stop,
     Point(PaintPoint),
 }
 
 /// A single entry in the point queue.
+#[deriving(PartialEq)]
 pub struct PointEntry {
     pub index: i32,
     pub entry: PointInfo,

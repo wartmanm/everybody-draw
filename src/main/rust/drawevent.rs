@@ -22,6 +22,7 @@ use collections::str::StrAllocating;
 use luascript::LuaScript;
 use log::logi;
 
+#[deriving(PartialEq)]
 enum DrawEvent {
     UseAnimShader(DrawObjectIndex<CopyShader>),
     UseCopyShader(DrawObjectIndex<CopyShader>),
@@ -123,5 +124,46 @@ impl<'a> Events<'a> {
     }
     pub fn clear(&mut self) {
         self.eventlist.clear();
+    }
+    fn get_event(&self, idx: uint) -> DrawEvent {
+        self.eventlist[idx]
+    }
+    pub fn get_eventcount(&self) -> uint {
+        self.eventlist.len()
+    }
+}
+
+pub struct EventStream {
+    position: uint,
+}
+
+impl EventStream {
+    pub fn new() -> EventStream {
+        EventStream { position: 0 }
+    }
+    pub fn advance<'a>(&mut self, events: &'a mut Events<'a>, mut framecount: u32, playback: bool, m: &mut ::point::PointProducer, gl: &mut ::glinit::Data) {
+        if framecount == 0 || self.position >= events.get_eventcount() {
+            return;
+        }
+        let limit = events.get_eventcount();
+        self.position += 1;
+        let event = events.get_event(self.position);
+        while framecount > 0 && self.position < limit {
+            match event {
+                // FIXME do this without exposing Events internal details
+                UseAnimShader(idx) => events.animshader = Some(events.copyshaders.get_object(idx)),
+                UseCopyShader(idx) => events.copyshader = Some(events.copyshaders.get_object(idx)),
+                UsePointShader(idx) => events.pointshader = Some(events.pointshaders.get_object(idx)),
+                UseBrush(idx) => events.brush = Some(events.textures.get_object(idx)),
+                UseInterpolator(idx) => events.interpolator = Some(events.luascripts.get_object(idx)),
+                Frame => {
+                    framecount -= 1;
+                    if playback {
+                        ::glinit::render_frame(gl);
+                    }
+                },
+                Point(p) => m.push(p),
+            }
+        }
     }
 }
