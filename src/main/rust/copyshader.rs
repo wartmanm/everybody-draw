@@ -52,35 +52,35 @@ pub static noalpha_fragment_shader: &'static str =
 
 pub struct CopyShader {
     program: GLuint,
-    positionHandle: GLuint,
-    texCoordHandle: GLuint,
-    textureHandle: GLint,
-    matrixHandle: GLint,
+    position_handle: GLuint,
+    tex_coord_handle: GLuint,
+    texture_handle: GLint,
+    matrix_handle: GLint,
 }
 
 impl Shader for CopyShader {
     fn new(vertopt: Option<&str>, fragopt: Option<&str>) -> Option<CopyShader> {
         let vert = vertopt.unwrap_or_else(|| { logi("copy shader: using default vertex shader"); default_vertex_shader});
         let frag = fragopt.unwrap_or_else(|| { logi("copy shader: using default fragment shader"); default_fragment_shader});
-        let programOption = glcommon::create_program(vert, frag);
-        match programOption {
+        let program_option = glcommon::create_program(vert, frag);
+        match program_option {
             None => {
                 loge("could not create texture copy shader");
                 None
             }
             Some(program) => {
-                let positionOption = get_shader_handle(program, "vPosition");
-                let texCoordOption = get_shader_handle(program, "vTexCoord");
-                let textureOption = get_uniform_handle_option(program, "texture");
-                let matrixOption = get_uniform_handle_option(program, "textureMatrix");
-                match (positionOption, texCoordOption, textureOption, matrixOption) {
-                    (Some(position), Some(texCoord), Some(texture), Some(matrix)) => {
+                let position_option = get_shader_handle(program, "vPosition");
+                let tex_coord_option = get_shader_handle(program, "vTexCoord");
+                let texture_option = get_uniform_handle_option(program, "texture");
+                let matrix_option = get_uniform_handle_option(program, "textureMatrix");
+                match (position_option, tex_coord_option, texture_option, matrix_option) {
+                    (Some(position), Some(tex_coord), Some(texture), Some(matrix)) => {
                         let shader = CopyShader {
                             program: program,
-                            positionHandle: position,
-                            texCoordHandle: texCoord,
-                            textureHandle: texture,
-                            matrixHandle: matrix,
+                            position_handle: position,
+                            tex_coord_handle: tex_coord,
+                            texture_handle: texture,
+                            matrix_handle: matrix,
                         };
                         logi!("created {}", shader);
                         Some(shader)
@@ -101,13 +101,13 @@ impl CopyShader {
         gl2::use_program(self.program);
         check_gl_error("copyshader: use_program");
 
-        glattrib_f32!(self.positionHandle, 2, gTriangleVertices);
-        glattrib_f32!(self.texCoordHandle, 2, gTextureVertices);
+        glattrib_f32!(self.position_handle, 2, gTriangleVertices);
+        glattrib_f32!(self.tex_coord_handle, 2, gTextureVertices);
 
-        gl2::uniform_matrix_4fv(self.matrixHandle, false, matrix);
+        gl2::uniform_matrix_4fv(self.matrix_handle, false, matrix);
         check_gl_error("uniform_matrix_4fv(textureMatrix)");
 
-        gl_bindtexture!(0, gl2::TEXTURE_2D, texture.texture, self.textureHandle as GLint);
+        gl_bindtexture!(0, gl2::TEXTURE_2D, texture.texture, self.texture_handle as GLint);
     }
 }
 

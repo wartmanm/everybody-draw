@@ -42,9 +42,9 @@ struct PointStorage {
 #[allow(ctypes)]
 pub struct MotionEventConsumer {
     consumer: PointConsumer,
-    currentPoints: SmallIntMap<PointStorage>,
+    current_points: SmallIntMap<PointStorage>,
     drawvec: Vec<ShaderPaintPoint>,
-    pointCounter: i32,
+    point_counter: i32,
     point_count: i32,
     all_pointer_state: activestate::ActiveState,
 }
@@ -63,9 +63,9 @@ pub extern fn create_motion_event_handler() -> (*mut MotionEventConsumer, *mut M
     let (consumer, producer) = spsc_queue::queue::<PointEntry>(0);
     let handler = box MotionEventConsumer {
         consumer: consumer,
-        currentPoints: SmallIntMap::new(),
+        current_points: SmallIntMap::new(),
         drawvec: Vec::new(),
-        pointCounter: 0,
+        point_counter: 0,
         point_count: 0,
         all_pointer_state: activestate::inactive,
     };
@@ -114,32 +114,32 @@ fn append_points(a: ShaderPaintPoint, b: ShaderPaintPoint, c: &mut Vec<ShaderPai
     let stepsize = (b.size - a.size) / count as f32;
     let stepspeed = (b.speed - a.speed) / count as f32;
     let stepdistance = (b.distance - a.distance) / count as f32;
-    let mut addPoint = a;
-    addPoint.time = (addPoint.time / timescale) % 1f32;
+    let mut add_point = a;
+    add_point.time = (add_point.time / timescale) % 1f32;
     for _ in range(0, count) {
-        c.push(addPoint);
-        addPoint.pos.x += stepx;
-        addPoint.pos.y += stepy;
-        addPoint.time += steptime;
-        addPoint.time = if addPoint.time > 1f32 { addPoint.time - 1f32 } else { addPoint.time };
-        addPoint.size += stepsize;
-        addPoint.speed += stepspeed;
-        addPoint.distance += stepdistance;
+        c.push(add_point);
+        add_point.pos.x += stepx;
+        add_point.pos.y += stepy;
+        add_point.time += steptime;
+        add_point.time = if add_point.time > 1f32 { add_point.time - 1f32 } else { add_point.time };
+        add_point.size += stepsize;
+        add_point.speed += stepspeed;
+        add_point.distance += stepdistance;
     }
 }
 
-pub fn draw_path(s: *mut MotionEventConsumer, framebuffer: GLuint, shader: &PointShader, interpolator: &LuaScript, matrix: *mut f32, color: [f32, ..3], brush: &Texture, backBuffer: &Texture, events: &mut Events) -> bool {
+pub fn draw_path(s: *mut MotionEventConsumer, framebuffer: GLuint, shader: &PointShader, interpolator: &LuaScript, matrix: *mut f32, color: [f32, ..3], brush: &Texture, back_buffer: &Texture, events: &mut Events) -> bool {
     let s = get_safe_data(s);
     s.drawvec.clear();
 
     interpolator.prep();
-    run_lua_shader(backBuffer.dimensions, (s, events));
+    run_lua_shader(back_buffer.dimensions, (s, events));
 
     let ref mut pointvec = s.drawvec;
     if pointvec.len() > 0 {
         bind_framebuffer(FRAMEBUFFER, framebuffer);
         let safe_matrix: &Matrix = unsafe { mem::transmute(matrix) };
-        shader.prep(safe_matrix.as_slice(), pointvec.as_slice(), color, brush, backBuffer);
+        shader.prep(safe_matrix.as_slice(), pointvec.as_slice(), color, brush, back_buffer);
         draw_arrays(POINTS, 0, pointvec.len() as i32);
         check_gl_error("draw_arrays");
     }
@@ -152,21 +152,21 @@ pub extern "C" fn next_point_from_lua(se: &mut (&mut MotionEventConsumer, &mut E
     let (ref mut s, ref mut e) = *se;
     //let (ref mut s, ref mut e) = se;
     let ref mut queue = s.consumer;
-    let ref mut currentPoints = s.currentPoints;
+    let ref mut current_points = s.current_points;
     loop {
         match queue.pop() {
             Some(point) => {
                 e.pushpoint(point);
                 let idx = point.index;
                 let newpoint = point.entry;
-                if !currentPoints.contains_key(&(idx as uint)) {
-                    currentPoints.insert(idx as uint, PointStorage {
+                if !current_points.contains_key(&(idx as uint)) {
+                    current_points.insert(idx as uint, PointStorage {
                         info: None,
                         sizeavg: RollingAverage16::new(),
                         speedavg: RollingAverage16::new(),
                     });
                 }
-                let oldpoint = currentPoints.find_mut(&(idx as uint)).unwrap();
+                let oldpoint = current_points.find_mut(&(idx as uint)).unwrap();
                 match (oldpoint.info, newpoint) {
                     (Some(op), point::Point(np)) => {
                         let dist = manhattan_distance(op.pos, np.pos);
@@ -191,8 +191,8 @@ pub extern "C" fn next_point_from_lua(se: &mut (&mut MotionEventConsumer, &mut E
                         s.point_count -= 1;
                     },
                     (_, point::Point(p)) => {
-                        let oldCounter = s.pointCounter;
-                        s.pointCounter += 1;
+                        let old_counter = s.point_counter;
+                        s.point_counter += 1;
                         s.point_count += 1;
                         oldpoint.info = Some(ShaderPaintPoint {
                             pos: p.pos,
@@ -200,7 +200,7 @@ pub extern "C" fn next_point_from_lua(se: &mut (&mut MotionEventConsumer, &mut E
                             size: p.size,
                             distance: 0f32,
                             speed: 0f32,
-                            counter: oldCounter as f32,
+                            counter: old_counter as f32,
                         });
 
                     },
@@ -221,7 +221,7 @@ fn run_lua_shader(dimensions: (i32, i32), mut statics: (&mut MotionEventConsumer
 }
 
 
-#[allow(non_snake_case_functions)]
+#[allow(non_snake_case)]
 #[allow(ctypes)]
 extern "C" {
     pub fn doInterpolateLua(x: i32, y: i32, statics: *mut (&mut MotionEventConsumer, &mut Events));
@@ -231,4 +231,3 @@ extern "C" {
 pub unsafe extern "C" fn pushrustvec(statics: &mut MotionEventConsumer, point: *const ShaderPaintPoint) {
     statics.drawvec.push(*point);
 }
-

@@ -25,7 +25,7 @@ impl Data {
 
 pub fn append_motion_event(data: &mut Data, evt: *const AInputEvent, queue: &mut PointProducer) -> () {
     let active = &mut data.pointer_states;
-    for (_, state) in active.mut_iter() {
+    for (_, state) in active.iter_mut() {
         *state = state.push(false);
     }
 
@@ -33,31 +33,31 @@ pub fn append_motion_event(data: &mut Data, evt: *const AInputEvent, queue: &mut
         AINPUT_EVENT_TYPE_KEY => { logi("got key event??"); return; },
         _ => { }
     }
-    let fullAction = unsafe { AMotionEvent_getAction(evt) } as u32;
-    let (actionEvent, actionIndex): (u32, u32) = (fullAction & AMOTION_EVENT_ACTION_MASK, (fullAction & AMOTION_EVENT_ACTION_POINTER_INDEX_MASK) >> AMOTION_EVENT_ACTION_POINTER_INDEX_SHIFT);
-    let actionId = unsafe { AMotionEvent_getPointerId(evt, actionIndex) };
-    match actionEvent {
+    let full_action = unsafe { AMotionEvent_getAction(evt) } as u32;
+    let (action_event, action_index): (u32, u32) = (full_action & AMOTION_EVENT_ACTION_MASK, (full_action & AMOTION_EVENT_ACTION_POINTER_INDEX_MASK) >> AMOTION_EVENT_ACTION_POINTER_INDEX_SHIFT);
+    let action_id = unsafe { AMotionEvent_getPointerId(evt, action_index) };
+    match action_event {
         AMOTION_EVENT_ACTION_DOWN => {
-            logi!("ACTION_DOWN: {}", actionId);
+            logi!("ACTION_DOWN: {}", action_id);
             push_stops(queue, active); // in case it's not paired with an action_up
             push_moves(queue, active, evt);
         }
         AMOTION_EVENT_ACTION_UP => {
-            logi!("ACTION_UP: {}", actionId);
+            logi!("ACTION_UP: {}", action_id);
             push_stops(queue, active);
         }
         AMOTION_EVENT_ACTION_CANCEL => {
-            logi!("ACTION_CANCEL: {}", actionId);
+            logi!("ACTION_CANCEL: {}", action_id);
             push_stops(queue, active);
         }
         AMOTION_EVENT_ACTION_POINTER_UP => {
-            logi!("ACTION_POINTER_UP: {}", actionId);
-            make_active(queue, active, actionId, false);
+            logi!("ACTION_POINTER_UP: {}", action_id);
+            make_active(queue, active, action_id, false);
             push_moves(queue, active, evt);
         }
         AMOTION_EVENT_ACTION_POINTER_DOWN => {
-            logi!("ACTION_POINTER_DOWN: {}", actionId);
-            make_active(queue, active, actionId, false); // in case it's not paired with an action_pointer_up
+            logi!("ACTION_POINTER_DOWN: {}", action_id);
+            make_active(queue, active, action_id, false); // in case it's not paired with an action_pointer_up
             push_moves(queue, active, evt);
         }
         AMOTION_EVENT_ACTION_MOVE => {
@@ -114,7 +114,7 @@ fn push_current_point(queue: &mut PointProducer, evt: *const AInputEvent, id: i3
 }
 
 fn push_stops(queue: &mut PointProducer, active: &mut PointerState) {
-    for (idx, active) in active.mut_iter() {
+    for (idx, active) in active.iter_mut() {
         if *active == activestate::stopping {
             queue.push(PointEntry { index: idx as i32, entry: point::Stop });
         }

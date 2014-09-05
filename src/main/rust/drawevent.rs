@@ -20,7 +20,6 @@ use pointshader::PointShader;
 use copyshader::CopyShader;
 use collections::str::StrAllocating;
 use luascript::LuaScript;
-use log::logi;
 
 #[deriving(PartialEq)]
 enum DrawEvent {

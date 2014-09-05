@@ -39,8 +39,8 @@ pub fn check_framebuffer_complete() -> bool {
     result
 }
 
-pub fn load_shader(shaderType: gl2::GLenum, source: &str) -> Option<GLuint> {
-    let shader = gl2::create_shader(shaderType);
+pub fn load_shader(shader_type: gl2::GLenum, source: &str) -> Option<GLuint> {
+    let shader = gl2::create_shader(shader_type);
     if shader != 0 {
         gl2::shader_source(shader, [source.as_bytes()].as_slice());
         gl2::compile_shader(shader);
@@ -49,7 +49,7 @@ pub fn load_shader(shaderType: gl2::GLenum, source: &str) -> Option<GLuint> {
             Some(shader)
         } else {
             let log = gl2::get_shader_info_log(shader);
-            loge!("Could not compile shader {}:\n{}\n", shaderType, log);
+            loge!("Could not compile shader {}:\n{}\n", shader_type, log);
             gl2::delete_shader(shader);
             None
         }
@@ -58,9 +58,9 @@ pub fn load_shader(shaderType: gl2::GLenum, source: &str) -> Option<GLuint> {
     }
 }
 
-pub fn create_program(vertexSource: &str, fragmentSource: &str) -> Option<GLuint> {
-    let vert_shader = load_shader(gl2::VERTEX_SHADER, vertexSource);
-    let pixel_shader = load_shader(gl2::FRAGMENT_SHADER, fragmentSource);
+pub fn create_program(vertex_source: &str, fragment_source: &str) -> Option<GLuint> {
+    let vert_shader = load_shader(gl2::VERTEX_SHADER, vertex_source);
+    let pixel_shader = load_shader(gl2::FRAGMENT_SHADER, fragment_source);
     let program = gl2::create_program();
     if vert_shader.is_none() || pixel_shader.is_none() || program == 0 {
         return None

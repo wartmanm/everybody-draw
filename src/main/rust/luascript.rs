@@ -1,7 +1,7 @@
 use core::prelude::*;
 use core::{ptr, fmt};
 use core::fmt::Show;
-use log::{logi, loge};
+use log::logi;
 
 extern "C" {
     fn loadLuaScript(script: *const u8) -> i32;

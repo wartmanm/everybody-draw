@@ -25,14 +25,14 @@ use luascript::LuaScript;
 use alloc::boxed::Box;
 
 
-static drawIndexes: [GLubyte, ..6] = [
+static draw_indexes: [GLubyte, ..6] = [
     0, 1, 2,
     0, 2, 3
 ];
 
 //#[deriving(FromPrimitive)]
 #[repr(i32)]
-#[allow(non_camel_case_types)]
+#[allow(non_camel_case_types, dead_code)]
 enum AndroidBitmapFormat {
     ANDROID_BITMAP_FORMAT_NONE      = 0,
     ANDROID_BITMAP_FORMAT_RGBA_8888 = 1,
@@ -99,11 +99,11 @@ fn get_texturetargets<'a> (data: &'a TargetData) -> (&'a TextureTarget, &'a Text
     (get_current_texturetarget(data), get_current_texturesource(data))
 }
 
-fn perform_copy(destFramebuffer: GLuint, sourceTexture: &Texture, shader: &CopyShader, matrix: &[f32]) -> () {
-    gl2::bind_framebuffer(gl2::FRAMEBUFFER, destFramebuffer);
+fn perform_copy(dest_framebuffer: GLuint, source_texture: &Texture, shader: &CopyShader, matrix: &[f32]) -> () {
+    gl2::bind_framebuffer(gl2::FRAMEBUFFER, dest_framebuffer);
     check_gl_error("bound framebuffer");
-    shader.prep(sourceTexture, matrix);
-    gl2::draw_elements(gl2::TRIANGLES, drawIndexes.len() as i32, gl2::UNSIGNED_BYTE, Some(drawIndexes.as_slice()));
+    shader.prep(source_texture, matrix);
+    gl2::draw_elements(gl2::TRIANGLES, draw_indexes.len() as i32, gl2::UNSIGNED_BYTE, Some(draw_indexes.as_slice()));
     check_gl_error("drew elements");
 }
 
@@ -127,7 +127,7 @@ pub fn draw_image(data: *mut Data, w: i32, h: i32, pixels: *const u8) -> () {
     logi!("drawing with ratio: {:5.3f}, glratio {:5.3f}, {:5.3f}, matrix:\n{}", ratio, glratiox, glratioy, matrix::log(matrix.as_slice()));
 
     unsafe {
-        pixels.to_option().map(|x| ::core::slice::raw::buf_as_slice(x, (w*h*4) as uint, |pixelvec| {
+        pixels.as_ref().map(|x| ::core::slice::raw::buf_as_slice(x, (w*h*4) as uint, |pixelvec| {
             data.events.copyshader.map(|shader| {
                 let intexture = Texture::with_image(w, h, Some(pixelvec), gltexture::RGBA);
                 check_gl_error("creating texture");
@@ -160,11 +160,11 @@ pub unsafe fn with_pixels(data: *mut Data, callback: unsafe extern "C" fn(i32, i
         let result = callback(x, y, pixptr, env);
         logi!("returning pixels: {}", pixptr);
         result
-    }).unwrap_or(ptr::mut_null())
+    }).unwrap_or(ptr::null_mut())
 }
 
 unsafe fn with_cstr_as_str<T>(ptr: *const i8, callback: |Option<&str>|->T)->T {
-    let cstr = ptr.to_option().map_or(None, |b| Some(CString::new(b, false)));
+    let cstr = ptr.as_ref().map_or(None, |b| Some(CString::new(b, false)));
     let vecstr = cstr.as_ref().and_then(|b| b.as_str());
     callback(vecstr)
 }
@@ -315,9 +315,7 @@ pub extern fn load_texture(data: *mut Data, w: i32, h: i32, a_pixels: *const u8,
     };
     format_and_size.and_then(|(texformat, size)| {
         logi!("setting brush texture for {:x}", a_pixels as uint);
-        let pixelopt = unsafe { a_pixels.to_option() };
-        // pixelvec has lifetime of a_pixels, not x
-        // there must be some way around this
+        let pixelopt = unsafe { a_pixels.as_ref() };
         unsafe {
             pixelopt.map(|x| ::std::slice::raw::buf_as_slice(x, (w*h*size) as uint, |x| {
                 mem::transmute(data.events.load_brush(w, h, x, texformat))

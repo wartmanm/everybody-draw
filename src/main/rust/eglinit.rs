@@ -43,18 +43,18 @@ fn get_no_attribs() -> *const i32 {
 }
 
 fn choose_egl_config(display: EGLDisplay) -> Option<EGLConfig> {
-    let mut configCount = 0;
+    let mut config_count = 0;
     let mut config: EGLConfig = 0 as EGLConfig;
     let configattrs = get_config();
     logi!("choosing config... attrs = {}", configattrs as uint);
-    if EGL_TRUE != ChooseConfig(display, get_config(), &mut config, 1, &mut configCount) {
+    if EGL_TRUE != ChooseConfig(display, get_config(), &mut config, 1, &mut config_count) {
         loge!("eglChooseConfig returned false :(");
         None
-    } else if configCount == 0 {
+    } else if config_count == 0 {
         loge!("no matching configs found :(");
         None
     } else {
-        logi!("got {} configs", configCount);
+        logi!("got {} configs", config_count);
         Some(config)
     }
 }
@@ -74,7 +74,7 @@ pub fn egl_init(window: *mut c_void) -> () {
     unsafe { data = init_context(window) };
 }
 
-fn init_context(surfaceTexture: *mut c_void) -> Option<EGLStatus> {
+fn init_context(surface_texture: *mut c_void) -> Option<EGLStatus> {
     let displayopt = get_display(EGL_DEFAULT_DISPLAY as EGLNativeDisplayType);
     if displayopt.is_none() {
         loge!("failed to get display :(\n");
@@ -103,7 +103,7 @@ fn init_context(surfaceTexture: *mut c_void) -> Option<EGLStatus> {
     let context = CreateContext(display, config, EGL_NO_CONTEXT, get_context_attribs());
     logi!("got context: 0x{:x}", context as uint);
     logi("creating window surface...");
-    let surface = CreateWindowSurface(display, config, surfaceTexture, get_no_attribs());
+    let surface = CreateWindowSurface(display, config, surface_texture, get_no_attribs());
     if surface == EGL_NO_SURFACE {
         logi("getting error...");
         let error = GetError();

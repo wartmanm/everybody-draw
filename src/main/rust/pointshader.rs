@@ -52,47 +52,47 @@ static default_fragment_shader: &'static str =
 
 pub struct PointShader {
     program: GLuint,
-    positionHandle: GLuint,
-    sizeHandle: Option<GLuint>,
-    timeHandle: Option<GLuint>,
-    matrixHandle: GLint,
-    textureHandle: Option<GLint>,
-    colorHandle: GLint,
-    pointerHandle: Option<GLuint>,
-    speedHandle: Option<GLuint>,
-    distanceHandle: Option<GLuint>,
-    backBufferHandle: Option<GLint>,
-    textureSizeHandle: GLint,
+    position_handle: GLuint,
+    size_handle: Option<GLuint>,
+    time_handle: Option<GLuint>,
+    matrix_handle: GLint,
+    texture_handle: Option<GLint>,
+    color_handle: GLint,
+    pointer_handle: Option<GLuint>,
+    speed_handle: Option<GLuint>,
+    distance_handle: Option<GLuint>,
+    back_buffer_handle: Option<GLint>,
+    texture_size_handle: GLint,
 }
 
 impl Shader for PointShader {
     fn new(vertopt: Option<&str>, fragopt: Option<&str>) -> Option<PointShader> {
         let vert = vertopt.unwrap_or_else(|| { logi("point shader: using default vertex shader"); default_vertex_shader});
         let frag = fragopt.unwrap_or_else(|| { logi("point shader: using default fragment shader"); default_fragment_shader});
-        let programOption = glcommon::create_program(vert, frag);
-        match programOption {
+        let program_option = glcommon::create_program(vert, frag);
+        match program_option {
             None => {
                 loge("could not create point shader");
                 None
             }
             Some(program) => {
-                let positionOption = get_shader_handle(program, "vPosition"); 
-                let matrixOption = gl2::get_uniform_location(program, "textureMatrix");
-                match (positionOption, matrixOption) {
+                let position_option = get_shader_handle(program, "vPosition"); 
+                let matrix_option = gl2::get_uniform_location(program, "textureMatrix");
+                match (position_option, matrix_option) {
                     (Some(position), matrix) if matrix != -1 => {
                         let shader = PointShader {
                             program: program,
-                            positionHandle: position,
-                            sizeHandle: get_shader_handle(program, "vSize"),
-                            timeHandle: get_shader_handle(program, "vTime"),
-                            matrixHandle: matrix,
-                            textureHandle: get_uniform_handle_option(program, "texture"),
-                            colorHandle: gl2::get_uniform_location(program, "vColor"),
-                            pointerHandle: get_shader_handle(program, "vPointer"),
-                            speedHandle: get_shader_handle(program, "vSpeed"),
-                            distanceHandle: get_shader_handle(program, "vDistance"),
-                            backBufferHandle: get_uniform_handle_option(program, "backbuffer"),
-                            textureSizeHandle: gl2::get_uniform_location(program, "texturesize"),
+                            position_handle: position,
+                            size_handle: get_shader_handle(program, "vSize"),
+                            time_handle: get_shader_handle(program, "vTime"),
+                            matrix_handle: matrix,
+                            texture_handle: get_uniform_handle_option(program, "texture"),
+                            color_handle: gl2::get_uniform_location(program, "vColor"),
+                            pointer_handle: get_shader_handle(program, "vPointer"),
+                            speed_handle: get_shader_handle(program, "vSpeed"),
+                            distance_handle: get_shader_handle(program, "vDistance"),
+                            back_buffer_handle: get_uniform_handle_option(program, "backbuffer"),
+                            texture_size_handle: gl2::get_uniform_location(program, "texturesize"),
                         };
                         logi!("created {}", shader);
                         Some(shader)
@@ -114,43 +114,43 @@ impl PointShader {
         gl2::use_program(self.program);
         check_gl_error("pointshader: use_program");
 
-        glattrib_f32!(self.positionHandle, 2, points, pos);
+        glattrib_f32!(self.position_handle, 2, points, pos);
 
-        self.timeHandle.map(|th| {
+        self.time_handle.map(|th| {
             glattrib_f32!(th, 1, points, time);
         });
 
-        self.sizeHandle.map(|sh| {
+        self.size_handle.map(|sh| {
             glattrib_f32!(sh, 1, points, size);
         });
 
-        gl2::uniform_matrix_4fv(self.matrixHandle, false, matrix);
+        gl2::uniform_matrix_4fv(self.matrix_handle, false, matrix);
         check_gl_error("uniform_matrix_4fv(textureMatrix)");
 
-        self.textureHandle.map(|th| {
+        self.texture_handle.map(|th| {
             gl_bindtexture!(0, gl2::TEXTURE_2D, brush.texture, th as GLint);
         });
 
-        self.pointerHandle.map(|ph| {
+        self.pointer_handle.map(|ph| {
             glattrib_f32!(ph, 1, points, counter);
         });
 
-        self.speedHandle.map(|sh| {
+        self.speed_handle.map(|sh| {
             glattrib_f32!(sh, 1, points, speed);
         });
 
-        self.distanceHandle.map(|dh| {
+        self.distance_handle.map(|dh| {
             glattrib_f32!(dh, 1, points, distance);
         });
 
-        self.backBufferHandle.map(|bb| {
+        self.back_buffer_handle.map(|bb| {
             gl_bindtexture!(1, gl2::TEXTURE_2D, backbuffer.texture, bb);
         });
 
         let (w, h) = backbuffer.dimensions;
-        gl2::uniform_2f(self.textureSizeHandle, w as f32, h as f32);
+        gl2::uniform_2f(self.texture_size_handle, w as f32, h as f32);
 
-        unsafe { gl2::glUniform3fv(self.colorHandle, 3, color.as_ptr() as *mut f32); }
+        unsafe { gl2::glUniform3fv(self.color_handle, 3, color.as_ptr() as *mut f32); }
         check_gl_error("uniform3fv");
     }
 
