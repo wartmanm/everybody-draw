@@ -2,6 +2,7 @@ package com.github.wartman4404.gldraw
 
 import android.content.Context
 import java.io.{InputStream, BufferedInputStream, FileInputStream, File}
+import java.util.zip.ZipFile
 import android.graphics.{Bitmap, BitmapFactory}
 
 import android.util.Log
@@ -66,43 +67,39 @@ def withFilename[T](reader: MaybeRead[T]): ((String, (Unit)=>ManagedResource[Inp
       })
   }
 
+  def loadShader[T](c: Context, constructor: MaybeRead[T], folder: String, defaultName: String, defaultObj: Option[T]) = {
+    val default = defaultObj.map(x => (defaultName, (_: Unit) => Some(x)))
+    val filenamed = withFilename[T](constructor)
+    val files = allfiles[T](c, folder)
+    val shaders: Seq[(String, (Unit)=>Option[T])] = files.map(filenamed)
+    (default.toSeq ++ shaders).toArray
+  }
+
   def loadBrushes(c: Context, data: GLInit): Array[(String, (Unit)=>Option[Texture])] = {
-    val decoder = decodeBitmap(Bitmap.Config.ALPHA_8) _
-    val toTexture = (ob: Option[Bitmap]) => ob.map(Texture(data, _))
-    val filenamed = withFilename[Texture](toTexture.compose(decoder))
-    val files: Array[(String, (Unit)=>ManagedResource[InputStream])] = allfiles[Texture](c, "brushes")
-    files.map(filenamed)
+    val decoder = (is: InputStream) => (decodeBitmap(Bitmap.Config.ALPHA_8)(is).map(Texture(data, _)))
+    loadShader(c, decoder, "brushes", null, None)
   }
 
   // TODO: make these safe
   def loadPointShaders(c: Context, data: GLInit): Seq[(String, (Unit)=>Option[PointShader])] = {
-    val defaultShader = PointShader(data, null, null).map(x => ("Default Paint", (_: Unit) => Some(x)))
-    defaultShader.toSeq ++ allfiles[PointShader](c, "pointshaders").map(withFilename(readShader(PointShader(data, _, _)) _))
+    val constructor = readShader(PointShader(data, _, _)) _
+    loadShader(c, constructor, "pointshaders", "Default Paint", PointShader(data, null, null))
   }
 
   def loadAnimShaders(c: Context, data: GLInit): Seq[(String, (Unit)=>Option[CopyShader])] = {
-    val defaultShader = CopyShader(data, null, null).map(x => ("Default Animation", (_: Unit) => Some(x)))
-    val decoded = readShader(CopyShader(data, _, _)) _
-    val filenamed = withFilename[CopyShader](decoded)
-    val files = allfiles[CopyShader](c, "animshaders")
-    val shaders: Seq[(String, (Unit)=>Option[CopyShader])] = files.map(filenamed)
-    defaultShader.toSeq ++ shaders
+    val constructor = readShader(CopyShader(data, _, _)) _
+    loadShader(c, constructor, "animshaders", "Default Animation", CopyShader(data, null, null))
   }
 
   def loadScripts(c: Context, data: GLInit): Seq[(String, (Unit)=>Option[LuaScript])] = {
-    val defaultScript = LuaScript(data, null).map(x => ("Default Interpolator", (_: Unit) => Some(x)))
-    val filenamed = withFilename((LuaScript(data, _: String)).compose(readStream _))
-    defaultScript.toSeq ++ allfiles[String](c, "interpolators").map(filenamed)
+    val constructor = (LuaScript(data, _: String)).compose(readStream _)
+    loadShader(c, constructor, "interpolators", "Default Interpolator", LuaScript(data, null))
   }
 
   def loadUniBrushes(c: Context, data: GLInit): Seq[(String, (Unit)=>Option[UniBrush])] = {
     val userdirs = c.getExternalFilesDirs("unibrushes").flatMap(Option(_))
     userdirs.flatMap(_.listFiles())
-    .filter(dir => dir.isDirectory() && new File(dir, "brush.json").isFile())
-    .map(dir => (dir.getName(), (_: Unit) => {
-        withFileStream(new File(dir, "brush.json")).map(readStream _).opt
-        .flatMap(src => UniBrush.compile(data, src, dir.getAbsolutePath()))
-      }))
+    .map(file => (file.getName(), (_: Unit) => UniBrush.compile(data, new ZipFile(file))))
   }
 
   def halfShaderPair(shader: String) = {
@@ -122,5 +119,9 @@ def withFilename[T](reader: MaybeRead[T]): ((String, (Unit)=>ManagedResource[Inp
     val text = source.getLines.mkString("\n")
     source.close()
     text
+  }
+
+  def readZip(zip: ZipFile, path: String) = {
+    Option(zip.getEntry(path)).map(ze => readStream(zip.getInputStream(ze)))
   }
 }
