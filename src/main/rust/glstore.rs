@@ -9,77 +9,46 @@
 /// more importantly, switch to a map and return keys, rather than using indices
 
 use core::prelude::*;
-use core::cell::UnsafeCell;
 use collections::vec::Vec;
 use collections::string::String;
-use collections::MutableSeq;
+use collections::{Map, MutableMap, MutableSeq};
+use collections::hash::Hash;
+use collections::hash::sip::SipHasher;
+use std::collections::HashMap;
+use std::rand;
+use std::rand::Rng;
 use copyshader::CopyShader;
 use gltexture::{PixelFormat, Texture};
 use pointshader::PointShader;
 use glcommon::Shader;
 use luascript::LuaScript;
 
-pub struct DrawObjectList<T, Init> {
-    list: Vec<CachedInit<T, Init>>,
+/// Holds GL objects that can be inited using the given keys.
+/// The list is to avoid having to pass those keys around, and serialize more easily.
+/// There may be a better way?
+pub struct DrawObjectList<T, Init: Eq+Hash> {
+    map: HashMap<Init, DrawObjectIndex<T>, SipHasher>,
+    list: Vec<T>,
 }
 
 pub struct DrawObjectIndex<T>(i32);
-impl<T> PartialEq for DrawObjectIndex<T> {
-    fn eq(&self, other: &DrawObjectIndex<T>) -> bool {
-        let (DrawObjectIndex(a), DrawObjectIndex(b)) = (*self, *other);
-        a == b
-    }
-}
-
 
 pub type ShaderInitValues = (Option<String>, Option<String>);
 pub type BrushInitValues = (PixelFormat, (i32, i32), Vec<u8>);
-pub type ShaderInit<T> = CachedInit<T, ShaderInitValues>;
-pub type BrushInit = CachedInit<Texture, BrushInitValues>;
 pub type LuaInitValues = Option<String>;
-pub type LuaInit = CachedInit<LuaScript, LuaInitValues>;
-
-pub struct CachedInit<T, Init> {
-    value: UnsafeCell<Option<T>>,
-    init: Init,
-}
+pub type PointShaderIndex = DrawObjectIndex<PointShader>;
+pub type CopyShaderIndex = DrawObjectIndex<CopyShader>;
+pub type BrushIndex = DrawObjectIndex<Texture>;
+pub type LuaIndex = DrawObjectIndex<LuaScript>;
 
 pub trait InitFromCache<Init> {
     fn init(&Init) -> Self;
 }
-pub trait MaybeInitFromCache<Init> {
+pub trait MaybeInitFromCache<Init: Eq+Hash> {
     fn maybe_init(&Init) -> Option<Self>;
 }
-
-impl<T: MaybeInitFromCache<Init>, Init> CachedInit<T, Init> {
-    pub fn get(&self) -> &T {
-        match unsafe { &*self.value.get() } {
-            &Some(ref x) => x,
-            &None => {
-                let value: Option<T> = MaybeInitFromCache::maybe_init(&self.init);
-                unsafe { *self.value.get() = Some(value).unwrap(); }
-                self.get()
-            }
-        }
-    }
-    pub fn new(init: Init) -> Option<CachedInit<T, Init>> {
-        let value: Option<T> = MaybeInitFromCache::maybe_init(&init);
-        match value {
-            Some(v) => Some(CachedInit { value: UnsafeCell::new(Some(v)), init: init }),
-            None => None
-        }
-    }
-}
-
-trait RunInit<T, Init> {
-    fn get_inited(&Init) -> Option<T>;
-}
-
-impl<T: InitFromCache<Init>, Init> CachedInit<T, Init> {
-    pub fn safe_new(init: Init) -> CachedInit<T, Init> {
-        let value: T = InitFromCache::init(&init);
-        CachedInit { value: UnsafeCell::new(Some(value)), init: init }
-    }
+trait ToOwnedInit<Init> {
+    fn to_owned(&Self) -> Init;
 }
 
 // this and the two shader impls were originally a single
@@ -116,20 +85,49 @@ impl MaybeInitFromCache<LuaInitValues> for LuaScript {
     }
 }
 
-impl<T: MaybeInitFromCache<Init>, Init> DrawObjectList<T, Init> {
+impl<T: MaybeInitFromCache<Init>, Init: Hash+Eq> DrawObjectList<T, Init> {
     pub fn new() -> DrawObjectList<T, Init> {
+        // the default hasher is keyed off of the task-local rng,
+        // which would blow up since we don't have a task
+        //let mut rng = rand::weak_rng();
+        //let hasher = SipHasher::new_with_keys(rng.next_u64(), rng.next_u64());
+        // FIXME weak_rng also blows up? can it not find /dev/urandom?
+        let hasher = SipHasher::new_with_keys(0, 0);
+        let map = HashMap::with_hasher(hasher);
         DrawObjectList {
-            list: Vec::new()
+            map: map,
+            list: Vec::new(),
         }
     }
 
-    pub fn push_object(&mut self, init: CachedInit<T, Init>) -> DrawObjectIndex<T> {
-        self.list.push(init);
-        DrawObjectIndex((self.list.len() -1) as i32)
+    // TODO: avoid allocations just to see if the key is in the map
+    pub fn push_object<'b>(&mut self, init: Init) -> Option<DrawObjectIndex<T>> {
+        // Can't use map.entry() here as it consumes the key
+        if self.map.contains_key(&init) {
+            Some(*self.map.find(&init).unwrap())
+        } else {
+            match MaybeInitFromCache::maybe_init(&init) {
+                Some(inited) => {
+                    self.list.push(inited);
+                    let index = self.list.len() - 1;
+                    let objindex = DrawObjectIndex(index as i32);
+                    self.map.insert(init, objindex);
+                    Some(objindex)
+                },
+                None => None,
+            }
+        }
     }
 
-    pub fn get_object(&self, i: DrawObjectIndex<T>) -> &T {
+    pub fn get_object<'a>(&'a self, i: DrawObjectIndex<T>) -> &T {
         let DrawObjectIndex(idx) = i;
-        self.list[idx as uint].get()
+        &self.list[idx as uint]
     }
 }
+
+impl<T: InitFromCache<Init>+MaybeInitFromCache<Init>, Init: Hash+Eq> DrawObjectList<T, Init> {
+    pub fn safe_push_object(&mut self, init: Init) -> DrawObjectIndex<T> {
+        self.push_object(init).unwrap()
+    }
+}
+

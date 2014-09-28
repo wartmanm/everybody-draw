@@ -9,6 +9,7 @@ use glcommon::check_gl_error;
 
 use log::logi;
 
+#[deriving(PartialEq, Eq, Hash)]
 pub enum PixelFormat {
     RGBA = gl2::RGBA as int,
     RGB = gl2::RGB as int,

@@ -13,7 +13,7 @@ use collections::vec::Vec;
 use collections::{Mutable, MutableSeq};
 use collections::slice::CloneableVector;
 use point::PointEntry;
-use glstore::{DrawObjectIndex, DrawObjectList, CachedInit, ShaderInit, BrushInit, LuaInit};
+use glstore::{DrawObjectIndex, DrawObjectList};
 use glstore::{ShaderInitValues, BrushInitValues, LuaInitValues};
 use gltexture::{Texture, PixelFormat};
 use pointshader::PointShader;
@@ -21,7 +21,6 @@ use copyshader::CopyShader;
 use collections::str::StrAllocating;
 use luascript::LuaScript;
 
-#[deriving(PartialEq)]
 enum DrawEvent {
     UseAnimShader(DrawObjectIndex<CopyShader>),
     UseCopyShader(DrawObjectIndex<CopyShader>),
@@ -64,8 +63,7 @@ impl<'a> Events<'a> {
     // FIXME: let glstore deal with optionalness
     pub fn load_copyshader(&mut self, vert: Option<&str>, frag: Option<&str>) -> Option<DrawObjectIndex<CopyShader>> {
         let initargs = (vert.map(|x|x.into_string()), frag.map(|x|x.into_string()));
-        let initopt: Option<ShaderInit<CopyShader>> = CachedInit::new(initargs);
-        initopt.map(|x| self.copyshaders.push_object(x))
+        self.copyshaders.push_object(initargs)
     }
 
     pub fn use_copyshader(&'a mut self, idx: DrawObjectIndex<CopyShader>) -> &CopyShader {
@@ -83,8 +81,7 @@ impl<'a> Events<'a> {
     }
     pub fn load_pointshader(&mut self, vert: Option<&str>, frag: Option<&str>) -> Option<DrawObjectIndex<PointShader>> {
         let initargs = (vert.map(|x|x.into_string()), frag.map(|x|x.into_string()));
-        let initopt: Option<ShaderInit<PointShader>> = CachedInit::new(initargs);
-        initopt.map(|x| self.pointshaders.push_object(x))
+        self.pointshaders.push_object(initargs)
     }
     pub fn use_pointshader(&'a mut self, idx: DrawObjectIndex<PointShader>) -> &PointShader {
         self.eventlist.push(UsePointShader(idx));
@@ -94,8 +91,8 @@ impl<'a> Events<'a> {
     }
     pub fn load_brush(&mut self, w: i32, h: i32, pixels: &[u8], format: PixelFormat) -> DrawObjectIndex<Texture> {
         let ownedpixels = pixels.to_vec();
-        let init: BrushInit = CachedInit::safe_new((format, (w, h), ownedpixels));
-        self.textures.push_object(init)
+        let init: BrushInitValues = (format, (w, h), ownedpixels);
+        self.textures.safe_push_object(init)
     }
     pub fn use_brush(&'a mut self, idx: DrawObjectIndex<Texture>) -> &Texture {
         self.eventlist.push(UseBrush(idx));
@@ -104,8 +101,8 @@ impl<'a> Events<'a> {
         brush
     }
     pub fn load_interpolator(&mut self, script: Option<&str>) -> Option<DrawObjectIndex<LuaScript>> {
-        let initopt: Option<LuaInit> = CachedInit::new(script.map(|x|x.into_string()));
-        initopt.map(|x| self.luascripts.push_object(x))
+        let initopt: LuaInitValues = script.map(|x|x.into_string());
+        self.luascripts.push_object(initopt)
     }
 
     pub fn use_interpolator(&'a mut self, idx: DrawObjectIndex<LuaScript>) -> &LuaScript {

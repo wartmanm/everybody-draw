@@ -1,4 +1,4 @@
-#![feature(globs, macro_rules)]
+#![feature(globs, macro_rules, default_type_params)]
 #![crate_name = "rustgl"]
 #![crate_type = "staticlib"]
 #![no_std]
