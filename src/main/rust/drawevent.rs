@@ -28,6 +28,8 @@ enum DrawEvent {
     UseBrush(DrawObjectIndex<Texture>),
     UseInterpolator(DrawObjectIndex<LuaScript>),
     Point(PointEntry),
+    AddLayer(DrawObjectIndex<CopyShader>, DrawObjectIndex<PointShader>, i32),
+    SetLayerCount(i32),
     Frame,
 }
 
@@ -41,7 +43,7 @@ pub struct Events<'a> {
     pub animshader: Option<&'a CopyShader>,
     pub copyshader: Option<&'a CopyShader>,
     pub brush: Option<&'a Texture>,
-    pub interpolator: Option<&'a LuaScript>,
+    pub interpolators: Vec<&'a LuaScript>,
 }
 
 impl<'a> Events<'a> {
@@ -56,7 +58,7 @@ impl<'a> Events<'a> {
             animshader: None,
             copyshader: None,
             brush: None,
-            interpolator: None,
+            interpolators: Vec::new(),
         }
     }
 
@@ -108,8 +110,18 @@ impl<'a> Events<'a> {
     pub fn use_interpolator(&'a mut self, idx: DrawObjectIndex<LuaScript>) -> &LuaScript {
         self.eventlist.push(UseInterpolator(idx));
         let interpolator = self.luascripts.get_object(idx);
-        self.interpolator = Some(interpolator);
+        self.interpolators.truncate(0);
+        self.interpolators.push(interpolator);
         interpolator
+    }
+
+    pub fn add_layer(&mut self, copyshader: DrawObjectIndex<CopyShader>, pointshader: DrawObjectIndex<PointShader>, pointidx: i32) -> (&CopyShader, &PointShader) {
+        self.eventlist.push(AddLayer(copyshader, pointshader, pointidx));
+        (self.copyshaders.get_object(copyshader), self.pointshaders.get_object(pointshader))
+    }
+
+    pub fn set_layer_count(&mut self, count: i32) {
+        self.eventlist.push(SetLayerCount(count));
     }
 
     pub fn pushpoint(&mut self, event: PointEntry) {
@@ -151,7 +163,10 @@ impl EventStream {
                 UseCopyShader(idx) => events.copyshader = Some(events.copyshaders.get_object(idx)),
                 UsePointShader(idx) => events.pointshader = Some(events.pointshaders.get_object(idx)),
                 UseBrush(idx) => events.brush = Some(events.textures.get_object(idx)),
-                UseInterpolator(idx) => events.interpolator = Some(events.luascripts.get_object(idx)),
+                UseInterpolator(idx) => {
+                    events.interpolators.truncate(0);
+                    events.interpolators.push(events.luascripts.get_object(idx));
+                },
                 Frame => {
                     framecount -= 1;
                     if playback {
@@ -159,6 +174,8 @@ impl EventStream {
                     }
                 },
                 Point(p) => m.push(p),
+                AddLayer(_, _, _) => { },
+                SetLayerCount(_) => { },
             }
         }
     }

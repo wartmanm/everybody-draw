@@ -25,7 +25,7 @@ static const char *lua_ffi_script =
 "    float counter;\n"
 "  };\n"
 "\n"
-"  void pushrustvec(void *output, struct ShaderPaintPoint *point);\n"
+"  void pushrustvec(void *output, int queue, struct ShaderPaintPoint *point);\n"
 "  char next_point_from_lua(void *output, struct ShaderPaintPoint *points);\n"
 "  void loglua(const char *message);\n"
 "\n"
