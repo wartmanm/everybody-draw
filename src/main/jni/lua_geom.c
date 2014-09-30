@@ -30,18 +30,31 @@ static const char *lua_ffi_script =
 "  void loglua(const char *message);\n"
 "\n"
 "]]\n"
-"function runmain(x, y, output, main)\n"
-"  if type(onframe) == \"function\" then\n"
+"\n"
+"pushpoint=ffi.C.pushrustvec\n"
+"ShaderPaintPoint=ffi.typeof(\"struct ShaderPaintPoint\")\n";
+
+static const char *lua_runner =
+"local _main = main\n"
+"local _onframe = onframe\n"
+"if type(main) ~= \"function\" then\n"
+"  loglua(\"main not defined for runmain()!!\")\n"
+"  return\n"
+"end\n"
+"\n"
+"function runmain(x, y, output)\n"
+"  if type(_onframe) == \"function\" then\n"
 "    onframe(x, y, output)\n"
+"  end\n"
+"  if type(_main) ~= \"function\" then\n"
+"    loglua(\"main doesn't exist!!\")\n"
+"    return\n"
 "  end\n"
 "  local pointpair = ffi.new(\"struct ShaderPaintPoint[2]\")\n"
 "  while ffi.C.next_point_from_lua(output, pointpair) ~= 0 do\n"
-"    main(pointpair[0], pointpair[1], x, y, output)\n"
+"    _main(pointpair[0], pointpair[1], x, y, output)\n"
 "  end\n"
 "end\n"
-"pushpoint=ffi.C.pushrustvec\n"
-"ShaderPaintPoint=ffi.typeof(\"struct ShaderPaintPoint\")\n"
-"return {}\n"
 "\n";
 
 static const char *defaultscript =
@@ -110,6 +123,22 @@ int loadLuaScript(const char *script) {
   }
   luaJIT_setmode(L, -1, LUAJIT_MODE_ALLFUNC|LUAJIT_MODE_ON);
   LOGI("main function defined :)");
+  lua_pop(L, 1);
+
+  // FIXME compile runner once
+  if (1 == luaL_dostring(L, lua_runner)) {
+    LOGE("lua runner failed to load: %s", lua_tostring(L, -1));
+    lua_pop(L, 1);
+    return -1;
+  }
+
+  lua_getglobal(L, "runmain");
+  if (!lua_isfunction(L, -1)) {
+    LOGE("runmain not defined :(");
+    lua_pop(L, 2);
+    return -1;
+  }
+  luaJIT_setmode(L, -1, LUAJIT_MODE_ALLFUNC|LUAJIT_MODE_ON);
 
   lua_settable(L, LUA_REGISTRYINDEX);
   glstuff_lua_key += 1;
@@ -125,7 +154,7 @@ void unloadLuaScript(int key) {
 void useLuaScript(int key) {
   lua_pushlightuserdata(L, (void*)key);
   lua_gettable(L, LUA_REGISTRYINDEX);
-  lua_setglobal(L, "main");
+  lua_setglobal(L, "runmain");
 }
 
 // TODO: would it be better to register a callback from lua?
@@ -135,9 +164,8 @@ static void interpolateLua(lua_State *L, int x, int y, void *output) {
   lua_pushnumber(L, (float)x);
   lua_pushnumber(L, (float)y);
   lua_pushlightuserdata(L, output);
-  lua_getglobal(L, "main");
 
-  if (lua_pcall(L, 4, 0, 0) != 0) {
+  if (lua_pcall(L, 3, 0, 0) != 0) {
     LOGE("script failed to run :(");
     const char *msg = lua_tostring(L, -1);
     LOGE("got error message: %s", msg);
