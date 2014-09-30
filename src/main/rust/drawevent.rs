@@ -43,7 +43,7 @@ pub struct Events<'a> {
     pub animshader: Option<&'a CopyShader>,
     pub copyshader: Option<&'a CopyShader>,
     pub brush: Option<&'a Texture>,
-    pub interpolators: Vec<&'a LuaScript>,
+    pub interpolator: Option<&'a LuaScript>,
 }
 
 impl<'a> Events<'a> {
@@ -58,7 +58,7 @@ impl<'a> Events<'a> {
             animshader: None,
             copyshader: None,
             brush: None,
-            interpolators: Vec::new(),
+            interpolator: None,
         }
     }
 
@@ -110,8 +110,7 @@ impl<'a> Events<'a> {
     pub fn use_interpolator(&'a mut self, idx: DrawObjectIndex<LuaScript>) -> &LuaScript {
         self.eventlist.push(UseInterpolator(idx));
         let interpolator = self.luascripts.get_object(idx);
-        self.interpolators.truncate(0);
-        self.interpolators.push(interpolator);
+        self.interpolator = Some(interpolator);
         interpolator
     }
 
@@ -163,10 +162,7 @@ impl EventStream {
                 UseCopyShader(idx) => events.copyshader = Some(events.copyshaders.get_object(idx)),
                 UsePointShader(idx) => events.pointshader = Some(events.pointshaders.get_object(idx)),
                 UseBrush(idx) => events.brush = Some(events.textures.get_object(idx)),
-                UseInterpolator(idx) => {
-                    events.interpolators.truncate(0);
-                    events.interpolators.push(events.luascripts.get_object(idx));
-                },
+                UseInterpolator(idx) => events.interpolator = Some(events.luascripts.get_object(idx)),
                 Frame => {
                     framecount -= 1;
                     if playback {
