@@ -46,8 +46,8 @@ static const char *lua_ffi_script =
 
 static const char *defaultscript =
 "function main(a, b, x, y, points)\n"
-"  pushpoint(points, a)\n"
-"  pushpoint(points, b)\n"
+"  pushpoint(points, 0, a)\n"
+"  pushpoint(points, 0, b)\n"
 "end\n";
 
 static lua_State *L = NULL;

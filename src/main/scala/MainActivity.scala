@@ -314,7 +314,7 @@ class MainActivity extends Activity with TypedActivity with AndroidImplicits {
       loadUniBrushItem(thread.setBrushTexture, unibrush.brush, controls.brushpicker)
       loadUniBrushItem(thread.setAnimShader, unibrush.baseanimshader, controls.animpicker)
       loadUniBrushItem(thread.setPointShader, unibrush.basepointshader, controls.paintpicker)
-      loadUniBrushItem(thread.setInterpScript, unibrush.baseinterpolator, controls.interppicker)
+      loadUniBrushItem(thread.setInterpScript, unibrush.interpolator, controls.interppicker)
       thread.setUnibrushLayers(unibrush.layers)
       //thread.setSeparateBrushlayer(unibrush.separatelayer)
     }

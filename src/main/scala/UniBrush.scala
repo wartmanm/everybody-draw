@@ -38,24 +38,20 @@ case class Layer(
 
 case class UniBrushSource (
   brushpath: Option[String],
-  pointshaders: Array[ShaderSource],
-  animshaders: Array[ShaderSource],
-  interpolators: Array[Option[String]],
+  pointshaders: Option[Array[ShaderSource]],
+  animshaders: Option[Array[ShaderSource]],
   basepointshader: Option[ShaderSource],
   baseanimshader: Option[ShaderSource],
-  baseinterpolator: Option[String],
-  layers: Array[LayerSource]
+  interpolator: Option[String],
+  layers: Option[Array[LayerSource]]
 )
   //separatelayer: Option[Boolean])
 
 case class UniBrush(
   brush: Option[Texture],
-  //pointshaders: Array[PointShader],
-  //animshaders: Array[CopyShader],
-  //interpolators: Array[LuaScript],
   basepointshader: Option[PointShader],
   baseanimshader: Option[CopyShader],
-  baseinterpolator: Option[LuaScript],
+  interpolator: Option[LuaScript],
   layers: Array[Layer])
   //separatelayer: Boolean)
 
@@ -83,28 +79,24 @@ object UniBrush extends AutoProductFormat {
         })
     }
     val zr = DrawFiles.readZip(sourceZip, _: String)
-    val interpolators: Array[LuaScript] = s.interpolators.map((i: Option[String]) => {
-        val src = i.map(zr(_).getOrElse(return None)).getOrElse(null)
-        LuaScript(data, src).getOrElse(return None)
-      })
-    val pointshaders: Array[PointShader] = s.pointshaders.map(_.compile(data, PointShader, sourceZip).getOrElse(return None))
-    val copyshaders: Array[CopyShader] = s.animshaders.map(_.compile(data, CopyShader, sourceZip).getOrElse(return None))
+    val pointshaders: Array[PointShader] = s.pointshaders.getOrElse(Array.empty).map(_.compile(data, PointShader, sourceZip).getOrElse(return None))
+    val copyshaders: Array[CopyShader] = s.animshaders.getOrElse(Array.empty).map(_.compile(data, CopyShader, sourceZip).getOrElse(return None))
     val baseanimshader = s.baseanimshader.map(_.compile(data, CopyShader, sourceZip).getOrElse(return None))
     val basepointshader = s.basepointshader.map(_.compile(data, PointShader, sourceZip).getOrElse(return None))
-    val baseinterpolator = s.baseinterpolator.map(zr(_).getOrElse(return None)).map(LuaScript(data, _).getOrElse(return None))
-    val layers = s.layers.map(l => {
-        val point = l.pointshader.map(pointshaders(_)).getOrElse(PointShader(data, null, null).get)
-        val copy = l.copyshader.map(copyshaders(_)).getOrElse(CopyShader(data, null, null).get)
+    val interpolator = s.interpolator.map(zr(_).getOrElse(return None)).map(LuaScript(data, _).getOrElse(return None))
+    val layers = s.layers.getOrElse(Array.empty).map(l => {
+        val point = l.pointshader.map(pointshaders.lift(_).getOrElse(return None)).getOrElse(PointShader(data, null, null).get)
+        val copy = l.copyshader.map(copyshaders.lift(_).getOrElse(return None)).getOrElse(CopyShader(data, null, null).get)
         val idx = l.pointsrc.getOrElse(0)
         Layer(point, copy, idx)
       })
 
     //val separateLayer = s.separatelayer.getOrElse(false)
-    Log.i("unibrush", s"have interpolator: ${baseinterpolator.nonEmpty}");
+    Log.i("unibrush", s"have interpolator: ${interpolator.nonEmpty}");
     Log.i("unibrush", s"have pointshader: ${basepointshader.nonEmpty}");
     Log.i("unibrush", s"have animshader: ${baseanimshader.nonEmpty}");
     Log.i("unibrush", s"have layers: ${layers.length}");
     Log.i("unibrush", s"have brush: ${brush.nonEmpty}");
-    Some(UniBrush(brush, basepointshader, baseanimshader, baseinterpolator, layers))
+    Some(UniBrush(brush, basepointshader, baseanimshader, interpolator, layers))
   }
 }
