@@ -45,7 +45,6 @@ case class UniBrushSource (
   interpolator: Option[String],
   layers: Option[Array[LayerSource]]
 )
-  //separatelayer: Option[Boolean])
 
 case class UniBrush(
   brush: Option[Texture],
@@ -53,7 +52,6 @@ case class UniBrush(
   baseanimshader: Option[CopyShader],
   interpolator: Option[LuaScript],
   layers: Array[Layer])
-  //separatelayer: Boolean)
 
 object UniBrush extends AutoProductFormat {
   def compile(data: GLInit, sourceZip: ZipFile): Option[UniBrush] = {
@@ -91,7 +89,6 @@ object UniBrush extends AutoProductFormat {
         Layer(point, copy, idx)
       })
 
-    //val separateLayer = s.separatelayer.getOrElse(false)
     Log.i("unibrush", s"have interpolator: ${interpolator.nonEmpty}");
     Log.i("unibrush", s"have pointshader: ${basepointshader.nonEmpty}");
     Log.i("unibrush", s"have animshader: ${baseanimshader.nonEmpty}");

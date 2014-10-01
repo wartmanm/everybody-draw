@@ -195,8 +195,6 @@ extends Thread with Handler.Callback with AndroidImplicits {
       }
     }}
   }
-
-  //def setSeparateBrushlayer(separatelayer: Boolean) = for (gl <- glinit) { runHere { nativeSetSeparateBrushlayer(gl, separatelayer) } }
   //unused
   def setCopyShader(shader: CopyShader) = for (gl <- glinit) { runHere { nativeSetCopyShader(gl, shader) } }
 }
