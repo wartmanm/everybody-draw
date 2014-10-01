@@ -51,4 +51,4 @@ int loadLuaScript(const char *script);
 void useLuaScript(int key);
 
 void add_layer(GLInit data, int copyshader, int pointshader, int pointidx);
-void set_layer_count(GLInit data, int count);
+void clear_layers(GLInit data);

@@ -20,6 +20,8 @@ use pointshader::PointShader;
 use copyshader::CopyShader;
 use collections::str::StrAllocating;
 use luascript::LuaScript;
+use paintlayer::PaintLayer;
+use point::ShaderPaintPoint;
 
 enum DrawEvent {
     UseAnimShader(DrawObjectIndex<CopyShader>),
@@ -28,8 +30,8 @@ enum DrawEvent {
     UseBrush(DrawObjectIndex<Texture>),
     UseInterpolator(DrawObjectIndex<LuaScript>),
     Point(PointEntry),
-    AddLayer(DrawObjectIndex<CopyShader>, DrawObjectIndex<PointShader>, i32),
-    SetLayerCount(i32),
+    AddLayer(Option<DrawObjectIndex<CopyShader>>, Option<DrawObjectIndex<PointShader>>, uint),
+    ClearLayers,
     Frame,
 }
 
@@ -44,6 +46,7 @@ pub struct Events<'a> {
     pub copyshader: Option<&'a CopyShader>,
     pub brush: Option<&'a Texture>,
     pub interpolator: Option<&'a LuaScript>,
+    pub layers: Vec<PaintLayer<'a>>,
 }
 
 impl<'a> Events<'a> {
@@ -59,6 +62,7 @@ impl<'a> Events<'a> {
             copyshader: None,
             brush: None,
             interpolator: None,
+            layers: Vec::new(),
         }
     }
 
@@ -114,13 +118,20 @@ impl<'a> Events<'a> {
         interpolator
     }
 
-    pub fn add_layer(&mut self, copyshader: DrawObjectIndex<CopyShader>, pointshader: DrawObjectIndex<PointShader>, pointidx: i32) -> (&CopyShader, &PointShader) {
+    pub fn add_layer(&'a mut self, dimensions: (i32, i32)
+                     , copyshader: Option<DrawObjectIndex<CopyShader>>, pointshader: Option<DrawObjectIndex<PointShader>>
+                     , pointidx: uint, pointref: &'a [Vec<ShaderPaintPoint>]) -> &PaintLayer<'a> {
         self.eventlist.push(AddLayer(copyshader, pointshader, pointidx));
-        (self.copyshaders.get_object(copyshader), self.pointshaders.get_object(pointshader))
+        let copyshader = match copyshader { Some(x) => Some(self.copyshaders.get_object(x)), None => None };
+        let pointshader = match pointshader { Some(x) => Some(self.pointshaders.get_object(x)), None => None };
+        let layer = PaintLayer::new(dimensions, copyshader, pointshader, &pointref[pointidx]);
+        self.layers.push(layer);
+        &self.layers[self.layers.len() - 1]
     }
 
-    pub fn set_layer_count(&mut self, count: i32) {
-        self.eventlist.push(SetLayerCount(count));
+    pub fn clear_layers(&mut self) {
+        self.eventlist.push(ClearLayers);
+        self.layers.clear();
     }
 
     pub fn pushpoint(&mut self, event: PointEntry) {
@@ -171,7 +182,7 @@ impl EventStream {
                 },
                 Point(p) => m.push(p),
                 AddLayer(_, _, _) => { },
-                SetLayerCount(_) => { },
+                ClearLayers => { },
             }
         }
     }

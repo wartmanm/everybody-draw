@@ -29,9 +29,8 @@ extends Thread with Handler.Callback with AndroidImplicits {
   @native protected def nativeSetBrushTexture(data: GLInit, t: Texture): Unit
   @native protected def exportPixels(data: GLInit): Bitmap
   @native protected def nativeSetInterpolator(data: GLInit, script: LuaScript): Unit
-  //@native protected def nativeSetSeparateBrushlayer(data: GLInit, separatelayer: Boolean): Unit
   @native protected def nativeAddLayer(data: GLInit, copyshader: CopyShader, pointshader: PointShader, pointidx: Int): Unit
-  @native protected def nativeSetLayerCount(data: GLInit, count: Int): Unit
+  @native protected def nativeClearLayers(data: GLInit): Unit
 
   override def run() = {
     Looper.prepare()
@@ -190,7 +189,7 @@ extends Thread with Handler.Callback with AndroidImplicits {
   def setInterpScript(script: LuaScript) = for (gl <- glinit) { runHere { nativeSetInterpolator(gl, script) } }
   def setUnibrushLayers(layers: Array[Layer]) = {
     for (gl <- glinit) { runHere {
-      nativeSetLayerCount(gl, 0)
+      nativeClearLayers(gl)
       for (layer <- layers) {
         nativeAddLayer(gl, layer.copyshader, layer.pointshader, layer.pointsrc)
       }

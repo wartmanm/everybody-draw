@@ -196,8 +196,8 @@ static void jniAddLayer(JNIEnv* env, jobject thiz, int data, int copyshader, int
   add_layer((GLInit) data, copyshader, pointshader, pointidx);
 }
 
-static void jniSetLayerCount(JNIEnv* env, jobject thiz, int data, int count) {
-  set_layer_count((GLInit) data, count);
+static void jniClearLayers(JNIEnv* env, jobject thiz, int data) {
+  clear_layers((GLInit) data);
 }
 
 jint JNI_OnLoad(JavaVM* vm, void* reserved) {
@@ -258,18 +258,14 @@ jint JNI_OnLoad(JavaVM* vm, void* reserved) {
       .name = "nativeSetInterpolator",
       .signature = "(II)V",
       .fnPtr = jniLuaSetInterpolator,
-    /*}, {*/
-      /*.name = "nativeSetSeparateBrushlayer",*/
-      /*.signature = "(IZ)V",*/
-      /*.fnPtr = jniSetSeparateBrushlayer,*/
     }, {
       .name = "nativeAddLayer",
       .signature = "(IIII)V",
       .fnPtr = jniAddLayer,
     }, {
-      .name = "nativeSetLayerCount",
+      .name = "nativeClearLayers",
       .signature = "(II)V",
-      .fnPtr = jniSetLayerCount,
+      .fnPtr = jniClearLayers,
     }
   };
   jclass textureclass = (*env)->FindClass(env, "com/github/wartman4404/gldraw/TextureSurfaceThread");

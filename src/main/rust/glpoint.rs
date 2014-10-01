@@ -18,7 +18,7 @@ use motionevent::append_motion_event;
 use android::input::AInputEvent;
 
 use point;
-use point::{ShaderPaintPoint, Coordinate, PointEntry, PointConsumer, PointProducer, ShaderPointInfo};
+use point::{ShaderPaintPoint, Coordinate, PointEntry, PointConsumer, PointProducer};
 use activestate;
 use drawevent::Events;
 
