@@ -1,0 +1,14 @@
+{
+    "interpolator": "invert.lua", 
+    "layers": [
+        {
+            "pointshader": 0, 
+            "pointsrc": 1
+        }
+    ], 
+    "pointshaders": [
+        {
+            "fragmentshader": "invert.fsh"
+        }
+    ]
+}

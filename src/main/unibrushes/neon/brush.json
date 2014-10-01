@@ -1,0 +1,17 @@
+{
+    "basepointshader": {
+        "fragmentshader": "corona.fsh"
+    }, 
+    "brushpath": "neon.png", 
+    "layers": [
+        {
+            "pointshader": 0, 
+            "pointsrc": 0
+        }
+    ], 
+    "pointshaders": [
+        {
+            "fragmentshader": "neon.fsh"
+        }
+    ]
+}

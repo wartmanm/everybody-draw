@@ -1,0 +1,8 @@
+{
+  "interpolator": "neko.lua", 
+  "brushpath": "xneko.png", 
+  "basepointshader": {
+    "vertexshader": "neko.vsh", 
+    "fragmentshader": "neko.fsh"
+  }
+}

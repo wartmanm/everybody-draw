@@ -97,9 +97,8 @@ def withFilename[T](reader: MaybeRead[T]): ((String, (Unit)=>ManagedResource[Inp
   }
 
   def loadUniBrushes(c: Context, data: GLInit): Seq[(String, (Unit)=>Option[UniBrush])] = {
-    val userdirs = c.getExternalFilesDirs("unibrushes").flatMap(Option(_))
-    userdirs.flatMap(_.listFiles())
-    .map(file => (file.getName(), (_: Unit) => UniBrush.compile(data, new ZipFile(file))))
+    val constructor = UniBrush.compile(data, _: InputStream)
+    loadShader(c, constructor, "unibrushes", null, None)
   }
 
   def halfShaderPair(shader: String) = {
