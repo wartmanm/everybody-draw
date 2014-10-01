@@ -95,15 +95,20 @@ object UniBrush extends AutoProductFormat {
   }
 
   def compile(data: GLInit, sourceZip: InputStream): Option[UniBrush] = {
+    Log.i("unibrush", "loading unibrush")
     try {
       val files = new ZipInputStream(sourceZip)
         .map { case (entry, bytes) => (entry.getName(), bytes) }
         .toMap
       val brushjson = files.get("brush.json").getOrElse(return logAbort("unable to find brush.json"))
+      Log.i("unibrush", "got brush.json")
       compile(data, new String(brushjson).parseJson.convertTo[UniBrushSource], files)
     } catch {
-      case e: ParsingException => logAbort(s"ParsingException ${e}")
+      case e @ (_: ParsingException | _: DeserializationException) => {
+        logAbort(s"unable to parse brush.json: ${e}")
+      }
       case e: IOException => logAbort(s"IOException ${e}")
+      case e: Exception => logAbort(s"Other exception ${e}")
     }
   }
 
