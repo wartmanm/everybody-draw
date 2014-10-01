@@ -264,7 +264,7 @@ jint JNI_OnLoad(JavaVM* vm, void* reserved) {
       .fnPtr = jniAddLayer,
     }, {
       .name = "nativeClearLayers",
-      .signature = "(II)V",
+      .signature = "(I)V",
       .fnPtr = jniClearLayers,
     }
   };
