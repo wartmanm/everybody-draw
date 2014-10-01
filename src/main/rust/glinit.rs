@@ -206,7 +206,7 @@ pub unsafe fn set_interpolator(data: *mut Data, interpolator: DrawObjectIndex<Lu
 pub unsafe fn add_layer(data: *mut Data, copyshader: DrawObjectIndex<CopyShader>, pointshader: DrawObjectIndex<PointShader>, pointidx: i32) -> () {
     logi("adding layer");
     let data = get_safe_data(data);
-    let extra: i32 = pointidx as i32 - data.points.len() as i32;
+    let extra: i32 = (pointidx as i32 + 1) - data.points.len() as i32;
     if extra > 0 {
         data.points.grow(extra as uint, Vec::new());
     }
