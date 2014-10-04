@@ -29,7 +29,7 @@ use luascript::LuaScript;
 use alloc::boxed::Box;
 
 
-static draw_indexes: [GLubyte, ..6] = [
+static DRAW_INDEXES: [GLubyte, ..6] = [
     0, 1, 2,
     0, 2, 3
 ];
@@ -80,7 +80,7 @@ fn perform_copy(dest_framebuffer: GLuint, source_texture: &Texture, shader: &Cop
     gl2::bind_framebuffer(gl2::FRAMEBUFFER, dest_framebuffer);
     check_gl_error("bound framebuffer");
     shader.prep(source_texture, matrix);
-    gl2::draw_elements(gl2::TRIANGLES, draw_indexes.len() as i32, gl2::UNSIGNED_BYTE, Some(draw_indexes.as_slice()));
+    gl2::draw_elements(gl2::TRIANGLES, DRAW_INDEXES.len() as i32, gl2::UNSIGNED_BYTE, Some(DRAW_INDEXES.as_slice()));
     check_gl_error("drew elements");
 }
 
@@ -120,7 +120,7 @@ pub unsafe fn with_pixels(data: *mut Data, callback: unsafe extern "C" fn(i32, i
     let data = get_safe_data(data);
     let oldtarget = get_current_texturetarget(&data.targetdata);
     let (x,y) = oldtarget.texture.dimensions;
-    let saveshader = Shader::new(None, Some(copyshader::noalpha_fragment_shader));
+    let saveshader = Shader::new(None, Some(copyshader::NOALPHA_FRAGMENT_SHADER));
     saveshader.map(|shader| {
         let newtarget = TextureTarget::new(x, y, gltexture::RGB);
         let matrix = [1f32,  0f32,  0f32,  0f32,
@@ -299,7 +299,7 @@ pub extern fn draw_queued_points(data: *mut Data, handler: *mut MotionEventConsu
                 draw_layer(completed, safe_matrix, color, brush, back_buffer);
 
                 if should_copy {
-                    let copymatrix = matrix::identity.as_slice();
+                    let copymatrix = matrix::IDENTITY.as_slice();
                     perform_copy(target.framebuffer, &layer.target.texture, completed.copyshader, copymatrix);
                     gl2::bind_framebuffer(gl2::FRAMEBUFFER, layer.target.framebuffer);
                     gl2::clear_color(0f32, 0f32, 0f32, 0f32);
@@ -356,7 +356,7 @@ pub extern fn render_frame(data: *mut Data) {
         (Some(copy_shader), Some(anim_shader)) => {
             data.events.pushframe();
             data.targetdata.current_target = data.targetdata.current_target ^ 1;
-            let copymatrix = matrix::identity.as_slice();
+            let copymatrix = matrix::IDENTITY.as_slice();
             gl2::disable(gl2::BLEND);
             let (target, source) = get_texturetargets(&data.targetdata);
             perform_copy(target.framebuffer, &source.texture, anim_shader, copymatrix);
@@ -378,4 +378,29 @@ pub unsafe extern fn deinit_gl(data: *mut Data) {
     let data: Box<Data> = mem::transmute(data);
     mem::drop(data);
     gl2::finish();
+}
+
+#[test]
+fn test_all() {
+    let data = setup_graphics(0, 0);
+    let (consumer, producer) = create_motion_event_handler();
+    let copyshader = compile_copy_shader(data, ptr::null(), ptr::null());
+    let pointshader = compile_point_shader(data, ptr::null(), ptr::null());
+    let interpolator = compile_luascript(data, ptr::null());
+    let brushpixels = [1u8, 0, 0, 1];
+    let brush = load_texture(data, 1, 1, brushpixels.to_ptr(), ANDROID_BITMAP_FORMAT_A_8);
+
+    set_copy_shader(data, copyshader);
+    set_anim_shader(data, copyshader);
+    set_point_shader(data, pointshader);
+    set_interpolator(data, interpolator);
+    set_brush_texture(data, brush);
+    clear_layers(data);
+    add_layer(data, copyshader, pointshader, 0);
+    draw_image(data, 1, 1, brushpixels.to_ptr());
+    
+    clear_buffer(data);
+    draw_queued_points(data, consumer, matrix::IDENTITY.to_ptr());
+    render_frame(data);
+    deinit_gl(data);
 }

@@ -11,20 +11,20 @@ use glcommon;
 use glcommon::{check_gl_error, get_shader_handle, get_uniform_handle_option, Shader};
 use gltexture::{Texture};
     
-static gTriangleVertices: [GLfloat, ..8] = [
+static TRIANGLE_VERTICES: [GLfloat, ..8] = [
    -1.0,  1.0,
    -1.0, -1.0,
     1.0, -1.0,
     1.0,  1.0
 ];
-static gTextureVertices: [GLfloat, ..8] = [
+static TEXTURE_VERTICES: [GLfloat, ..8] = [
     0.0, 1.0,
     0.0, 0.0,
     1.0, 0.0,
     1.0, 1.0
 ];
 
-static default_vertex_shader: &'static str =
+static DEFAULT_VERTEX_SHADER: &'static str =
    "attribute vec4 vPosition;
     attribute vec4 vTexCoord;
     uniform mat4 textureMatrix;
@@ -34,7 +34,7 @@ static default_vertex_shader: &'static str =
         gl_Position = vPosition;
     }\n";
 
-static default_fragment_shader: &'static str =
+static DEFAULT_FRAGMENT_SHADER: &'static str =
    "precision lowp float;
     uniform sampler2D texture;
     varying vec2 uv;
@@ -42,7 +42,7 @@ static default_fragment_shader: &'static str =
         gl_FragColor = texture2D(texture, uv);
     }\n";
 
-pub static noalpha_fragment_shader: &'static str =
+pub static NOALPHA_FRAGMENT_SHADER: &'static str =
    "precision lowp float;
     uniform sampler2D texture;
     varying vec2 uv;
@@ -60,8 +60,8 @@ pub struct CopyShader {
 
 impl Shader for CopyShader {
     fn new(vertopt: Option<&str>, fragopt: Option<&str>) -> Option<CopyShader> {
-        let vert = vertopt.unwrap_or_else(|| { logi("copy shader: using default vertex shader"); default_vertex_shader});
-        let frag = fragopt.unwrap_or_else(|| { logi("copy shader: using default fragment shader"); default_fragment_shader});
+        let vert = vertopt.unwrap_or_else(|| { logi("copy shader: using default vertex shader"); DEFAULT_VERTEX_SHADER});
+        let frag = fragopt.unwrap_or_else(|| { logi("copy shader: using default fragment shader"); DEFAULT_FRAGMENT_SHADER});
         let program_option = glcommon::create_program(vert, frag);
         match program_option {
             None => {
@@ -101,8 +101,8 @@ impl CopyShader {
         gl2::use_program(self.program);
         check_gl_error("copyshader: use_program");
 
-        glattrib_f32!(self.position_handle, 2, gTriangleVertices);
-        glattrib_f32!(self.tex_coord_handle, 2, gTextureVertices);
+        glattrib_f32!(self.position_handle, 2, TRIANGLE_VERTICES);
+        glattrib_f32!(self.tex_coord_handle, 2, TEXTURE_VERTICES);
 
         gl2::uniform_matrix_4fv(self.matrix_handle, false, matrix);
         check_gl_error("uniform_matrix_4fv(textureMatrix)");

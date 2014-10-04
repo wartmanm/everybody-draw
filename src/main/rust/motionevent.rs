@@ -84,9 +84,9 @@ fn push_moves(queue: &mut PointProducer, active: &mut PointerState, evt: *const 
 }
 
 fn make_active(queue: &mut PointProducer, active: &mut PointerState, id: i32, newstate: bool) {
-    let updated = active.find(&(id as uint)).unwrap_or(&activestate::inactive).push(newstate);
+    let updated = active.find(&(id as uint)).unwrap_or(&activestate::INACTIVE).push(newstate);
     active.insert(id as uint, updated);
-    if updated == activestate::stopping {
+    if updated == activestate::STOPPING {
         queue.push(PointEntry { index: id, entry: point::Stop });
     }
 }
@@ -115,7 +115,7 @@ fn push_current_point(queue: &mut PointProducer, evt: *const AInputEvent, id: i3
 
 fn push_stops(queue: &mut PointProducer, active: &mut PointerState) {
     for (idx, active) in active.iter_mut() {
-        if *active == activestate::stopping {
+        if *active == activestate::STOPPING {
             queue.push(PointEntry { index: idx as i32, entry: point::Stop });
         }
     }
