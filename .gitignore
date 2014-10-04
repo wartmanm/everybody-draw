@@ -13,4 +13,5 @@ target/
 *.vim
 *.class
 /notes/
-/src/main/rust/android/
+/src/main/rust/src/android/
+Cargo.lock

@@ -36,7 +36,7 @@ object General {
   }
 
   lazy val cleanRustTask = Def.task {
-    val result = sbt.Process("make clean",
+    val result = sbt.Process("cargo clean",
       rustDir.value,
       environment.value: _*
     ) !< processLogger.value
@@ -45,7 +45,7 @@ object General {
   }
 
   lazy val compileRustTask = Def.task {
-    val result = sbt.Process("make all",
+    val result = sbt.Process("cargo build --target arm-linux-androideabi",
       rustDir.value,
       environment.value: _*
     ) !< processLogger.value
