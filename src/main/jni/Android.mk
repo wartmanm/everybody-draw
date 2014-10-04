@@ -17,7 +17,8 @@ LOCAL_PATH := $(call my-dir)
 include $(CLEAR_VARS)
 
 LOCAL_MODULE    := rustgl
-LOCAL_SRC_FILES := ../rust/librustgl.a
+
+LOCAL_SRC_FILES := ../rust/target/arm-linux-androideabi/librustgl-45c2de64c06f60f1.a
 
 include $(PREBUILT_STATIC_LIBRARY)
 
@@ -31,7 +32,7 @@ include $(PREBUILT_STATIC_LIBRARY)
 include $(CLEAR_VARS)
 
 LOCAL_MODULE    := gl-stuff
-LOCAL_SRC_FILES := hello-jni.c unwind.c lua_geom.c
+LOCAL_SRC_FILES := unwind.c lua_geom.c
 
 LOCAL_CFLAGS := -std=c99 -Wall -Wextra -Wno-unused -Werror -g
 LOCAL_LDFLAGS := -L/opt/android-ndk/android-ndk-r9b/sources/cxx-stl/gnu-libstdc++/4.6/libs/armeabi -z muldefs

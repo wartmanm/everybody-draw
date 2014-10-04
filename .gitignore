@@ -10,9 +10,13 @@ target/
 *.so
 *.rlib
 *.a
+*.pyc
+*.pyo
 *.vim
 *.class
 /notes/
 /src/main/rust/src/android/
 Cargo.lock
 src/main/assets/unibrushes
+src/main/rust/src/bindgen_builtins.rs
+src/main/rust/src/jni.rs
