@@ -84,7 +84,7 @@ fn perform_copy(dest_framebuffer: GLuint, source_texture: &Texture, shader: &Cop
 }
 
 #[no_mangle]
-pub fn draw_image(data: *mut Data, w: i32, h: i32, pixels: *const u8) -> () {
+pub fn draw_image(data: &mut Data, w: i32, h: i32, pixels: *const u8) -> () {
     logi("drawing image...");
     let data = get_safe_data(data);
     let target = get_current_texturetarget(&data.targetdata);
@@ -114,7 +114,7 @@ pub fn draw_image(data: *mut Data, w: i32, h: i32, pixels: *const u8) -> () {
 }
 
 #[no_mangle]
-pub unsafe fn with_pixels<T>(data: *mut Data, callback: |i32, i32, *const u8|->T) -> T {
+pub unsafe fn with_pixels<T>(data: &mut Data, callback: |i32, i32, *const u8|->T) -> T {
     logi("in with_pixels");
     let data = get_safe_data(data);
     let oldtarget = get_current_texturetarget(&data.targetdata);
@@ -140,23 +140,23 @@ pub unsafe fn with_pixels<T>(data: *mut Data, callback: |i32, i32, *const u8|->T
 }
 
 #[no_mangle]
-pub unsafe fn compile_copy_shader(data: *mut Data, vert: Option<String>, frag: Option<String>) -> Option<DrawObjectIndex<CopyShader>> {
+pub unsafe fn compile_copy_shader(data: &mut Data, vert: Option<String>, frag: Option<String>) -> Option<DrawObjectIndex<CopyShader>> {
     get_safe_data(data).events.load_copyshader(vert, frag)
 }
 
 #[no_mangle]
-pub unsafe fn compile_point_shader(data: *mut Data, vert: Option<String>, frag: Option<String>) -> Option<DrawObjectIndex<PointShader>> {
+pub unsafe fn compile_point_shader(data: &mut Data, vert: Option<String>, frag: Option<String>) -> Option<DrawObjectIndex<PointShader>> {
     get_safe_data(data).events.load_pointshader(vert, frag)
 }
 
 #[no_mangle]
-pub unsafe fn compile_luascript(data: *mut Data, luastr: Option<String>) -> Option<DrawObjectIndex<LuaScript>> {
+pub unsafe fn compile_luascript(data: &mut Data, luastr: Option<String>) -> Option<DrawObjectIndex<LuaScript>> {
     get_safe_data(data).events.load_interpolator(luastr)
 }
 
 // TODO: make an enum for these with a scala counterpart
 #[no_mangle]
-pub unsafe fn set_copy_shader(data: *mut Data, shader: DrawObjectIndex<CopyShader>) -> () {
+pub unsafe fn set_copy_shader(data: &mut Data, shader: DrawObjectIndex<CopyShader>) -> () {
     logi("setting copy shader");
     get_safe_data(data).events.use_copyshader(shader);
 }
@@ -164,25 +164,25 @@ pub unsafe fn set_copy_shader(data: *mut Data, shader: DrawObjectIndex<CopyShade
 // these can also be null to unset the shader
 // TODO: document better from scala side
 #[no_mangle]
-pub unsafe fn set_anim_shader(data: *mut Data, shader: DrawObjectIndex<CopyShader>) -> () {
+pub unsafe fn set_anim_shader(data: &mut Data, shader: DrawObjectIndex<CopyShader>) -> () {
     logi("setting anim shader");
     get_safe_data(data).events.use_animshader(shader);
 }
 
 #[no_mangle]
-pub unsafe fn set_point_shader(data: *mut Data, shader: DrawObjectIndex<PointShader>) -> () {
+pub unsafe fn set_point_shader(data: &mut Data, shader: DrawObjectIndex<PointShader>) -> () {
     logi("setting point shader");
     get_safe_data(data).events.use_pointshader(shader);
 }
 
 #[no_mangle]
-pub unsafe fn set_interpolator(data: *mut Data, interpolator: DrawObjectIndex<LuaScript>) -> () {
+pub unsafe fn set_interpolator(data: &mut Data, interpolator: DrawObjectIndex<LuaScript>) -> () {
     logi("setting interpolator");
     get_safe_data(data).events.use_interpolator(interpolator);
 }
 
 #[no_mangle]
-pub unsafe fn add_layer(data: *mut Data, copyshader: DrawObjectIndex<CopyShader>, pointshader: DrawObjectIndex<PointShader>, pointidx: i32) -> () {
+pub unsafe fn add_layer(data: &mut Data, copyshader: DrawObjectIndex<CopyShader>, pointshader: DrawObjectIndex<PointShader>, pointidx: i32) -> () {
     logi("adding layer");
     let data = get_safe_data(data);
     let extra: i32 = (pointidx as i32 + 1) - data.points.len() as i32;
@@ -193,7 +193,7 @@ pub unsafe fn add_layer(data: *mut Data, copyshader: DrawObjectIndex<CopyShader>
 }
 
 #[no_mangle]
-pub unsafe fn clear_layers(data: *mut Data) {
+pub unsafe fn clear_layers(data: &mut Data) {
     logi!("setting layer count to 0");
     let data = get_safe_data(data);
     data.events.clear_layers();
@@ -201,7 +201,7 @@ pub unsafe fn clear_layers(data: *mut Data) {
 }
 
 #[no_mangle]
-pub extern fn setup_graphics<'a>(w: i32, h: i32) -> *mut Data<'a> {
+pub extern fn setup_graphics<'a>(w: i32, h: i32) -> Box<Data<'a>> {
     print_gl_string("Version", gl2::VERSION);
     print_gl_string("Vendor", gl2::VENDOR);
     print_gl_string("Renderer", gl2::RENDERER);
@@ -224,10 +224,8 @@ pub extern fn setup_graphics<'a>(w: i32, h: i32) -> *mut Data<'a> {
     gl2::viewport(0, 0, w, h);
     gl2::disable(gl2::DEPTH_TEST);
     gl2::blend_func(gl2::ONE, gl2::ONE_MINUS_SRC_ALPHA);
-    unsafe {
-        let dataptr: *mut Data = mem::transmute(data);
-        dataptr
-    }
+
+    data
 }
 
 fn get_safe_data(data: *mut Data) -> &mut Data {
@@ -245,7 +243,7 @@ fn draw_layer(layer: CompletedLayer, matrix: &[f32], color: [f32, ..3]
 }
 
 #[no_mangle]
-pub extern fn draw_queued_points(data: *mut Data, handler: *mut MotionEventConsumer, matrix: &matrix::Matrix) {
+pub extern fn draw_queued_points(data: &mut Data, handler: &mut MotionEventConsumer, matrix: &matrix::Matrix) {
     let data = get_safe_data(data);
     match (data.events.pointshader, data.events.copyshader, data.events.brush) {
         (Some(point_shader), Some(copy_shader), Some(brush)) => {
@@ -291,7 +289,7 @@ pub extern fn draw_queued_points(data: *mut Data, handler: *mut MotionEventConsu
 }
 
 #[no_mangle]
-pub extern fn load_texture(data: *mut Data, w: i32, h: i32, pixels: &[u8], format: i32) -> Option<DrawObjectIndex<Texture>> {
+pub extern fn load_texture(data: &mut Data, w: i32, h: i32, pixels: &[u8], format: i32) -> Option<DrawObjectIndex<Texture>> {
     let data = get_safe_data(data);
     let formatenum: AndroidBitmapFormat = unsafe { mem::transmute(format) };
     let format = match formatenum {
@@ -306,12 +304,12 @@ pub extern fn load_texture(data: *mut Data, w: i32, h: i32, pixels: &[u8], forma
 }
 
 #[no_mangle]
-pub extern fn set_brush_texture(data: *mut Data, texture: DrawObjectIndex<Texture>) {
+pub extern fn set_brush_texture(data: &mut Data, texture: DrawObjectIndex<Texture>) {
     get_safe_data(data).events.use_brush(texture);
 }
 
 #[no_mangle]
-pub extern fn clear_buffer(data: *mut Data) {
+pub extern fn clear_buffer(data: &mut Data) {
     let data = get_safe_data(data);
     for target in data.targetdata.targets.iter() {
         gl2::bind_framebuffer(gl2::FRAMEBUFFER, target.framebuffer);
@@ -323,7 +321,7 @@ pub extern fn clear_buffer(data: *mut Data) {
 }
 
 #[no_mangle]
-pub extern fn render_frame(data: *mut Data) {
+pub extern fn render_frame(data: &mut Data) {
     let data = get_safe_data(data);
     match (data.events.copyshader, data.events.animshader) {
         (Some(copy_shader), Some(anim_shader)) => {
@@ -347,7 +345,7 @@ pub extern fn render_frame(data: *mut Data) {
 }
 
 #[no_mangle]
-pub unsafe extern fn deinit_gl(data: *mut Data) {
+pub unsafe extern fn deinit_gl(data: &mut Data) {
     let data: Box<Data> = mem::transmute(data);
     mem::drop(data);
     gl2::finish();

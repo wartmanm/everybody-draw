@@ -58,7 +58,7 @@ fn get_safe_data<'a, T>(data: *mut T) -> &'a mut T {
 }
 
 #[no_mangle]
-pub extern fn create_motion_event_handler() -> (*mut MotionEventConsumer, *mut MotionEventProducer) {
+pub extern fn create_motion_event_handler() -> (Box<MotionEventConsumer>, Box<MotionEventProducer>) {
     let (consumer, producer) = spsc_queue::queue::<PointEntry>(0);
     let handler = box MotionEventConsumer {
         consumer: consumer,
@@ -72,18 +72,12 @@ pub extern fn create_motion_event_handler() -> (*mut MotionEventConsumer, *mut M
         pointer_data: motionevent::Data::new(),
     };
     logi("created statics");
-    unsafe {
-        let handlerptr: *mut MotionEventConsumer = mem::transmute(handler) ;
-        let producerptr: *mut MotionEventProducer = mem::transmute(producer) ;
-        (handlerptr, producerptr)
-    }
+    (handler, producer)
 }
 
 #[no_mangle]
-pub unsafe extern fn destroy_motion_event_handler(consumer: *mut MotionEventConsumer, producer: *mut MotionEventProducer) {
-    let handler: Box<MotionEventConsumer> = mem::transmute(consumer);
-    let producer: Box<MotionEventProducer> = mem::transmute(producer);
-    mem::drop(handler);
+pub unsafe extern fn destroy_motion_event_handler(consumer: Box<MotionEventConsumer>, producer: Box<MotionEventProducer>) {
+    mem::drop(consumer);
     mem::drop(producer);
 }
 
