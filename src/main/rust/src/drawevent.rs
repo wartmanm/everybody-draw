@@ -59,12 +59,12 @@ impl<'a> Events<'a> {
         self.copyshaders.push_object(initargs)
     }
 
-    pub fn use_copyshader(&mut self, idx: DrawObjectIndex<CopyShader>) -> &CopyShader {
+    pub fn use_copyshader(&mut self, idx: DrawObjectIndex<CopyShader>) -> &'a CopyShader {
         self.eventlist.push(UseCopyShader(idx));
         self.copyshaders.get_object(idx)
     }
 
-    pub fn use_animshader(&mut self, idx: DrawObjectIndex<CopyShader>) -> &CopyShader {
+    pub fn use_animshader(&mut self, idx: DrawObjectIndex<CopyShader>) -> &'a CopyShader {
         self.eventlist.push(UseAnimShader(idx));
         self.copyshaders.get_object(idx)
     }
@@ -73,7 +73,7 @@ impl<'a> Events<'a> {
         let initargs = (vert, frag);
         self.pointshaders.push_object(initargs)
     }
-    pub fn use_pointshader(&mut self, idx: DrawObjectIndex<PointShader>) -> &PointShader {
+    pub fn use_pointshader(&mut self, idx: DrawObjectIndex<PointShader>) -> &'a PointShader {
         self.eventlist.push(UsePointShader(idx));
         self.pointshaders.get_object(idx)
     }
@@ -82,7 +82,7 @@ impl<'a> Events<'a> {
         let init: BrushInitValues = (format, (w, h), ownedpixels);
         self.textures.safe_push_object(init)
     }
-    pub fn use_brush(&mut self, idx: DrawObjectIndex<Texture>) -> &Texture {
+    pub fn use_brush(&mut self, idx: DrawObjectIndex<Texture>) -> &'a Texture {
         self.eventlist.push(UseBrush(idx));
         self.textures.get_object(idx)
     }
@@ -91,14 +91,14 @@ impl<'a> Events<'a> {
         self.luascripts.push_object(initopt)
     }
 
-    pub fn use_interpolator(&mut self, idx: DrawObjectIndex<LuaScript>) -> &LuaScript {
+    pub fn use_interpolator(&mut self, idx: DrawObjectIndex<LuaScript>) -> &'a LuaScript {
         self.eventlist.push(UseInterpolator(idx));
         self.luascripts.get_object(idx)
     }
 
     pub fn add_layer(&mut self, dimensions: (i32, i32)
                      , copyshader: Option<DrawObjectIndex<CopyShader>>, pointshader: Option<DrawObjectIndex<PointShader>>
-                     , pointidx: i32) -> PaintLayer {
+                     , pointidx: i32) -> PaintLayer<'a> {
         self.eventlist.push(AddLayer(copyshader, pointshader, pointidx));
         let copyshader = match copyshader { Some(x) => Some(self.copyshaders.get_object(x)), None => None };
         let pointshader = match pointshader { Some(x) => Some(self.pointshaders.get_object(x)), None => None };
