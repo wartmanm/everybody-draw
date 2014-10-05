@@ -8,7 +8,7 @@ use libc::{c_void, c_char};
 use collections::string::String;
 
 use jni;
-use jni::{jobject, jclass, jfieldID, jmethodID, JNIEnv, jint, jstring, jfloatArray, JNINativeMethod, JavaVM, jboolean, jchar, jsize};
+use jni::{jobject, jclass, jfieldID, jmethodID, JNIEnv, jint, jfloat, jstring, jfloatArray, JNINativeMethod, JavaVM, jboolean, jchar, jsize};
 use android::input::AInputEvent;
 use android::bitmap::{AndroidBitmap_getInfo, AndroidBitmap_lockPixels, AndroidBitmap_unlockPixels, AndroidBitmapInfo};
 use android::bitmap::{ANDROID_BITMAP_FORMAT_RGBA_8888, ANDROID_BITMAP_FORMAT_A_8};
@@ -60,7 +60,7 @@ unsafe extern "C" fn finish_gl(env: *mut JNIEnv, thiz: jobject, data: jint) {
 
 unsafe extern "C" fn native_draw_queued_points(env: *mut JNIEnv, thiz: jobject, data: i32, handler: i32, java_matrix: jfloatArray) {
     let mut matrix: Matrix = mem::uninitialized();
-    ((**env).GetFloatArrayRegion).unwrap()(env, java_matrix, 0, 16, matrix.as_mut_ptr());
+    get_float_array_region(env, java_matrix, 0, 16, matrix.as_mut_ptr());
     glinit::draw_queued_points(data as GLInit, handler as *mut MotionEventConsumer, matrix.as_mut_ptr());
 }
 
@@ -71,8 +71,9 @@ unsafe extern "C" fn native_update_gl(env: *mut JNIEnv, thiz: jobject, data: i32
 unsafe extern "C" fn init_motion_event_handler(env: *mut JNIEnv, thiz: jobject) -> jobject {
     let (consumer, producer) = glpoint::create_motion_event_handler();
     let pairclass = find_class(env, cstr!("com/github/wartman4404/gldraw/MotionEventHandlerPair"));
-    let constructor = ((**env).GetMethodID).unwrap()(env, pairclass, cstr!("<init>"), cstr!("(II)V"));
-    ((**env).NewObject).unwrap()(env, pairclass, constructor, consumer as int, producer as int)
+    let constructor = get_methodid(env, pairclass, cstr!("<init>"), cstr!("(II)V"));
+    let newobj: extern "C" fn(*mut JNIEnv, jclass, jmethodID, ...) -> jobject = mem::transmute((**env).NewObject);
+    newobj(env, pairclass, constructor, consumer as int, producer as int)
 }
 
 unsafe extern "C" fn destroy_motion_event_handler(env: *mut JNIEnv, thiz: jobject, pairobj: jobject) {
@@ -165,8 +166,9 @@ unsafe extern "C" fn export_pixels(env: *mut JNIEnv, thiz: jobject, data: i32) -
         let outpixels = bitmap.as_slice();
         ptr::copy_nonoverlapping_memory(outpixels.as_mut_ptr(), pixels as *const u8, outpixels.len());
         let bitmap = bitmap.obj;
-        let premult = ((**env).GetMethodID).unwrap()(env, bitmapclass, cstr!("setPremultiplied"), cstr!("(Z)V"));
-        ((**env).CallVoidMethod).unwrap()(env, bitmap, premult, ::jni_constants::JNI_TRUE);
+        let premult = get_methodid(env, bitmapclass, cstr!("setPremultiplied"), cstr!("(Z)V"));
+        let voidmethod: extern "C" fn(*mut JNIEnv, jobject, jmethodID, ...) = mem::transmute((**env).CallVoidMethod);
+        voidmethod(env, bitmap, premult, JNI_TRUE);
         logi!("done with callback");
         bitmap
     })
@@ -194,7 +196,8 @@ impl AndroidBitmap {
         let argbfield = ((**env).GetStaticFieldID).unwrap()(env, configclass, cstr!("ARGB_8888"), cstr!("Landroid/graphics/Bitmap$Config;"));
         let argb = ((**env).GetStaticObjectField).unwrap()(env, configclass, argbfield);
         let createbitmap = ((**env).GetStaticMethodID).unwrap()(env, bitmapclass, cstr!("createBitmap"), cstr!("(IILandroid/graphics/Bitmap$Config;)Landroid/graphics/Bitmap;"));
-        let bitmap = ((**env).CallStaticObjectMethod).unwrap()(env, bitmapclass, createbitmap, w, h, argb);
+        let callstatic: extern "C" fn(*mut JNIEnv, jclass, jmethodID, ...) -> jobject = mem::transmute((**env).GetStaticMethodID);
+        let bitmap = callstatic(env, bitmapclass, createbitmap, w, h, argb);
         logi!("created bitmap");
         AndroidBitmap::from_jobject(env, bitmap)
     }
@@ -263,6 +266,18 @@ unsafe fn get_fieldid(env: *mut JNIEnv, class: jclass, name: *const c_char, sig:
 unsafe fn get_int_field(env: *mut JNIEnv, obj: jobject, field: jfieldID) -> jint {
     let getintfield: extern "C" fn(*mut JNIEnv, jobject, jfieldID) -> jint = mem::transmute((**env).GetIntField);
     getintfield(env, obj, field)
+}
+
+#[inline(always)]
+unsafe fn get_float_array_region(env: *mut JNIEnv, array: jfloatArray, start: jsize, end: jsize, target: *mut jfloat) {
+    let getfloatarrayregion: extern "C" fn(*mut JNIEnv, jfloatArray, jsize, jsize, *mut jfloat) = mem::transmute((**env).GetFloatArrayRegion);
+    getfloatarrayregion(env, array, start, end, target)
+}
+
+#[inline(always)]
+unsafe fn get_methodid(env: *mut JNIEnv, class: jclass, name: *const c_char, sig: *const c_char) -> jmethodID {
+    let getmethodid: extern "C" fn(*mut JNIEnv, jclass, *const c_char, *const c_char) -> jmethodID = mem::transmute((**env).GetMethodID);
+    getmethodid(env, class, name, sig)
 }
 
 unsafe fn register_classmethods(env: *mut JNIEnv, classname: *const i8, methods: &[JNINativeMethod]) {
@@ -349,6 +364,7 @@ pub unsafe extern "C" fn JNI_OnLoad(vm: *mut JavaVM, reserved: *mut libc::c_void
     logi!("finished jni_onload");
     JNI_VERSION_1_2
 }
+
 
 
 
