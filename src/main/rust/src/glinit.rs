@@ -115,7 +115,7 @@ pub fn draw_image(data: *mut Data, w: i32, h: i32, pixels: *const u8) -> () {
 }
 
 #[no_mangle]
-pub unsafe fn with_pixels(data: *mut Data, callback: unsafe extern "C" fn(i32, i32, *const u8, *mut ())-> *mut (), env: *mut ()) -> *mut () {
+pub unsafe fn with_pixels<T>(data: *mut Data, callback: |i32, i32, *const u8|->*mut T) -> *mut T {
     logi("in with_pixels");
     let data = get_safe_data(data);
     let oldtarget = get_current_texturetarget(&data.targetdata);
@@ -134,7 +134,7 @@ pub unsafe fn with_pixels(data: *mut Data, callback: unsafe extern "C" fn(i32, i
         logi("gl2::read_pixels()");
         let pixptr = pixels.as_ptr();
         logi!("calling callback");
-        let result = callback(x, y, pixptr, env);
+        let result = callback(x, y, pixptr);
         logi!("returning pixels: {}", pixptr);
         result
     }).unwrap_or(ptr::null_mut())
