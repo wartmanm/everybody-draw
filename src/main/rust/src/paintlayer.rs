@@ -1,5 +1,4 @@
 use core::prelude::*;
-use collections::vec::Vec;
 
 use log::logi;
 
@@ -9,7 +8,6 @@ use opengles::gl2::GLuint;
 use copyshader::CopyShader;
 use gltexture::Texture;
 use pointshader::PointShader;
-use point::ShaderPaintPoint;
 use gltexture;
 
 pub struct TextureTarget {
@@ -21,14 +19,13 @@ pub struct PaintLayer<'a> {
     pub copyshader: Option<&'a CopyShader>,
     pub pointshader: Option<&'a PointShader>,
     pub target: TextureTarget,
-    pub points: &'a Vec<ShaderPaintPoint>,
+    pub pointidx: i32,
 }
 
 pub struct CompletedLayer<'a, 'b> {
     pub copyshader: &'a CopyShader,
     pub pointshader: &'a PointShader,
     pub target: &'b TextureTarget,
-    pub points: &'a Vec<ShaderPaintPoint>,
 }
 
 impl TextureTarget {
@@ -53,13 +50,13 @@ impl Drop for TextureTarget {
 }
 
 impl<'a> PaintLayer<'a> {
-    pub fn new(dimensions: (i32, i32), copyshader: Option<&'a CopyShader>, pointshader: Option<&'a PointShader>, points: &'a Vec<ShaderPaintPoint>) -> PaintLayer<'a> {
+    pub fn new(dimensions: (i32, i32), copyshader: Option<&'a CopyShader>, pointshader: Option<&'a PointShader>, pointidx: i32) -> PaintLayer<'a> {
         let (w, h) = dimensions;
         PaintLayer {
             copyshader: copyshader,
             pointshader: pointshader,
             target: TextureTarget::new(w, h, gltexture::RGBA),
-            points: points
+            pointidx: pointidx,
         }
     }
 
@@ -68,7 +65,6 @@ impl<'a> PaintLayer<'a> {
             copyshader: self.copyshader.unwrap_or(basecopyshader),
             pointshader: self.pointshader.unwrap_or(basepointshader),
             target: &self.target,
-            points: self.points,
         }
     }
 }

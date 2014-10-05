@@ -21,7 +21,6 @@ use copyshader::CopyShader;
 use collections::str::StrAllocating;
 use luascript::LuaScript;
 use paintlayer::PaintLayer;
-use point::ShaderPaintPoint;
 
 enum DrawEvent {
     UseAnimShader(DrawObjectIndex<CopyShader>),
@@ -30,7 +29,7 @@ enum DrawEvent {
     UseBrush(DrawObjectIndex<Texture>),
     UseInterpolator(DrawObjectIndex<LuaScript>),
     Point(PointEntry),
-    AddLayer(Option<DrawObjectIndex<CopyShader>>, Option<DrawObjectIndex<PointShader>>, uint),
+    AddLayer(Option<DrawObjectIndex<CopyShader>>, Option<DrawObjectIndex<PointShader>>, i32),
     ClearLayers,
     Frame,
 }
@@ -111,20 +110,20 @@ impl<'a> Events<'a> {
         self.luascripts.push_object(initopt)
     }
 
-    pub fn use_interpolator(&'a mut self, idx: DrawObjectIndex<LuaScript>) -> &LuaScript {
+    pub fn use_interpolator(&mut self, idx: DrawObjectIndex<LuaScript>) -> &LuaScript {
         self.eventlist.push(UseInterpolator(idx));
         let interpolator = self.luascripts.get_object(idx);
         self.interpolator = Some(interpolator);
         interpolator
     }
 
-    pub fn add_layer(&'a mut self, dimensions: (i32, i32)
+    pub fn add_layer(&mut self, dimensions: (i32, i32)
                      , copyshader: Option<DrawObjectIndex<CopyShader>>, pointshader: Option<DrawObjectIndex<PointShader>>
-                     , pointidx: uint, pointref: &'a [Vec<ShaderPaintPoint>]) -> &PaintLayer<'a> {
+                     , pointidx: i32) -> &PaintLayer {
         self.eventlist.push(AddLayer(copyshader, pointshader, pointidx));
         let copyshader = match copyshader { Some(x) => Some(self.copyshaders.get_object(x)), None => None };
         let pointshader = match pointshader { Some(x) => Some(self.pointshaders.get_object(x)), None => None };
-        let layer = PaintLayer::new(dimensions, copyshader, pointshader, &pointref[pointidx]);
+        let layer = PaintLayer::new(dimensions, copyshader, pointshader, pointidx);
         self.layers.push(layer);
         &self.layers[self.layers.len() - 1]
     }

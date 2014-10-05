@@ -210,8 +210,7 @@ pub unsafe fn add_layer(data: *mut Data, copyshader: DrawObjectIndex<CopyShader>
     if extra > 0 {
         data.points.grow(extra as uint, Vec::new());
     }
-    data.events.add_layer(data.dimensions, Some(copyshader), Some(pointshader)
-                          , pointidx as uint, data.points.as_slice());
+    data.events.add_layer(data.dimensions, Some(copyshader), Some(pointshader) , pointidx);
 }
 
 #[no_mangle]
@@ -257,11 +256,11 @@ fn get_safe_data(data: *mut Data) -> &mut Data {
 }
 
 fn draw_layer(layer: CompletedLayer, matrix: &[f32], color: [f32, ..3]
-              , brush: &Texture, back_buffer: &Texture) {
-    if layer.points.len() > 0 {
+              , brush: &Texture, back_buffer: &Texture, points: &[ShaderPaintPoint]) {
+    if points.len() > 0 {
         gl2::bind_framebuffer(gl2::FRAMEBUFFER, layer.target.framebuffer);
-        layer.pointshader.prep(matrix.as_slice(), layer.points.as_slice(), color, brush, back_buffer);
-        gl2::draw_arrays(gl2::POINTS, 0, layer.points.len() as i32);
+        layer.pointshader.prep(matrix.as_slice(), points, color, brush, back_buffer);
+        gl2::draw_arrays(gl2::POINTS, 0, points.len() as i32);
         check_gl_error("draw_arrays");
     }
 }
@@ -290,13 +289,13 @@ pub extern fn draw_queued_points(data: *mut Data, handler: *mut MotionEventConsu
                 copyshader: copy_shader,
                 pointshader: point_shader,
                 target: target,
-                points: &drawvecs[0],
             };
-            draw_layer(baselayer, safe_matrix, color, brush, back_buffer);
+            draw_layer(baselayer, safe_matrix, color, brush, back_buffer, drawvecs[0].as_slice());
 
             for layer in data.events.layers.iter() {
                 let completed = layer.complete(copy_shader, point_shader);
-                draw_layer(completed, safe_matrix, color, brush, back_buffer);
+                let points = drawvecs[layer.pointidx as uint].as_slice();
+                draw_layer(completed, safe_matrix, color, brush, back_buffer, points);
 
                 if should_copy {
                     let copymatrix = matrix::IDENTITY.as_slice();
