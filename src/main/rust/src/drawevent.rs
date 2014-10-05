@@ -158,7 +158,7 @@ impl EventStream {
     pub fn new() -> EventStream {
         EventStream { position: 0 }
     }
-    pub fn advance<'a>(&mut self, events: &'a mut Events<'a>, mut framecount: u32, playback: bool, m: &mut ::point::PointProducer, gl: &mut ::glinit::Data) {
+    pub fn advance<'a>(&mut self, events: &'a mut Events<'a>, mut framecount: u32, playback: bool, m: &mut ::point::PointProducer, gl: &mut ::glinit::GLInit) {
         if framecount == 0 || self.position >= events.get_eventcount() {
             return;
         }
@@ -176,7 +176,7 @@ impl EventStream {
                 Frame => {
                     framecount -= 1;
                     if playback {
-                        ::glinit::render_frame(gl);
+                        gl.render_frame();
                     }
                 },
                 Point(p) => m.push(p),
