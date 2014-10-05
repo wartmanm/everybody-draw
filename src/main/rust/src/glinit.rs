@@ -2,9 +2,8 @@ extern crate opengles;
 use core::prelude::*;
 use core::{mem,ptr};
 use collections::vec::Vec;
+use collections::string::String;
 use collections::{Mutable, MutableSeq};
-
-use std::c_str::CString;
 
 use log::logi;
 
@@ -140,38 +139,21 @@ pub unsafe fn with_pixels<T>(data: *mut Data, callback: |i32, i32, *const u8|->*
     }).unwrap_or(ptr::null_mut())
 }
 
-unsafe fn with_cstr_as_str<T>(ptr: *const i8, callback: |Option<&str>|->T)->T {
-    let cstr = ptr.as_ref().map_or(None, |b| Some(CString::new(b, false)));
-    let vecstr = cstr.as_ref().and_then(|b| b.as_str());
-    callback(vecstr)
-}
-
-unsafe fn compile_shader<T>(vec: *const i8, frag: *const i8, 
-                 callback: |Option<&str>, Option<&str>| -> T) -> T {
-    // note that this will use the default shader in case of non-utf8 chars
-    // also, must be separate lines b/c ownership
-    with_cstr_as_str(vec, |vecstr| with_cstr_as_str(frag, |fragstr| {
-        callback(vecstr, fragstr)
-    }))
-}
-
 #[no_mangle]
-pub unsafe fn compile_copy_shader(data: *mut Data, vert: *const i8, frag: *const i8) -> DrawObjectIndex<CopyShader> {
-    let shader = compile_shader(vert, frag, |v,f|get_safe_data(data).events.load_copyshader(v,f));
+pub unsafe fn compile_copy_shader(data: *mut Data, vert: Option<String>, frag: Option<String>) -> DrawObjectIndex<CopyShader> {
+    let shader = get_safe_data(data).events.load_copyshader(vert, frag);
     shader.unwrap_or(mem::transmute(-1i))
 }
 
 #[no_mangle]
-pub unsafe fn compile_point_shader(data: *mut Data, vert: *const i8, frag: *const i8) -> DrawObjectIndex<PointShader> {
-    let shader = compile_shader(vert, frag, |v,f|get_safe_data(data).events.load_pointshader(v,f));
+pub unsafe fn compile_point_shader(data: *mut Data, vert: Option<String>, frag: Option<String>) -> DrawObjectIndex<PointShader> {
+    let shader = get_safe_data(data).events.load_pointshader(vert, frag);
     shader.unwrap_or(mem::transmute(-1i))
 }
 
 #[no_mangle]
-pub unsafe fn compile_luascript(data: *mut Data, luachars: *const i8) -> DrawObjectIndex<LuaScript> {
-    let script = with_cstr_as_str(luachars, |luastr| {
-        get_safe_data(data).events.load_interpolator(luastr)
-    });
+pub unsafe fn compile_luascript(data: *mut Data, luastr: Option<String>) -> DrawObjectIndex<LuaScript> {
+    let script = get_safe_data(data).events.load_interpolator(luastr);
     script.unwrap_or(mem::transmute(-1i))
 }
 

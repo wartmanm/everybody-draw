@@ -12,13 +12,13 @@ use core::prelude::*;
 use collections::vec::Vec;
 use collections::{Mutable, MutableSeq};
 use collections::slice::CloneableVector;
+use collections::string::String;
 use point::PointEntry;
 use glstore::{DrawObjectIndex, DrawObjectList};
 use glstore::{ShaderInitValues, BrushInitValues, LuaInitValues};
 use gltexture::{Texture, PixelFormat};
 use pointshader::PointShader;
 use copyshader::CopyShader;
-use collections::str::StrAllocating;
 use luascript::LuaScript;
 use paintlayer::PaintLayer;
 
@@ -66,8 +66,8 @@ impl<'a> Events<'a> {
     }
 
     // FIXME: let glstore deal with optionalness
-    pub fn load_copyshader(&mut self, vert: Option<&str>, frag: Option<&str>) -> Option<DrawObjectIndex<CopyShader>> {
-        let initargs = (vert.map(|x|x.into_string()), frag.map(|x|x.into_string()));
+    pub fn load_copyshader(&mut self, vert: Option<String>, frag: Option<String>) -> Option<DrawObjectIndex<CopyShader>> {
+        let initargs = (vert, frag);
         self.copyshaders.push_object(initargs)
     }
 
@@ -84,8 +84,8 @@ impl<'a> Events<'a> {
         self.animshader = Some(shader);
         shader
     }
-    pub fn load_pointshader(&mut self, vert: Option<&str>, frag: Option<&str>) -> Option<DrawObjectIndex<PointShader>> {
-        let initargs = (vert.map(|x|x.into_string()), frag.map(|x|x.into_string()));
+    pub fn load_pointshader(&mut self, vert: Option<String>, frag: Option<String>) -> Option<DrawObjectIndex<PointShader>> {
+        let initargs = (vert, frag);
         self.pointshaders.push_object(initargs)
     }
     pub fn use_pointshader(&'a mut self, idx: DrawObjectIndex<PointShader>) -> &PointShader {
@@ -105,8 +105,8 @@ impl<'a> Events<'a> {
         self.brush = Some(brush);
         brush
     }
-    pub fn load_interpolator(&mut self, script: Option<&str>) -> Option<DrawObjectIndex<LuaScript>> {
-        let initopt: LuaInitValues = script.map(|x|x.into_string());
+    pub fn load_interpolator(&mut self, script: Option<String>) -> Option<DrawObjectIndex<LuaScript>> {
+        let initopt: LuaInitValues = script;
         self.luascripts.push_object(initopt)
     }
 

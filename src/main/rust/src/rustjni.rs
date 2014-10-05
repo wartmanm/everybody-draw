@@ -2,12 +2,16 @@
 use core::prelude::*;
 use core::{ptr, mem};
 use core::ptr::RawMutPtr;
+use core::raw;
 use libc;
+use libc::{c_void, c_char};
+use collections::string::String;
 
 use jni;
-use jni::{jobject, jclass, jfieldID, jmethodID, JNIEnv, jint, jstring, jfloatArray, JNINativeMethod, JavaVM};
+use jni::{jobject, jclass, jfieldID, jmethodID, JNIEnv, jint, jstring, jfloatArray, JNINativeMethod, JavaVM, jboolean, jchar, jsize};
 use android::input::AInputEvent;
 use android::bitmap::{AndroidBitmap_getInfo, AndroidBitmap_lockPixels, AndroidBitmap_unlockPixels, AndroidBitmapInfo};
+use android::bitmap::{ANDROID_BITMAP_FORMAT_RGBA_8888, ANDROID_BITMAP_FORMAT_A_8};
 use android::native_window_jni::{ANativeWindow_fromSurface};//, ANativeWindow_release};
 use android::native_window::ANativeWindow_release;
 
@@ -31,6 +35,16 @@ macro_rules! cstr(
         concat!($str, "\0").as_ptr() as *const ::libc::c_char
     )
 )
+macro_rules! native_method(
+    ($name:expr, $sig:expr, $fn_ptr:expr) => (
+        JNINativeMethod {
+            name: cstr!($name),
+            signature: cstr!($sig),
+            fnPtr: $fn_ptr as *mut libc::c_void,
+        }
+    )
+)
+
 
 static mut MOTION_CLASS: jclass = 0 as jclass;
 static mut MOTIONEVENT_NATIVE_PTR_FIELD: jfieldID = 0 as jfieldID;
@@ -56,22 +70,22 @@ unsafe extern "C" fn native_update_gl(env: *mut JNIEnv, thiz: jobject, data: i32
 
 unsafe extern "C" fn init_motion_event_handler(env: *mut JNIEnv, thiz: jobject) -> jobject {
     let (consumer, producer) = glpoint::create_motion_event_handler();
-    let pairclass = ((**env).FindClass).unwrap()(env, cstr!("com/github/wartman4404/gldraw/MotionEventHandlerPair"));
+    let pairclass = find_class(env, cstr!("com/github/wartman4404/gldraw/MotionEventHandlerPair"));
     let constructor = ((**env).GetMethodID).unwrap()(env, pairclass, cstr!("<init>"), cstr!("(II)V"));
     ((**env).NewObject).unwrap()(env, pairclass, constructor, consumer as int, producer as int)
 }
 
 unsafe extern "C" fn destroy_motion_event_handler(env: *mut JNIEnv, thiz: jobject, pairobj: jobject) {
-    let pairclass = ((**env).FindClass).unwrap()(env, cstr!("com/github/wartman4404/gldraw/MotionEventHandlerPair"));
-    let consumerfield = ((**env).GetFieldID).unwrap()(env, pairclass, cstr!("consumer"), cstr!("I"));
-    let producerfield = ((**env).GetFieldID).unwrap()(env, pairclass, cstr!("producer"), cstr!("I"));
-    let consumer = ((**env).GetIntField).unwrap()(env, pairobj, consumerfield) as *mut MotionEventConsumer;
-    let producer = ((**env).GetIntField).unwrap()(env, pairobj, producerfield) as *mut MotionEventProducer;
+    let pairclass = find_class(env, cstr!("com/github/wartman4404/gldraw/MotionEventHandlerPair"));
+    let consumerfield = get_fieldid(env, pairclass, cstr!("consumer"), cstr!("I"));
+    let producerfield = get_fieldid(env, pairclass, cstr!("producer"), cstr!("I"));
+    let consumer = get_int_field(env, pairobj, consumerfield) as *mut MotionEventConsumer;
+    let producer = get_int_field(env, pairobj, producerfield) as *mut MotionEventProducer;
     glpoint::destroy_motion_event_handler(consumer, producer);
 }
 
 unsafe extern "C" fn native_append_motion_event(env: *mut JNIEnv, thiz: jobject, handler: jint, evtobj: jobject) {
-    let evtptr = ((**env).GetIntField).unwrap()(env, evtobj, MOTIONEVENT_NATIVE_PTR_FIELD);
+    let evtptr = get_int_field(env, evtobj, MOTIONEVENT_NATIVE_PTR_FIELD);
     glpoint::jni_append_motion_event(mem::transmute(handler), evtptr as *const AInputEvent);
 }
 
@@ -92,12 +106,8 @@ unsafe extern "C" fn set_brush_texture(env: *mut JNIEnv, thiz: jobject, data: ji
 }
 
 unsafe extern "C" fn create_texture(env: *mut JNIEnv, thiz: jobject, data: jint, bitmap: jobject) -> jint {
-    let mut info: AndroidBitmapInfo = mem::uninitialized();
-    AndroidBitmap_getInfo(env, bitmap, &mut info);
-    let mut pixels: *mut libc::c_void = ptr::null_mut();
-    AndroidBitmap_lockPixels(env, bitmap, &mut pixels);
-    let texture = glinit::load_texture(data as GLInit, info.width as i32, info.height as i32, pixels as *const u8, info.format);
-    AndroidBitmap_unlockPixels(env, bitmap);
+    let bitmap = AndroidBitmap::from_jobject(env, bitmap);
+    let texture = glinit::load_texture(data as GLInit, bitmap.info.width as i32, bitmap.info.height as i32, bitmap.pixels as *const u8, bitmap.info.format);
     texture
 }
 
@@ -105,13 +115,32 @@ unsafe extern "C" fn clear_framebuffer(env: *mut JNIEnv, thiz: jobject, data: ji
     glinit::clear_buffer(data as GLInit);
 }
 
-unsafe fn shader_strs<T>(env: *mut JNIEnv, data: GLInit, vec: jstring, frag: jstring, callback: unsafe fn(GLInit, *const i8, *const i8) -> T) -> T {
-    let vecstr  = vec .as_mut().and_then(|v| ((**env).GetStringUTFChars).unwrap()(env, v, ptr::null_mut()).as_ref().map(|x| x as *const i8));
-    let fragstr = frag.as_mut().and_then(|f| ((**env).GetStringUTFChars).unwrap()(env, f, ptr::null_mut()).as_ref().map(|x| x as *const i8));
-    let ret = callback(data, vecstr.unwrap_or(ptr::null()), fragstr.unwrap_or(ptr::null()));
-    for v in vecstr.iter()  { ((**env).ReleaseStringUTFChars).unwrap()(env, vec, *v); }
-    for f in fragstr.iter() { ((**env).ReleaseStringUTFChars).unwrap()(env, frag, *f); }
+unsafe fn shader_strs<T>(env: *mut JNIEnv, data: GLInit, vec: jstring, frag: jstring, callback: unsafe fn(GLInit, Option<String>, Option<String>) -> T) -> T {
+    let vecstr = get_string(env, vec);
+    let fragstr = get_string(env, frag);
+    let ret = callback(data, vecstr, fragstr);
     ret
+}
+
+unsafe fn get_string(env: *mut JNIEnv, string: jstring) -> Option<String> {
+    match string.as_mut() {
+        Some(string) => {
+            let getchars: extern "C" fn(*mut JNIEnv, jstring, *mut jboolean) -> *const jchar = mem::transmute((**env).GetStringChars);
+            let chars = getchars(env, string, ptr::null_mut()).as_ref();
+            match chars {
+                Some(c) => {
+                    let getlen: extern "C" fn(*mut JNIEnv, jstring) -> jsize = mem::transmute((**env).GetStringLength);
+                    let strslice: &[u16] = mem::transmute(raw::Slice { data: c, len: getlen(env, string) as uint });
+                    let ruststr = String::from_utf16(strslice);
+                    let releasechars: extern "C" fn(*mut JNIEnv, jstring, *const jchar) = mem::transmute((**env).ReleaseStringChars);
+                    releasechars(env, string as jstring, strslice.as_ptr());
+                    ruststr
+                },
+                None => None,
+            }
+        },
+        None => None,
+    }
 }
 
 unsafe extern "C" fn compile_copyshader(env: *mut JNIEnv, thiz: jobject, data: i32, vec: jstring, frag: jstring) -> jint {
@@ -124,36 +153,70 @@ unsafe extern "C" fn compile_pointshader(env: *mut JNIEnv, thiz: jobject, data: 
 
 unsafe extern "C" fn draw_image(env: *mut JNIEnv, thiz: jobject, data: i32, bitmap: jobject) {
     // TODO: ensure rgba_8888 format and throw error
-    let mut info: AndroidBitmapInfo = mem::uninitialized();
-    AndroidBitmap_getInfo(env, bitmap, &mut info);
-    let mut pixels: *mut libc::c_void = ptr::null_mut();
-    AndroidBitmap_lockPixels(env, bitmap, &mut pixels);
-    glinit::draw_image(data as GLInit, info.width as i32, info.height as i32, pixels as *const u8);
-    AndroidBitmap_unlockPixels(env, bitmap);
+    let bitmap = AndroidBitmap::from_jobject(env, bitmap);
+    glinit::draw_image(data as GLInit, bitmap.info.width as i32, bitmap.info.height as i32, bitmap.pixels as *const u8);
 }
 
 unsafe extern "C" fn export_pixels(env: *mut JNIEnv, thiz: jobject, data: i32) -> jobject {
     glinit::with_pixels(data as GLInit, |w, h, pixels| {
         logi!("in callback!");
-        let bitmapclass = ((**env).FindClass).unwrap()(env, cstr!("android/graphics/Bitmap"));
-        let configclass = ((**env).FindClass).unwrap()(env, cstr!("android/graphics/Bitmap$Config"));
-        let argbfield = ((**env).GetStaticFieldID).unwrap()(env, configclass, cstr!("ARGB_8888"), cstr!("Landroid/graphics/Bitmap$Config;"));
-        let argb = ((**env).GetStaticObjectField).unwrap()(env, configclass, argbfield);
-        let createbitmap = ((**env).GetStaticMethodID).unwrap()(env, bitmapclass, cstr!("createBitmap"), cstr!("(IILandroid/graphics/Bitmap$Config;)Landroid/graphics/Bitmap;"));
-        let bitmap = ((**env).CallStaticObjectMethod).unwrap()(env, bitmapclass, createbitmap, w, h, argb);
-        logi!("created bitmap");
-        let mut outpixels: *mut libc::c_void = ptr::null_mut();
-        AndroidBitmap_lockPixels(env, bitmap, &mut outpixels);
-        logi!("locked pixels");
-        ptr::copy_nonoverlapping_memory(outpixels, pixels as *const libc::c_void, (w*h*4) as uint);
-        logi!("copied pixels");
-        AndroidBitmap_unlockPixels(env, bitmap);
-        logi!("unlocked pixels");
+        let bitmapclass = find_class(env, cstr!("android/graphics/Bitmap"));
+        let bitmap = AndroidBitmap::new(env, w, h);
+        let outpixels = bitmap.as_slice();
+        ptr::copy_nonoverlapping_memory(outpixels.as_mut_ptr(), pixels as *const u8, outpixels.len());
+        let bitmap = bitmap.obj;
         let premult = ((**env).GetMethodID).unwrap()(env, bitmapclass, cstr!("setPremultiplied"), cstr!("(Z)V"));
         ((**env).CallVoidMethod).unwrap()(env, bitmap, premult, ::jni_constants::JNI_TRUE);
         logi!("done with callback");
         bitmap
     })
+}
+
+struct AndroidBitmap {
+    env: *mut JNIEnv,
+    obj: jobject,
+    pixels: *mut u8,
+    info: AndroidBitmapInfo,
+}
+impl AndroidBitmap {
+    unsafe fn from_jobject(env: *mut JNIEnv, bitmap: jobject) -> AndroidBitmap {
+        let mut pixels: *mut libc::c_void = ptr::null_mut();
+        AndroidBitmap_lockPixels(env, bitmap, &mut pixels);
+        logi!("locked pixels in {}", pixels);
+        let mut result = AndroidBitmap { env: env, obj: bitmap, pixels: pixels as *mut u8, info: mem::zeroed() };
+        AndroidBitmap_getInfo(env, bitmap, &mut result.info);
+        result
+    }
+
+    unsafe fn new(env: *mut JNIEnv, w: i32, h: i32) -> AndroidBitmap {
+        let bitmapclass = find_class(env, cstr!("android/graphics/Bitmap"));
+        let configclass = find_class(env, cstr!("android/graphics/Bitmap$Config"));
+        let argbfield = ((**env).GetStaticFieldID).unwrap()(env, configclass, cstr!("ARGB_8888"), cstr!("Landroid/graphics/Bitmap$Config;"));
+        let argb = ((**env).GetStaticObjectField).unwrap()(env, configclass, argbfield);
+        let createbitmap = ((**env).GetStaticMethodID).unwrap()(env, bitmapclass, cstr!("createBitmap"), cstr!("(IILandroid/graphics/Bitmap$Config;)Landroid/graphics/Bitmap;"));
+        let bitmap = ((**env).CallStaticObjectMethod).unwrap()(env, bitmapclass, createbitmap, w, h, argb);
+        logi!("created bitmap");
+        AndroidBitmap::from_jobject(env, bitmap)
+    }
+    
+    unsafe fn as_slice(&self) -> &mut [u8] {
+        let pixelsize = match self.info.format as u32 {
+            ANDROID_BITMAP_FORMAT_RGBA_8888 => 4,
+            ANDROID_BITMAP_FORMAT_A_8 => 1,
+            x => fail!("bitmap format {} not implemented!", x),
+        };
+        let pixelvec = raw::Slice { data: self.pixels as *const u8, len: (self.info.width * self.info.height * pixelsize) as uint };
+        mem::transmute(pixelvec)
+    }
+}
+
+impl Drop for AndroidBitmap {
+    fn drop(&mut self) {
+        unsafe {
+            AndroidBitmap_unlockPixels(self.env, self.obj);
+        }
+        logi!("unlocked pixels");
+    }
 }
 
 unsafe extern "C" fn jni_egl_finish(env: *mut JNIEnv, thiz: jobject) {
@@ -168,10 +231,8 @@ unsafe extern "C" fn jni_egl_init(env: *mut JNIEnv, thiz: jobject, surface: jobj
 }
 
 unsafe extern "C" fn jni_lua_compile_script(env: *mut JNIEnv, thiz: jobject, data: i32, script: jstring) -> jint {
-    let scriptchars = script.as_mut().and_then(|s| ((**env).GetStringUTFChars).unwrap()(env, s, ptr::null_mut()).as_ref().map(|x| x as *const i8));
-    let scriptid = glinit::compile_luascript(data as GLInit, scriptchars.unwrap_or(ptr::null()));
-    for s in scriptchars.iter()  { ((**env).ReleaseStringUTFChars).unwrap()(env, script, *s); }
-    mem::transmute(scriptid)
+    let scriptstr = get_string(env, script);
+    mem::transmute(glinit::compile_luascript(data as GLInit, scriptstr))
 }
 
 unsafe extern "C" fn jni_lua_set_interpolator(env: *mut JNIEnv, thiz: jobject, data: jint, scriptid: jint) {
@@ -186,7 +247,30 @@ unsafe extern "C" fn jni_clear_layers(env: *mut JNIEnv, thiz: jobject, data: jin
     glinit::clear_layers(data as GLInit);
 }
 
-/// because this gets compiled into a static library first, we can't directly implement JNI_OnLoad
+#[inline(always)]
+unsafe fn find_class(env: *mut JNIEnv, name: *const c_char) -> jclass {
+    let findclass: extern "C" fn(*mut JNIEnv, *const c_char) -> jclass = mem::transmute((**env).FindClass);
+    findclass(env, name)
+}
+
+#[inline(always)]
+unsafe fn get_fieldid(env: *mut JNIEnv, class: jclass, name: *const c_char, sig: *const c_char) -> jfieldID {
+    let getfieldid: extern "C" fn(*mut JNIEnv, jclass, *const c_char, *const c_char) -> jfieldID = mem::transmute((**env).GetFieldID);
+    getfieldid(env, class, name, sig)
+}
+
+#[inline(always)]
+unsafe fn get_int_field(env: *mut JNIEnv, obj: jobject, field: jfieldID) -> jint {
+    let getintfield: extern "C" fn(*mut JNIEnv, jobject, jfieldID) -> jint = mem::transmute((**env).GetIntField);
+    getintfield(env, obj, field)
+}
+
+unsafe fn register_classmethods(env: *mut JNIEnv, classname: *const i8, methods: &[JNINativeMethod]) {
+    let registernatives: extern "C" fn(*mut JNIEnv, jclass, *const JNINativeMethod, jint) = mem::transmute((**env).RegisterNatives);
+    let class = find_class(env, classname);
+    registernatives(env, class, methods.as_ptr(), methods.len() as i32);
+}
+
 #[allow(non_snake_case)]
 #[no_mangle]
 pub unsafe extern "C" fn JNI_OnLoad(vm: *mut JavaVM, reserved: *mut libc::c_void) -> jint {
@@ -197,159 +281,70 @@ pub unsafe extern "C" fn JNI_OnLoad(vm: *mut JavaVM, reserved: *mut libc::c_void
     }
     let env = env as *mut JNIEnv;
     logi!("got environment!: {}", env);
-    MOTION_CLASS = ((**env).FindClass).unwrap()(env, cstr!("android/view/MotionEvent"));
-    MOTIONEVENT_NATIVE_PTR_FIELD = ((**env).GetFieldID).unwrap()(env, MOTION_CLASS, cstr!("mNativePtr"), cstr!("I"));
+    MOTION_CLASS = find_class(env, cstr!("android/view/MotionEvent"));
+    MOTIONEVENT_NATIVE_PTR_FIELD = get_fieldid(env, MOTION_CLASS, cstr!("mNativePtr"), cstr!("I"));
     logi!("got motion classes");
 
     let mainmethods = [
-        JNINativeMethod { 
-            name: cstr!("nativeAppendMotionEvent"),
-            signature: cstr!("(ILandroid/view/MotionEvent;)V"),
-            fnPtr: native_append_motion_event as *mut libc::c_void,
-        }
+        native_method!("nativeAppendMotionEvent", "(ILandroid/view/MotionEvent;)V", native_append_motion_event),
     ];
-
-    let mainactivityclass = ((**env).FindClass).unwrap()(env, cstr!("com/github/wartman4404/gldraw/MainActivity"));
-    ((**env).RegisterNatives).unwrap()(env, mainactivityclass, mainmethods.as_ptr(), mainmethods.len() as i32);
+    register_classmethods(env, cstr!("com/github/wartman4404/gldraw/MainActivity"), mainmethods);
 
     let texturemethods = [
-        JNINativeMethod {
-            name: cstr!("nativeUpdateGL"),
-            signature: cstr!("(I)V"),
-            fnPtr: native_update_gl as *mut libc::c_void as *mut libc::c_void,
-        }, JNINativeMethod {
-            name: cstr!("nativeDrawQueuedPoints"),
-            signature: cstr!("(II[F)V"),
-            fnPtr: native_draw_queued_points as *mut libc::c_void as *mut libc::c_void,
-        }, JNINativeMethod {
-            name: cstr!("nativeClearFramebuffer"),
-            signature: cstr!("(I)V"),
-            fnPtr: clear_framebuffer as *mut libc::c_void,
-        }, JNINativeMethod {
-            name: cstr!("drawImage"),
-            signature: cstr!("(ILandroid/graphics/Bitmap;)V"),
-            fnPtr: draw_image as *mut libc::c_void,
-        }, JNINativeMethod {
-            name: cstr!("nativeSetAnimShader"),
-            signature: cstr!("(II)Z"),
-            fnPtr: set_anim_shader as *mut libc::c_void,
-        }, JNINativeMethod {
-            name: cstr!("nativeSetCopyShader"),
-            signature: cstr!("(II)Z"),
-            fnPtr: set_copy_shader as *mut libc::c_void,
-        }, JNINativeMethod {
-            name: cstr!("nativeSetPointShader"),
-            signature: cstr!("(II)Z"),
-            fnPtr: set_point_shader as *mut libc::c_void,
-        }, JNINativeMethod {
-            name: cstr!("nativeSetBrushTexture"),
-            signature: cstr!("(II)V"),
-            fnPtr: set_brush_texture as *mut libc::c_void,
-        }, JNINativeMethod {
-            name: cstr!("exportPixels"),
-            signature: cstr!("(I)Landroid/graphics/Bitmap;"),
-            fnPtr: export_pixels as *mut libc::c_void,
-        }, JNINativeMethod {
-            name: cstr!("nativeSetInterpolator"),
-            signature: cstr!("(II)V"),
-            fnPtr: jni_lua_set_interpolator as *mut libc::c_void,
-        }, JNINativeMethod {
-            name: cstr!("nativeAddLayer"),
-            signature: cstr!("(IIII)V"),
-            fnPtr: jni_add_layer as *mut libc::c_void,
-        }, JNINativeMethod {
-            name: cstr!("nativeClearLayers"),
-            signature: cstr!("(I)V"),
-            fnPtr: jni_clear_layers as *mut libc::c_void,
-        },
+        native_method!("nativeUpdateGL", "(I)V", native_update_gl),
+        native_method!("nativeDrawQueuedPoints", "(II[F)V", native_draw_queued_points),
+        native_method!("nativeClearFramebuffer", "(I)V", clear_framebuffer),
+        native_method!("drawImage", "(ILandroid/graphics/Bitmap;)V", draw_image),
+        native_method!("nativeSetAnimShader", "(II)Z", set_anim_shader),
+        native_method!("nativeSetCopyShader", "(II)Z", set_copy_shader),
+        native_method!("nativeSetPointShader", "(II)Z", set_point_shader),
+        native_method!("nativeSetBrushTexture", "(II)V", set_brush_texture),
+        native_method!("exportPixels", "(I)Landroid/graphics/Bitmap;", export_pixels),
+        native_method!("nativeSetInterpolator", "(II)V", jni_lua_set_interpolator),
+        native_method!("nativeAddLayer", "(IIII)V", jni_add_layer),
+        native_method!("nativeClearLayers", "(I)V", jni_clear_layers),
     ];
-    let textureclass = ((**env).FindClass).unwrap()(env, cstr!("com/github/wartman4404/gldraw/TextureSurfaceThread"));
-    ((**env).RegisterNatives).unwrap()(env, textureclass, texturemethods.as_ptr(), texturemethods.len() as i32);
-    logi!("registered texture methods!");
+    register_classmethods(env, cstr!("com/github/wartman4404/gldraw/TextureSurfaceThread"), texturemethods);
+    logi!("registered texture thread methods!");
 
     let pointshaderstaticmethods = [
-        JNINativeMethod {
-            name: cstr!("compile"),
-            signature: cstr!("(ILjava/lang/String;Ljava/lang/String;)I"),
-            fnPtr: compile_pointshader as *mut libc::c_void,
-        },
+        native_method!("compile", "(ILjava/lang/String;Ljava/lang/String;)I", compile_pointshader),
     ];
     let copyshaderstaticmethods = [
-        JNINativeMethod {
-            name: cstr!("compile"),
-            signature: cstr!("(ILjava/lang/String;Ljava/lang/String;)I"),
-            fnPtr: compile_copyshader as *mut libc::c_void,
-        },
+        native_method!("compile", "(ILjava/lang/String;Ljava/lang/String;)I", compile_copyshader),
     ];
     let texturestaticmethods = [
-        JNINativeMethod {
-            name: cstr!("init"),
-            signature: cstr!("(ILandroid/graphics/Bitmap;)I"),
-            fnPtr: create_texture as *mut libc::c_void,
-        },
+        native_method!("init", "(ILandroid/graphics/Bitmap;)I", create_texture),
     ];
-
-    let copyshaderstatic = ((**env).FindClass).unwrap()(env, cstr!("com/github/wartman4404/gldraw/CopyShader$"));
-    let pointshaderstatic = ((**env).FindClass).unwrap()(env, cstr!("com/github/wartman4404/gldraw/PointShader$"));
-    let texturestatic = ((**env).FindClass).unwrap()(env, cstr!("com/github/wartman4404/gldraw/Texture$"));
-    ((**env).RegisterNatives).unwrap()(env, copyshaderstatic, copyshaderstaticmethods.as_ptr(), copyshaderstaticmethods.len() as i32);
-    ((**env).RegisterNatives).unwrap()(env, pointshaderstatic, pointshaderstaticmethods.as_ptr(), pointshaderstaticmethods.len() as i32);
-    ((**env).RegisterNatives).unwrap()(env, texturestatic, texturestaticmethods.as_ptr(), texturestaticmethods.len() as i32);
+    register_classmethods(env, cstr!("com/github/wartman4404/gldraw/PointShader$"), pointshaderstaticmethods);
+    register_classmethods(env, cstr!("com/github/wartman4404/gldraw/CopyShader$"), copyshaderstaticmethods);
+    register_classmethods(env, cstr!("com/github/wartman4404/gldraw/Texture$"), texturestaticmethods);
     logi!("registered point|copy|texture static methods!");
 
     let eglhelpermethods = [
-        JNINativeMethod {
-            name: cstr!("nativeFinish"),
-            signature: cstr!("()V"),
-            fnPtr: jni_egl_finish as *mut libc::c_void,
-        }, JNINativeMethod {
-            name: cstr!("nativeInit"),
-            signature: cstr!("(Landroid/view/Surface;)V"),
-            fnPtr: jni_egl_init as *mut libc::c_void,
-        }
+        native_method!("nativeFinish", "()V", jni_egl_finish),
+        native_method!("nativeInit", "(Landroid/view/Surface;)V", jni_egl_init),
     ];
-    let eglhelper = ((**env).FindClass).unwrap()(env, cstr!("com/github/wartman4404/gldraw/EGLHelper"));
-    ((**env).RegisterNatives).unwrap()(env, eglhelper, eglhelpermethods.as_ptr(), eglhelpermethods.len() as i32);
+    register_classmethods(env, cstr!("com/github/wartman4404/gldraw/EGLHelper"), eglhelpermethods);
     logi!("registered egl methods!");
 
     let luastaticmethods = [
-        JNINativeMethod {
-            name: cstr!("init"),
-            signature: cstr!("(ILjava/lang/String;)I"),
-            fnPtr: jni_lua_compile_script as *mut libc::c_void,
-        }
+        native_method!("init", "(ILjava/lang/String;)I", jni_lua_compile_script),
     ];
-    let luastatic = ((**env).FindClass).unwrap()(env, cstr!("com/github/wartman4404/gldraw/LuaScript$"));
-    ((**env).RegisterNatives).unwrap()(env, luastatic, luastaticmethods.as_ptr(), luastaticmethods.len() as i32);
+    register_classmethods(env, cstr!("com/github/wartman4404/gldraw/LuaScript$"), luastaticmethods);
     logi!("registered lua methods!");
 
     let glinitstaticmethods = [
-        JNINativeMethod {
-            name: cstr!("initGL"),
-            signature: cstr!("(II)I"),
-            fnPtr: init_gl as *mut libc::c_void,
-        }, JNINativeMethod {
-            name: cstr!("destroy"),
-            signature: cstr!("(I)V"),
-            fnPtr: finish_gl as *mut libc::c_void,
-        }
+        native_method!("initGL", "(II)I", init_gl),
+        native_method!("destroy", "(I)V", finish_gl),
     ];
-    let glinitstatic = ((**env).FindClass).unwrap()(env, cstr!("com/github/wartman4404/gldraw/GLInit$"));
-    ((**env).RegisterNatives).unwrap()(env, glinitstatic, glinitstaticmethods.as_ptr(), glinitstaticmethods.len() as i32);
+    register_classmethods(env, cstr!("com/github/wartman4404/gldraw/GLInit$"), glinitstaticmethods);
 
     let motioneventhandlerstaticmethods = [
-        JNINativeMethod {
-            name: cstr!("init"),
-            signature: cstr!("()Lcom/github/wartman4404/gldraw/MotionEventHandlerPair;"),
-            fnPtr: init_motion_event_handler as *mut libc::c_void,
-        }, JNINativeMethod {
-            name: cstr!("destroy"),
-            signature: cstr!("(Lcom/github/wartman4404/gldraw/MotionEventHandlerPair;)V"),
-            fnPtr: destroy_motion_event_handler as *mut libc::c_void,
-        }
+        native_method!("init", "()Lcom/github/wartman4404/gldraw/MotionEventHandlerPair;", init_motion_event_handler),
+        native_method!("destroy", "(Lcom/github/wartman4404/gldraw/MotionEventHandlerPair;)V", destroy_motion_event_handler),
     ];
-    let motioneventhandlerpairstatic = ((**env).FindClass).unwrap()(env, cstr!("com/github/wartman4404/gldraw/MotionEventHandlerPair$"));
-    ((**env).RegisterNatives).unwrap()(env, motioneventhandlerpairstatic, motioneventhandlerstaticmethods.as_ptr(), motioneventhandlerstaticmethods.len() as i32);
+    register_classmethods(env, cstr!("com/github/wartman4404/gldraw/MotionEventHandlerPair$"), motioneventhandlerstaticmethods);
     logi!("registered motionevent methods!");
     logi!("finished jni_onload");
     JNI_VERSION_1_2
