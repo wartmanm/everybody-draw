@@ -21,6 +21,7 @@ use pointshader::PointShader;
 use copyshader::CopyShader;
 use luascript::LuaScript;
 use paintlayer::PaintLayer;
+use glcommon::GLResult;
 
 enum DrawEvent {
     UseAnimShader(DrawObjectIndex<CopyShader>),
@@ -54,7 +55,7 @@ impl<'a> Events<'a> {
     }
 
     // FIXME: let glstore deal with optionalness
-    pub fn load_copyshader(&mut self, vert: Option<String>, frag: Option<String>) -> Option<DrawObjectIndex<CopyShader>> {
+    pub fn load_copyshader(&mut self, vert: Option<String>, frag: Option<String>) -> GLResult<DrawObjectIndex<CopyShader>> {
         let initargs = (vert, frag);
         self.copyshaders.push_object(initargs)
     }
@@ -69,7 +70,7 @@ impl<'a> Events<'a> {
         self.copyshaders.get_object(idx)
     }
 
-    pub fn load_pointshader(&mut self, vert: Option<String>, frag: Option<String>) -> Option<DrawObjectIndex<PointShader>> {
+    pub fn load_pointshader(&mut self, vert: Option<String>, frag: Option<String>) -> GLResult<DrawObjectIndex<PointShader>> {
         let initargs = (vert, frag);
         self.pointshaders.push_object(initargs)
     }
@@ -86,7 +87,7 @@ impl<'a> Events<'a> {
         self.eventlist.push(UseBrush(idx));
         self.textures.get_object(idx)
     }
-    pub fn load_interpolator(&mut self, script: Option<String>) -> Option<DrawObjectIndex<LuaScript>> {
+    pub fn load_interpolator(&mut self, script: Option<String>) -> GLResult<DrawObjectIndex<LuaScript>> {
         let initopt: LuaInitValues = script;
         self.luascripts.push_object(initopt)
     }

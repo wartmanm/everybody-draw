@@ -22,6 +22,7 @@ use pointshader::PointShader;
 use glcommon::Shader;
 use luascript::LuaScript;
 use arena::TypedArena;
+use glcommon::GLResult;
 
 /// Holds GL objects that can be inited using the given keys.
 /// The list is to avoid having to pass those keys around, and serialize more easily.
@@ -54,7 +55,7 @@ pub trait InitFromCache<Init> {
     fn init(&Init) -> Self;
 }
 pub trait MaybeInitFromCache<Init: Eq+Hash> {
-    fn maybe_init(&Init) -> Option<Self>;
+    fn maybe_init(&Init) -> GLResult<Self>;
 }
 trait ToOwnedInit<Init> {
     fn to_owned(&Self) -> Init;
@@ -63,21 +64,21 @@ trait ToOwnedInit<Init> {
 // this and the two shader impls were originally a single
 // impl<T: Shader> InitFromCache<ShaderInitValues> for Option<T>
 // but that counts as the impl for all of Option, not just Option<Shader>
-fn _init_copy_shader<T: Shader>(value: &(Option<String>, Option<String>)) -> Option<T> {
+fn _init_copy_shader<T: Shader>(value: &(Option<String>, Option<String>)) -> GLResult<T> {
     let &(ref frag, ref vert) = value;
     let (vertopt, fragopt) = (vert.as_ref().map(|x|x.as_slice()), frag.as_ref().map(|x|x.as_slice()));
     Shader::new(fragopt, vertopt)
 }
 impl MaybeInitFromCache<ShaderInitValues> for CopyShader {
-    fn maybe_init(value: &(Option<String>, Option<String>)) -> Option<CopyShader> { _init_copy_shader(value) }
+    fn maybe_init(value: &(Option<String>, Option<String>)) -> GLResult<CopyShader> { _init_copy_shader(value) }
 }
 impl MaybeInitFromCache<ShaderInitValues> for PointShader {
-    fn maybe_init(value: &(Option<String>, Option<String>)) -> Option<PointShader> { _init_copy_shader(value) }
+    fn maybe_init(value: &(Option<String>, Option<String>)) -> GLResult<PointShader> { _init_copy_shader(value) }
 }
 // TODO: use this as the impl for all InitFromCache<Init>
 impl MaybeInitFromCache<BrushInitValues> for Texture {
-    fn maybe_init(value: &BrushInitValues) -> Option<Texture> {
-        Some(InitFromCache::init(value))
+    fn maybe_init(value: &BrushInitValues) -> GLResult<Texture> {
+        Ok(InitFromCache::init(value))
     }
 }
 
@@ -89,7 +90,7 @@ impl InitFromCache<BrushInitValues> for Texture {
 }
 
 impl MaybeInitFromCache<LuaInitValues> for LuaScript {
-    fn maybe_init(value: &Option<String>) -> Option<LuaScript> {
+    fn maybe_init(value: &Option<String>) -> GLResult<LuaScript> {
         LuaScript::new(value.as_ref().map(|x|x.as_slice()))
     }
 }
@@ -111,26 +112,22 @@ impl<'a, T: MaybeInitFromCache<Init>, Init: Hash+Eq> DrawObjectList<'a, T, Init>
     }
 
     // TODO: avoid allocations just to see if the key is in the map
-    pub fn push_object(&mut self, init: Init) -> Option<DrawObjectIndex<T>> {
+    pub fn push_object(&mut self, init: Init) -> GLResult<DrawObjectIndex<T>> {
         // Can't use map.entry() here as it consumes the key
         if self.map.contains_key(&init) {
-            Some(*self.map.find(&init).unwrap())
+            Ok(*self.map.find(&init).unwrap())
         } else {
-            match MaybeInitFromCache::maybe_init(&init) {
-                Some(inited) => {
-                    // ptr's lifetime is limited to &self's, which is fair but not very useful.
-                    // smart ptrs involve individual allocs but are probably better
-                    let ptr = self.arena.alloc(inited);
-                    unsafe {
-                        self.list.push(mem::transmute(ptr));
-                    }
-                    let index = self.list.len() - 1;
-                    let objindex = DrawObjectIndex(index as i32);
-                    self.map.insert(init, objindex);
-                    Some(objindex)
-                },
-                None => None,
+            let inited = try!(MaybeInitFromCache::maybe_init(&init));
+            // ptr's lifetime is limited to &self's, which is fair but not very useful.
+            // smart ptrs involve individual allocs but are probably better
+            let ptr = self.arena.alloc(inited);
+            unsafe {
+                self.list.push(mem::transmute(ptr));
             }
+            let index = self.list.len() - 1;
+            let objindex = DrawObjectIndex(index as i32);
+            self.map.insert(init, objindex);
+            Ok(objindex)
         }
     }
 

@@ -3,6 +3,7 @@ use core::prelude::*;
 use core::mem;
 use collections::vec::Vec;
 use collections::string::String;
+use collections::str::StrAllocating;
 use collections::{Mutable, MutableSeq};
 
 use log::logi;
@@ -10,7 +11,7 @@ use log::logi;
 use opengles::gl2;
 use opengles::gl2::{GLuint, GLenum, GLubyte};
 
-use glcommon::{Shader, check_gl_error};
+use glcommon::{Shader, check_gl_error, GLResult};
 use glpoint::{MotionEventConsumer, run_interpolators, create_motion_event_handler, destroy_motion_event_handler};
 use point::ShaderPaintPoint;
 use pointshader::PointShader;
@@ -167,15 +168,15 @@ impl<'a> GLInit<'a> {
         result
     }
 
-    pub fn compile_copy_shader(&mut self, vert: Option<String>, frag: Option<String>) -> Option<DrawObjectIndex<CopyShader>> {
+    pub fn compile_copy_shader(&mut self, vert: Option<String>, frag: Option<String>) -> GLResult<DrawObjectIndex<CopyShader>> {
         self.events.load_copyshader(vert, frag)
     }
 
-    pub fn compile_point_shader(&mut self, vert: Option<String>, frag: Option<String>) -> Option<DrawObjectIndex<PointShader>> {
+    pub fn compile_point_shader(&mut self, vert: Option<String>, frag: Option<String>) -> GLResult<DrawObjectIndex<PointShader>> {
         self.events.load_pointshader(vert, frag)
     }
 
-    pub fn compile_luascript(&mut self, luastr: Option<String>) -> Option<DrawObjectIndex<LuaScript>> {
+    pub fn compile_luascript(&mut self, luastr: Option<String>) -> GLResult<DrawObjectIndex<LuaScript>> {
         self.events.load_interpolator(luastr)
     }
 
@@ -294,12 +295,12 @@ impl<'a> GLInit<'a> {
         }
     }
 
-    pub fn load_texture(&mut self, w: i32, h: i32, pixels: &[u8], format: AndroidBitmapFormat) -> Option<DrawObjectIndex<Texture>> {
+    pub fn load_texture(&mut self, w: i32, h: i32, pixels: &[u8], format: AndroidBitmapFormat) -> GLResult<DrawObjectIndex<Texture>> {
         let formatenum: AndroidBitmapFormat = unsafe { mem::transmute(format) };
         let format = match formatenum {
-            ANDROID_BITMAP_FORMAT_RGBA_8888 => Some(gltexture::RGBA),
-            ANDROID_BITMAP_FORMAT_A_8 => Some(gltexture::ALPHA),
-            _ => None,
+            ANDROID_BITMAP_FORMAT_RGBA_8888 => Ok(gltexture::RGBA),
+            ANDROID_BITMAP_FORMAT_A_8 => Ok(gltexture::ALPHA),
+            _ => Err("Unsupported texture format!".into_string()),
         };
         format.map(|texformat| {
             logi!("setting brush texture for {:x}", pixels.as_ptr() as uint);

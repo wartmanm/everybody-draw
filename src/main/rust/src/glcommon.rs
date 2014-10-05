@@ -3,6 +3,10 @@ use core::prelude::*;
 use opengles::gl2;
 use opengles::gl2::{GLuint, GLint};
 use log::{logi, loge};
+use collections::string::String;
+use collections::str::StrAllocating;
+
+pub type GLResult<T> = Result<T, String>;
 
 fn get_gl_error_name(error: u32) -> &'static str {
     match error {
@@ -39,44 +43,44 @@ pub fn check_framebuffer_complete() -> bool {
     result
 }
 
-pub fn load_shader(shader_type: gl2::GLenum, source: &str) -> Option<GLuint> {
+pub fn load_shader(shader_type: gl2::GLenum, source: &str) -> GLResult<GLuint> {
     let shader = gl2::create_shader(shader_type);
     if shader != 0 {
         gl2::shader_source(shader, [source.as_bytes()].as_slice());
         gl2::compile_shader(shader);
         let compiled = gl2::get_shader_iv(shader, gl2::COMPILE_STATUS);
         if compiled != 0 {
-            Some(shader)
+            Ok(shader)
         } else {
             let log = gl2::get_shader_info_log(shader);
             loge!("Could not compile shader {}:\n{}\n", shader_type, log);
             gl2::delete_shader(shader);
-            None
+            Err(log)
         }
     } else {
-        None
+        Err(format!("Unknown error initializing shader type {}", shader_type))
     }
 }
 
-pub fn create_program(vertex_source: &str, fragment_source: &str) -> Option<GLuint> {
-    let vert_shader = load_shader(gl2::VERTEX_SHADER, vertex_source);
-    let pixel_shader = load_shader(gl2::FRAGMENT_SHADER, fragment_source);
+pub fn create_program(vertex_source: &str, fragment_source: &str) -> GLResult<GLuint> {
+    let vert_shader = try!(load_shader(gl2::VERTEX_SHADER, vertex_source));
+    let pixel_shader = try!(load_shader(gl2::FRAGMENT_SHADER, fragment_source));
     let program = gl2::create_program();
-    if vert_shader.is_none() || pixel_shader.is_none() || program == 0 {
-        return None
+    if program == 0 {
+        return Err("Unknown error creating shader program".into_string());
     }
-    gl2::attach_shader(program, vert_shader.unwrap());
+    gl2::attach_shader(program, vert_shader);
     check_gl_error("glAttachShader");
-    gl2::attach_shader(program, pixel_shader.unwrap());
+    gl2::attach_shader(program, pixel_shader);
     check_gl_error("glAttachShader");
     gl2::link_program(program);
     if gl2::get_program_iv(program, gl2::LINK_STATUS) as u8 == gl2::TRUE {
-        Some(program)
+        Ok(program)
     } else {
         let log = gl2::get_program_info_log(program);
         loge!("Could not link program: \n{}\n", log);
         gl2::delete_program(program);
-        None
+        Err(log)
     }
 }
 
@@ -96,7 +100,7 @@ pub fn get_uniform_handle_option(program: GLuint, name: &str) -> Option<GLint> {
 }
 
 pub trait Shader {
-    fn new(vertopt: Option<&str>, fragopt: Option<&str>) -> Option<Self>;
+    fn new(vertopt: Option<&str>, fragopt: Option<&str>) -> GLResult<Self>;
 }
 
 macro_rules! glattrib_f32 (

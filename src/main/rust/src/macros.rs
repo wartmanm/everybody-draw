@@ -46,3 +46,7 @@ macro_rules! fail(
         format_args!(_run_fmt, $fmt, $($arg)*)
     });
 )
+
+macro_rules! try(
+    ($e:expr) => (match $e { Ok(e) => e, Err(e) => return Err(e) })
+)
