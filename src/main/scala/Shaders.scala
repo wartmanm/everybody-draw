@@ -14,26 +14,32 @@ class GLInit private (private val nativePtr: Int) extends AnyVal {
     m
   }
 }
+object GLResultTypeDef {
+  type GLResult[T] = Either[String, T]
+}
+
+import GLResultTypeDef._
 
 trait Shader[T] {
-  def apply(data: GLInit, vec: String, frag: String): Option[T]
+  def apply(data: GLInit, vec: String, frag: String): GLResult[T]
 }
 
 object CopyShader extends Shader[CopyShader] {
-  @native def compile(data: GLInit, vec: String, frag: String): Int
-  def apply(data: GLInit, vec: String, frag: String): Option[CopyShader] = {
+  @native def compile(data: GLInit, vec: String, frag: String): GLResult[Int]
+  def apply(data: GLInit, vec: String, frag: String): GLResult[CopyShader] = {
     compile(data, vec, frag) match {
-      case -1 => None
-      case x => Some(new CopyShader(x))
+      case Left(x) => Left(x)
+      case Right(x) => Right(new CopyShader(x))
     }
   }
 }
+
 object PointShader extends Shader[PointShader] {
-  @native def compile(data: GLInit, vec: String, frag: String): Int;
-  def apply(data: GLInit, vec: String, frag: String): Option[PointShader] = {
+  @native def compile(data: GLInit, vec: String, frag: String): GLResult[Int]
+  def apply(data: GLInit, vec: String, frag: String): GLResult[PointShader] = {
     compile(data, vec, frag) match {
-      case -1 => None
-      case x => Some(new PointShader(x))
+      case Left(x) => Left(x)
+      case Right(x) => Right(new PointShader(x))
     }
   }
 }
@@ -46,11 +52,11 @@ object Texture {
 }
 
 object LuaScript {
-  @native def init(data: GLInit, script: String): Int;
-  def apply(data: GLInit, script: String): Option[LuaScript] = {
+  @native def init(data: GLInit, script: String): GLResult[Int]
+  def apply(data: GLInit, script: String): GLResult[LuaScript] = {
     init(data, script) match {
-      case -1 => None
-      case x => Some(new LuaScript(x))
+      case Left(x) => Left(x)
+      case Right(x) => Right(new LuaScript(x))
     }
   }
 }

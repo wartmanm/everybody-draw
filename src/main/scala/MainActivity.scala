@@ -33,6 +33,7 @@ import java.util.concurrent.Executors
 class MainActivity extends Activity with TypedActivity with AndroidImplicits {
   import MainActivity._
   import MainActivity.Constants._
+  import GLResultTypeDef._
 
   lazy val content = new TextureView(this)
   lazy val contentframe = findView(TR.textureviewframe)
@@ -214,7 +215,7 @@ class MainActivity extends Activity with TypedActivity with AndroidImplicits {
     Log.i("main", "loading from file")
     try {
       for (input <- managed(new BufferedInputStream(MainActivity.this.openFileInput("screen")))) {
-        savedBitmap = DrawFiles.decodeBitmap(Bitmap.Config.ARGB_8888)(input)
+        savedBitmap = DrawFiles.decodeBitmap(Bitmap.Config.ARGB_8888)(input).right.toOption
         val input2 = MainActivity.this.openFileInput("status")
         controls.load(input2)
       }
@@ -243,7 +244,7 @@ class MainActivity extends Activity with TypedActivity with AndroidImplicits {
     }
   }
 
-  def populatePicker[U, T <: (String, (Unit)=>Option[U])](picker: NamedPicker[U], arr: Array[T], cb: (U)=>Unit, thread: TextureSurfaceThread) = {
+  def populatePicker[U, T <: (String, (Unit)=>GLResult[U])](picker: NamedPicker[U], arr: Array[T], cb: (U)=>Unit, thread: TextureSurfaceThread) = {
     val adapter = new LazyPicker(this, thread, arr)
     picker.control.setAdapter(adapter)
     picker.control.setOnItemSelectedListener(new AdapterView.OnItemSelectedListener() {
@@ -282,10 +283,10 @@ class MainActivity extends Activity with TypedActivity with AndroidImplicits {
   }
 
   //TODO: caching, seriously!
-  def loadAndSet[T](setter: (T)=>Unit, value: Option[T]) = {
+  def loadAndSet[T](setter: (T)=>Unit, value: GLResult[T]) = {
     value match {
-      case Some(value) => setter(value)
-      case None => Toast.makeText(this, "unable to load item!", Toast.LENGTH_LONG)
+      case Right(value) => setter(value)
+      case Left(errmsg) => Toast.makeText(this, "unable to load item!\n" + errmsg, Toast.LENGTH_LONG)
     }
   }
     
@@ -301,7 +302,7 @@ class MainActivity extends Activity with TypedActivity with AndroidImplicits {
         val adapter = picker.control.getAdapter().asInstanceOf[LazyPicker[T]]
         val setting = adapter.getItem(picker.control.getSelectedItemPosition())._2
         setting.get(newitem => {
-            newitem.map(setter)
+            newitem.right.map(setter)
             runOnUiThread(() => picker.control.setEnabled(true))
           })
       }
@@ -353,7 +354,7 @@ class MainActivity extends Activity with TypedActivity with AndroidImplicits {
       Log.i("main", s"got activity result: ${data}")
       if (resultCode == Activity.RESULT_OK) {
         val path = FileUtils.getPath(this, data.getData())
-        val bitmap = DrawFiles.withFileStream(new File(path)).map(DrawFiles.decodeBitmap(Bitmap.Config.ARGB_8888) _).opt.flatten
+        val bitmap = DrawFiles.withFileStream(new File(path)).map(DrawFiles.decodeBitmap(Bitmap.Config.ARGB_8888) _).opt.map(x => x.right.toOption).flatten
         Log.i("main", s"got bitmap ${bitmap}")
         for (b <- bitmap; thread <- textureThread) {
           Log.i("main", "drawing bitmap...")

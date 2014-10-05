@@ -12,8 +12,9 @@ import resource._
 import unibrush.UniBrush
 
 object DrawFiles {
-  type MaybeRead[T] = (InputStream)=>Option[T]
-  type MaybeReader[T] = (MaybeRead[T])=>Option[T]
+  import GLResultTypeDef._
+  type MaybeRead[T] = (InputStream)=>GLResult[T]
+  type MaybeReader[T] = (MaybeRead[T])=>GLResult[T]
   def allfiles[T](c: Context, path: String): Array[(String, (Unit)=>ManagedResource[InputStream])] = {
     val builtins = c.getAssets().list(path).map(path ++ "/" ++ _)
     val userdirs = c.getExternalFilesDirs(path).flatMap(Option(_)) // some paths may be null??
@@ -41,14 +42,17 @@ object DrawFiles {
     s.substring(s.lastIndexOf("/") + 1)
   }
 
-  def useInputStream[T](reader: (InputStream)=>Option[T]) = {
-    val out: (ManagedResource[InputStream])=>Option[T] = (m: ManagedResource[InputStream]) => {
-      m.map(reader).opt.flatten
+  def useInputStream[T](reader: (InputStream)=>GLResult[T]) = {
+    val out: (ManagedResource[InputStream])=>GLResult[T] = (m: ManagedResource[InputStream]) => {
+      m.map(reader).opt match {
+        case Some(x) => x
+        case None => Left("Failed to load file")
+      }
     }
     out
   }
 
-def withFilename[T](reader: MaybeRead[T]): ((String, (Unit)=>ManagedResource[InputStream]))=>(String, (Unit)=>Option[T]) = {
+def withFilename[T](reader: MaybeRead[T]): ((String, (Unit)=>ManagedResource[InputStream]))=>(String, (Unit)=>GLResult[T]) = {
     val a = (kv: (String, (Unit)=>ManagedResource[InputStream])) => {
       val (k, v) = kv
       k -> useInputStream(reader).compose(v)
@@ -56,47 +60,52 @@ def withFilename[T](reader: MaybeRead[T]): ((String, (Unit)=>ManagedResource[Inp
     a
   }
 
-  def decodeBitmap(config: Bitmap.Config)(stream: InputStream): Option[Bitmap] = {
+  def decodeBitmap(config: Bitmap.Config)(stream: InputStream): GLResult[Bitmap] = {
     val options = new BitmapFactory.Options
     options.inPreferredConfig = config
     options.inScaled = false
-    Option(BitmapFactory.decodeStream(stream, null, options)).map(bitmap => {
+    Option(BitmapFactory.decodeStream(stream, null, options)) match {
+      case None => Left("unable to load bitmap!")
+      case Some(bitmap) => {
         Log.i("drawfiles", "bitmap: config %s, w: %d, h: %d, alpha: %b".format(
           bitmap.getConfig(), bitmap.getHeight(), bitmap.getWidth(), bitmap.hasAlpha()))
-        bitmap
-      })
+        Right(bitmap)
+      }
+    }
   }
 
-  def loadShader[T](c: Context, constructor: MaybeRead[T], folder: String, defaultName: String, defaultObj: Option[T]) = {
-    val default = defaultObj.map(x => (defaultName, (_: Unit) => Some(x)))
+  def loadShader[T](c: Context, constructor: MaybeRead[T], folder: String, defaultName: String, defaultObj: Option[T]): Array[(String, (Unit)=>GLResult[T])] = {
+    val default = defaultObj.map(x => (defaultName, (_: Unit) => Right(x)))
     val filenamed = withFilename[T](constructor)
     val files = allfiles[T](c, folder)
-    val shaders: Seq[(String, (Unit)=>Option[T])] = files.map(filenamed)
+    val shaders: Seq[(String, (Unit)=>GLResult[T])] = files.map(filenamed)
     (default.toSeq ++ shaders).toArray
   }
 
-  def loadBrushes(c: Context, data: GLInit): Array[(String, (Unit)=>Option[Texture])] = {
-    val decoder = (is: InputStream) => (decodeBitmap(Bitmap.Config.ALPHA_8)(is).map(Texture(data, _)))
-    loadShader(c, decoder, "brushes", null, None)
+  def loadBrushes(c: Context, data: GLInit): Array[(String, (Unit)=>GLResult[Texture])] = {
+    val decoder: (InputStream=>GLResult[Texture]) = (is: InputStream) => (decodeBitmap(Bitmap.Config.ALPHA_8)(is).right.map(Texture(data, _)))
+    loadShader[Texture](c, decoder, "brushes", null, None)
   }
+
+  def foldShader[T](x: GLResult[T]) = x.fold(a => None, b => Some(b))
 
   // TODO: make these safe
-  def loadPointShaders(c: Context, data: GLInit): Seq[(String, (Unit)=>Option[PointShader])] = {
+  def loadPointShaders(c: Context, data: GLInit): Seq[(String, (Unit)=>GLResult[PointShader])] = {
     val constructor = readShader(PointShader(data, _, _)) _
-    loadShader(c, constructor, "pointshaders", "Default Paint", PointShader(data, null, null))
+    loadShader(c, constructor, "pointshaders", "Default Paint", foldShader(PointShader(data, null, null)))
   }
 
-  def loadAnimShaders(c: Context, data: GLInit): Seq[(String, (Unit)=>Option[CopyShader])] = {
+  def loadAnimShaders(c: Context, data: GLInit): Seq[(String, (Unit)=>GLResult[CopyShader])] = {
     val constructor = readShader(CopyShader(data, _, _)) _
-    loadShader(c, constructor, "animshaders", "Default Animation", CopyShader(data, null, null))
+    loadShader(c, constructor, "animshaders", "Default Animation", foldShader(CopyShader(data, null, null)))
   }
 
-  def loadScripts(c: Context, data: GLInit): Seq[(String, (Unit)=>Option[LuaScript])] = {
+  def loadScripts(c: Context, data: GLInit): Seq[(String, (Unit)=>GLResult[LuaScript])] = {
     val constructor = (LuaScript(data, _: String)).compose(readStream _)
-    loadShader(c, constructor, "interpolators", "Default Interpolator", LuaScript(data, null))
+    loadShader(c, constructor, "interpolators", "Default Interpolator", foldShader(LuaScript(data, null)))
   }
 
-  def loadUniBrushes(c: Context, data: GLInit): Seq[(String, (Unit)=>Option[UniBrush])] = {
+  def loadUniBrushes(c: Context, data: GLInit): Seq[(String, (Unit)=>GLResult[UniBrush])] = {
     val constructor = UniBrush.compile(data, _: InputStream)
     loadShader(c, constructor, "unibrushes", null, None)
   }
@@ -107,10 +116,11 @@ def withFilename[T](reader: MaybeRead[T]): ((String, (Unit)=>ManagedResource[Inp
       else None
   }
 
-  def readShader[T](constructor: (String, String)=>Option[T])(src: InputStream): Option[T] = {
-    halfShaderPair(readStream(src)).flatMap({case (vec, frag) => {
-        constructor(vec, frag)
-      }})
+  def readShader[T](constructor: (String, String)=>GLResult[T])(src: InputStream): GLResult[T] = {
+    halfShaderPair(readStream(src)) match {
+      case Some((vec, frag)) => constructor(vec, frag)
+      case None => Left("unable to load file")
+    }
   }
 
   def readStream(src: InputStream) = {
