@@ -24,6 +24,7 @@ use eglinit;
 use drawevent::Events;
 use glstore::DrawObjectIndex;
 use luascript::LuaScript;
+use paintlayer::PaintLayer;
 
 
 static DRAW_INDEXES: [GLubyte, ..6] = [
@@ -48,6 +49,7 @@ pub struct GLInit<'a> {
     #[allow(dead_code)]
     dimensions: (i32, i32),
     events: Events<'a>,
+    pub paintstate: PaintState<'a>,
     targetdata: TargetData,
     points: Vec<Vec<ShaderPaintPoint>>,
 }
@@ -55,6 +57,28 @@ pub struct GLInit<'a> {
 pub struct TargetData {
     targets: [TextureTarget, ..2],
     current_target: u8,
+}
+
+pub struct PaintState<'a> {
+    pub pointshader: Option<&'a PointShader>,
+    pub animshader: Option<&'a CopyShader>,
+    pub copyshader: Option<&'a CopyShader>,
+    pub brush: Option<&'a Texture>,
+    pub interpolator: Option<&'a LuaScript>,
+    pub layers: Vec<PaintLayer<'a>>,
+}
+
+impl<'a> PaintState<'a> {
+    pub fn new() -> PaintState<'a> {
+        PaintState {
+            pointshader: None,
+            animshader: None,
+            copyshader: None,
+            brush: None,
+            interpolator: None,
+            layers: Vec::new(),
+        }
+    }
 }
 
 fn print_gl_string(name: &str, s: GLenum) {
@@ -112,7 +136,7 @@ impl<'a> GLInit<'a> {
                       (1f32 - glratiox) / 2f32, (1f32 + glratioy) / 2f32, 0f32, 0f32];
         logi!("drawing with ratio: {:5.3f}, glratio {:5.3f}, {:5.3f}, matrix:\n{}", ratio, glratiox, glratioy, matrix::log(matrix.as_slice()));
 
-        self.events.copyshader.map(|shader| {
+        self.paintstate.copyshader.map(|shader| {
             let intexture = Texture::with_image(w, h, Some(pixels), gltexture::RGBA);
             check_gl_error("creating texture");
             perform_copy(target.framebuffer, &intexture, shader, matrix.as_slice());
@@ -158,24 +182,28 @@ impl<'a> GLInit<'a> {
     // TODO: make an enum for these with a scala counterpart
     pub fn set_copy_shader(&mut self, shader: DrawObjectIndex<CopyShader>) -> () {
         logi("setting copy shader");
-        self.events.use_copyshader(shader);
+        self.paintstate.copyshader = Some(self.events.use_copyshader(shader));
     }
 
     // these can also be null to unset the shader
     // TODO: document better from scala side
     pub fn set_anim_shader(&mut self, shader: DrawObjectIndex<CopyShader>) -> () {
         logi("setting anim shader");
-        self.events.use_animshader(shader);
+        self.paintstate.animshader = Some(self.events.use_animshader(shader));
     }
 
     pub fn set_point_shader(&mut self, shader: DrawObjectIndex<PointShader>) -> () {
         logi("setting point shader");
-        self.events.use_pointshader(shader);
+        self.paintstate.pointshader = Some(self.events.use_pointshader(shader));
     }
 
     pub fn set_interpolator(&mut self, interpolator: DrawObjectIndex<LuaScript>) -> () {
         logi("setting interpolator");
-        self.events.use_interpolator(interpolator);
+        self.paintstate.interpolator = Some(self.events.use_interpolator(interpolator));
+    }
+
+    pub fn set_brush_texture(&mut self, texture: DrawObjectIndex<Texture>) {
+        self.paintstate.brush = Some(self.events.use_brush(texture));
     }
 
     pub fn add_layer(&mut self, copyshader: DrawObjectIndex<CopyShader>, pointshader: DrawObjectIndex<PointShader>, pointidx: i32) -> () {
@@ -184,12 +212,14 @@ impl<'a> GLInit<'a> {
         if extra > 0 {
             self.points.grow(extra as uint, Vec::new());
         }
-        self.events.add_layer(self.dimensions, Some(copyshader), Some(pointshader) , pointidx);
+        let layer = self.events.add_layer(self.dimensions, Some(copyshader), Some(pointshader) , pointidx);
+        self.paintstate.layers.push(layer);
     }
 
     pub fn clear_layers(&mut self) {
         logi!("setting layer count to 0");
         self.events.clear_layers();
+        self.paintstate.layers.clear();
         self.points.truncate(1);
     }
 
@@ -211,6 +241,7 @@ impl<'a> GLInit<'a> {
                 current_target: 0,
             },
             points: points,
+            paintstate: PaintState::new(),
         };
 
         gl2::viewport(0, 0, w, h);
@@ -221,7 +252,7 @@ impl<'a> GLInit<'a> {
     }
 
     pub fn draw_queued_points(&mut self, handler: &mut MotionEventConsumer, matrix: &matrix::Matrix) {
-        match (self.events.pointshader, self.events.copyshader, self.events.brush) {
+        match (self.paintstate.pointshader, self.paintstate.copyshader, self.paintstate.brush) {
             (Some(point_shader), Some(copy_shader), Some(brush)) => {
                 gl2::enable(gl2::BLEND);
                 gl2::blend_func(gl2::ONE, gl2::ONE_MINUS_SRC_ALPHA);
@@ -235,7 +266,7 @@ impl<'a> GLInit<'a> {
                 for drawvec in drawvecs.iter_mut() {
                     drawvec.clear();
                 }
-                let should_copy = run_interpolators(self.dimensions, handler, &mut self.events, drawvecs);
+                let should_copy = run_interpolators(self.dimensions, handler, &mut self.events, self.paintstate.interpolator, drawvecs);
 
                 let baselayer = CompletedLayer {
                     copyshader: copy_shader,
@@ -244,7 +275,7 @@ impl<'a> GLInit<'a> {
                 };
                 draw_layer(baselayer, matrix, color, brush, back_buffer, drawvecs[0].as_slice());
 
-                for layer in self.events.layers.iter() {
+                for layer in self.paintstate.layers.iter() {
                     let completed = layer.complete(copy_shader, point_shader);
                     let points = drawvecs[layer.pointidx as uint].as_slice();
                     draw_layer(completed, matrix, color, brush, back_buffer, points);
@@ -276,10 +307,6 @@ impl<'a> GLInit<'a> {
         })
     }
 
-    pub fn set_brush_texture(&mut self, texture: DrawObjectIndex<Texture>) {
-        self.events.use_brush(texture);
-    }
-
     pub fn clear_buffer(&mut self) {
         for target in self.targetdata.targets.iter() {
             gl2::bind_framebuffer(gl2::FRAMEBUFFER, target.framebuffer);
@@ -291,7 +318,7 @@ impl<'a> GLInit<'a> {
     }
 
     pub fn render_frame(&mut self) {
-        match (self.events.copyshader, self.events.animshader) {
+        match (self.paintstate.copyshader, self.paintstate.animshader) {
             (Some(copy_shader), Some(anim_shader)) => {
                 self.events.pushframe();
                 self.targetdata.current_target = self.targetdata.current_target ^ 1;
@@ -301,7 +328,7 @@ impl<'a> GLInit<'a> {
                 perform_copy(target.framebuffer, &source.texture, anim_shader, copymatrix);
                 perform_copy(0 as GLuint, &target.texture, copy_shader, copymatrix);
                 gl2::enable(gl2::BLEND);
-                for layer in self.events.layers.iter() {
+                for layer in self.paintstate.layers.iter() {
                     perform_copy(0 as GLuint, &layer.target.texture, layer.copyshader.unwrap_or(copy_shader), copymatrix);
                 }
                 eglinit::egl_swap();

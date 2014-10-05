@@ -21,6 +21,7 @@ use point;
 use point::{ShaderPaintPoint, Coordinate, PointEntry, PointConsumer, PointProducer};
 use activestate;
 use drawevent::Events;
+use luascript::LuaScript;
 
 use alloc::boxed::Box;
 
@@ -86,8 +87,8 @@ fn manhattan_distance(a: Coordinate, b: Coordinate) -> f32 {
     return if x > y { x } else { y };
 }
 
-pub fn run_interpolators(dimensions: (i32, i32), s: &mut MotionEventConsumer, events: & mut Events, drawvecs: & mut [Vec<ShaderPaintPoint>]) -> bool {
-    match events.interpolator {
+pub fn run_interpolators(dimensions: (i32, i32), s: &mut MotionEventConsumer, events: & mut Events, interpolator: Option<&LuaScript>, drawvecs: & mut [Vec<ShaderPaintPoint>]) -> bool {
+    match interpolator {
         Some(interpolator) => {
             interpolator.prep();
             run_lua_shader(dimensions, LuaCallbackType {
