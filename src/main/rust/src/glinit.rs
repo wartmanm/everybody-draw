@@ -1,6 +1,6 @@
 extern crate opengles;
 use core::prelude::*;
-use core::{mem,ptr};
+use core::mem;
 use collections::vec::Vec;
 use collections::string::String;
 use collections::{Mutable, MutableSeq};
@@ -114,7 +114,7 @@ pub fn draw_image(data: *mut Data, w: i32, h: i32, pixels: *const u8) -> () {
 }
 
 #[no_mangle]
-pub unsafe fn with_pixels<T>(data: *mut Data, callback: |i32, i32, *const u8|->*mut T) -> *mut T {
+pub unsafe fn with_pixels<T>(data: *mut Data, callback: |i32, i32, *const u8|->T) -> T {
     logi("in with_pixels");
     let data = get_safe_data(data);
     let oldtarget = get_current_texturetarget(&data.targetdata);
@@ -136,25 +136,22 @@ pub unsafe fn with_pixels<T>(data: *mut Data, callback: |i32, i32, *const u8|->*
         let result = callback(x, y, pixptr);
         logi!("returning pixels: {}", pixptr);
         result
-    }).unwrap_or(ptr::null_mut())
+    }).unwrap()
 }
 
 #[no_mangle]
-pub unsafe fn compile_copy_shader(data: *mut Data, vert: Option<String>, frag: Option<String>) -> DrawObjectIndex<CopyShader> {
-    let shader = get_safe_data(data).events.load_copyshader(vert, frag);
-    shader.unwrap_or(mem::transmute(-1i))
+pub unsafe fn compile_copy_shader(data: *mut Data, vert: Option<String>, frag: Option<String>) -> Option<DrawObjectIndex<CopyShader>> {
+    get_safe_data(data).events.load_copyshader(vert, frag)
 }
 
 #[no_mangle]
-pub unsafe fn compile_point_shader(data: *mut Data, vert: Option<String>, frag: Option<String>) -> DrawObjectIndex<PointShader> {
-    let shader = get_safe_data(data).events.load_pointshader(vert, frag);
-    shader.unwrap_or(mem::transmute(-1i))
+pub unsafe fn compile_point_shader(data: *mut Data, vert: Option<String>, frag: Option<String>) -> Option<DrawObjectIndex<PointShader>> {
+    get_safe_data(data).events.load_pointshader(vert, frag)
 }
 
 #[no_mangle]
-pub unsafe fn compile_luascript(data: *mut Data, luastr: Option<String>) -> DrawObjectIndex<LuaScript> {
-    let script = get_safe_data(data).events.load_interpolator(luastr);
-    script.unwrap_or(mem::transmute(-1i))
+pub unsafe fn compile_luascript(data: *mut Data, luastr: Option<String>) -> Option<DrawObjectIndex<LuaScript>> {
+    get_safe_data(data).events.load_interpolator(luastr)
 }
 
 // TODO: make an enum for these with a scala counterpart
@@ -248,7 +245,7 @@ fn draw_layer(layer: CompletedLayer, matrix: &[f32], color: [f32, ..3]
 }
 
 #[no_mangle]
-pub extern fn draw_queued_points(data: *mut Data, handler: *mut MotionEventConsumer, matrix: *mut f32) {
+pub extern fn draw_queued_points(data: *mut Data, handler: *mut MotionEventConsumer, matrix: &matrix::Matrix) {
     let data = get_safe_data(data);
     match (data.events.pointshader, data.events.copyshader, data.events.brush) {
         (Some(point_shader), Some(copy_shader), Some(brush)) => {
@@ -294,28 +291,23 @@ pub extern fn draw_queued_points(data: *mut Data, handler: *mut MotionEventConsu
 }
 
 #[no_mangle]
-pub extern fn load_texture(data: *mut Data, w: i32, h: i32, a_pixels: *const u8, format: i32) -> i32 {
+pub extern fn load_texture(data: *mut Data, w: i32, h: i32, pixels: &[u8], format: i32) -> Option<DrawObjectIndex<Texture>> {
     let data = get_safe_data(data);
     let formatenum: AndroidBitmapFormat = unsafe { mem::transmute(format) };
-    let format_and_size = match formatenum {
-        ANDROID_BITMAP_FORMAT_RGBA_8888 => Some((gltexture::RGBA, 4)),
-        ANDROID_BITMAP_FORMAT_A_8 => Some((gltexture::ALPHA, 1)),
+    let format = match formatenum {
+        ANDROID_BITMAP_FORMAT_RGBA_8888 => Some(gltexture::RGBA),
+        ANDROID_BITMAP_FORMAT_A_8 => Some(gltexture::ALPHA),
         _ => None,
     };
-    format_and_size.and_then(|(texformat, size)| {
-        logi!("setting brush texture for {:x}", a_pixels as uint);
-        let pixelopt = unsafe { a_pixels.as_ref() };
-        unsafe {
-            pixelopt.map(|x| ::std::slice::raw::buf_as_slice(x, (w*h*size) as uint, |x| {
-                mem::transmute(data.events.load_brush(w, h, x, texformat))
-            }))
-        }
-    }).unwrap_or(-1)
+    format.map(|texformat| {
+        logi!("setting brush texture for {:x}", pixels.as_ptr() as uint);
+        data.events.load_brush(w, h, pixels, texformat)
+    })
 }
 
 #[no_mangle]
-pub extern fn set_brush_texture(data: *mut Data, texture: i32) {
-    get_safe_data(data).events.use_brush(unsafe { mem::transmute(texture) });
+pub extern fn set_brush_texture(data: *mut Data, texture: DrawObjectIndex<Texture>) {
+    get_safe_data(data).events.use_brush(texture);
 }
 
 #[no_mangle]

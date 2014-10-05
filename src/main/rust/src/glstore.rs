@@ -9,6 +9,7 @@
 /// more importantly, switch to a map and return keys, rather than using indices
 
 use core::prelude::*;
+use core::mem;
 use collections::vec::Vec;
 use collections::string::String;
 use collections::{Map, MutableMap, MutableSeq};
@@ -30,6 +31,12 @@ pub struct DrawObjectList<T, Init: Eq+Hash> {
 }
 
 pub struct DrawObjectIndex<T>(i32);
+
+impl<T> DrawObjectIndex<T> {
+    pub fn error() -> DrawObjectIndex<T> {
+        unsafe { mem::transmute(-1i) }
+    }
+}
 
 pub type ShaderInitValues = (Option<String>, Option<String>);
 pub type BrushInitValues = (PixelFormat, (i32, i32), Vec<u8>);

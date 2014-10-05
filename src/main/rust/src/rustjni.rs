@@ -61,7 +61,7 @@ unsafe extern "C" fn finish_gl(env: *mut JNIEnv, thiz: jobject, data: jint) {
 unsafe extern "C" fn native_draw_queued_points(env: *mut JNIEnv, thiz: jobject, data: i32, handler: i32, java_matrix: jfloatArray) {
     let mut matrix: Matrix = mem::uninitialized();
     ((**env).GetFloatArrayRegion)(env, java_matrix, 0, 16, matrix.as_mut_ptr());
-    glinit::draw_queued_points(data as GLInit, handler as *mut MotionEventConsumer, matrix.as_mut_ptr());
+    glinit::draw_queued_points(data as GLInit, handler as *mut MotionEventConsumer, &matrix);
 }
 
 unsafe extern "C" fn native_update_gl(env: *mut JNIEnv, thiz: jobject, data: i32) {
@@ -103,24 +103,24 @@ unsafe extern "C" fn set_point_shader(env: *mut JNIEnv, thiz: jobject, data: jin
 }
 
 unsafe extern "C" fn set_brush_texture(env: *mut JNIEnv, thiz: jobject, data: jint, texture: jint) {
-    glinit::set_brush_texture(data as GLInit, texture as i32);
+    glinit::set_brush_texture(data as GLInit, mem::transmute(texture));
 }
 
 unsafe extern "C" fn create_texture(env: *mut JNIEnv, thiz: jobject, data: jint, bitmap: jobject) -> jint {
     let bitmap = AndroidBitmap::from_jobject(env, bitmap);
-    let texture = glinit::load_texture(data as GLInit, bitmap.info.width as i32, bitmap.info.height as i32, bitmap.pixels as *const u8, bitmap.info.format);
-    texture
+    let (w, h) = (bitmap.info.width, bitmap.info.height);
+    let texture = glinit::load_texture(data as GLInit, w as i32, h as i32, bitmap.as_slice(), bitmap.info.format);
+    mem::transmute(texture.unwrap_or(DrawObjectIndex::error()))
 }
 
 unsafe extern "C" fn clear_framebuffer(env: *mut JNIEnv, thiz: jobject, data: jint) {
     glinit::clear_buffer(data as GLInit);
 }
 
-unsafe fn shader_strs<T>(env: *mut JNIEnv, data: GLInit, vec: jstring, frag: jstring, callback: unsafe fn(GLInit, Option<String>, Option<String>) -> T) -> T {
+unsafe fn shader_strs<T>(env: *mut JNIEnv, data: GLInit, vec: jstring, frag: jstring, callback: unsafe fn(GLInit, Option<String>, Option<String>) -> Option<DrawObjectIndex<T>>) -> DrawObjectIndex<T> {
     let vecstr = get_string(env, vec);
     let fragstr = get_string(env, frag);
-    let ret = callback(data, vecstr, fragstr);
-    ret
+    callback(data, vecstr, fragstr).unwrap_or(DrawObjectIndex::error())
 }
 
 unsafe fn get_string(env: *mut JNIEnv, string: jstring) -> Option<String> {
@@ -234,7 +234,7 @@ unsafe extern "C" fn jni_egl_init(env: *mut JNIEnv, thiz: jobject, surface: jobj
 
 unsafe extern "C" fn jni_lua_compile_script(env: *mut JNIEnv, thiz: jobject, data: i32, script: jstring) -> jint {
     let scriptstr = get_string(env, script);
-    mem::transmute(glinit::compile_luascript(data as GLInit, scriptstr))
+    mem::transmute(glinit::compile_luascript(data as GLInit, scriptstr).unwrap_or(DrawObjectIndex::error()))
 }
 
 unsafe extern "C" fn jni_lua_set_interpolator(env: *mut JNIEnv, thiz: jobject, data: jint, scriptid: jint) {
