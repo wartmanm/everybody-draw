@@ -45,9 +45,9 @@ object PointShader extends Shader[PointShader] {
 }
 
 object Texture {
-  @native def init(data: GLInit, image: Bitmap): Int;
+  @native def init(data: GLInit, image: Bitmap): GLResult[Int];
   def apply(data: GLInit, image: Bitmap): Texture = {
-    new Texture(init(data, image))
+    new Texture(init(data, image).right.get)
   }
 }
 

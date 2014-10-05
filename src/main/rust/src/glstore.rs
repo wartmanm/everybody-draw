@@ -35,6 +35,7 @@ pub struct DrawObjectList<'a, T: 'a, Init: Eq+Hash> {
     arena: TypedArena<T>,
 }
 
+#[deriving(Show)]
 pub struct DrawObjectIndex<T>(i32);
 
 impl<T> DrawObjectIndex<T> {

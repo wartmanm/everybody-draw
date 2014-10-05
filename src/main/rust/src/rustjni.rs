@@ -60,10 +60,15 @@ impl CaseClass {
     pub unsafe fn new(env: *mut JNIEnv, name: *const c_char, sig: *const c_char) -> CaseClass {
         let class = ((**env).FindClass)(env, name);
         let constructor = ((**env).GetMethodID)(env, class, cstr!("<init>"), sig);
-        CaseClass { constructor: constructor, class: class }
+        let globalclass = ((**env).NewGlobalRef)(env, class);
+
+        CaseClass { constructor: constructor, class: globalclass }
     }
     pub unsafe fn construct<T>(&self, env: *mut JNIEnv, arg: T) -> jobject {
         ((**env).NewObject)(env, self.class, self.constructor, arg)
+    }
+    pub unsafe fn destroy(self, env: *mut JNIEnv) {
+        ((**env).DeleteGlobalRef)(env, self.class);
     }
 }
 
@@ -72,16 +77,20 @@ static mut SCALA_RIGHT: CaseClass = CaseClass { constructor: 0 as jmethodID, cla
 static mut BOXED_JINT: CaseClass = CaseClass { constructor: 0 as jmethodID, class: 0 as jclass };
 
 unsafe fn glresult_to_either<T>(env: *mut JNIEnv, result: GLResult<DrawObjectIndex<T>>) -> jobject {
+    logi!("in glresult_to_either");
     match result {
         Err(msg) => {
+            logi!("creating scala.util.Left for message: \"{}\"", msg);
             let u16msg: Vec<u16> = msg.as_slice().utf16_units().collect();
             let jmsg = ((**env).NewString)(env, u16msg.as_ptr(), u16msg.len() as i32);
             SCALA_LEFT.construct(env, jmsg)
         },
         Ok(idx) => {
             let idx: jint = mem::transmute(idx);
+            logi!("creating scala.util.Right for drawobjectindex {}", idx);
             let boxedidx = BOXED_JINT.construct(env, idx);
-            SCALA_RIGHT.construct(env, boxedidx)
+            let result = SCALA_RIGHT.construct(env, boxedidx);
+            result
         }
     }
 }
@@ -336,7 +345,7 @@ pub unsafe extern "C" fn JNI_OnLoad(vm: *mut JavaVM, reserved: *mut libc::c_void
         native_method!("compile", "(ILjava/lang/String;Ljava/lang/String;)Lscala/util/Either;", compile_copyshader),
     ];
     let texturestaticmethods = [
-        native_method!("init", "(ILandroid/graphics/Bitmap;)I", create_texture),
+        native_method!("init", "(ILandroid/graphics/Bitmap;)Lscala/util/Either;", create_texture),
     ];
     register_classmethods(env, cstr!("com/github/wartman4404/gldraw/PointShader$"), pointshaderstaticmethods);
     register_classmethods(env, cstr!("com/github/wartman4404/gldraw/CopyShader$"), copyshaderstaticmethods);
