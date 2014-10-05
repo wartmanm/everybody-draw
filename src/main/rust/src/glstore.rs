@@ -21,13 +21,17 @@ use gltexture::{PixelFormat, Texture};
 use pointshader::PointShader;
 use glcommon::Shader;
 use luascript::LuaScript;
+use arena::TypedArena;
 
 /// Holds GL objects that can be inited using the given keys.
 /// The list is to avoid having to pass those keys around, and serialize more easily.
-/// There may be a better way?
-pub struct DrawObjectList<T, Init: Eq+Hash> {
+/// The arena doesn't relocate its entries, so we can pass back longer-lived pointers,
+/// even if it needs some encouragement to do so.
+/// There ought to be a better way.
+pub struct DrawObjectList<'a, T: 'a, Init: Eq+Hash> {
     map: HashMap<Init, DrawObjectIndex<T>, SipHasher>,
-    list: Vec<T>,
+    list: Vec<&'a T>,
+    arena: TypedArena<T>,
 }
 
 pub struct DrawObjectIndex<T>(i32);
@@ -90,8 +94,8 @@ impl MaybeInitFromCache<LuaInitValues> for LuaScript {
     }
 }
 
-impl<T: MaybeInitFromCache<Init>, Init: Hash+Eq> DrawObjectList<T, Init> {
-    pub fn new() -> DrawObjectList<T, Init> {
+impl<'a, T: MaybeInitFromCache<Init>, Init: Hash+Eq> DrawObjectList<'a, T, Init> {
+    pub fn new() -> DrawObjectList<'a, T, Init> {
         // the default hasher is keyed off of the task-local rng,
         // which would blow up since we don't have a task
         //let mut rng = rand::weak_rng();
@@ -102,18 +106,24 @@ impl<T: MaybeInitFromCache<Init>, Init: Hash+Eq> DrawObjectList<T, Init> {
         DrawObjectList {
             map: map,
             list: Vec::new(),
+            arena: TypedArena::new(),
         }
     }
 
     // TODO: avoid allocations just to see if the key is in the map
-    pub fn push_object<'b>(&mut self, init: Init) -> Option<DrawObjectIndex<T>> {
+    pub fn push_object(&mut self, init: Init) -> Option<DrawObjectIndex<T>> {
         // Can't use map.entry() here as it consumes the key
         if self.map.contains_key(&init) {
             Some(*self.map.find(&init).unwrap())
         } else {
             match MaybeInitFromCache::maybe_init(&init) {
                 Some(inited) => {
-                    self.list.push(inited);
+                    // ptr's lifetime is limited to &self's, which is fair but not very useful.
+                    // smart ptrs involve individual allocs but are probably better
+                    let ptr = self.arena.alloc(inited);
+                    unsafe {
+                        self.list.push(mem::transmute(ptr));
+                    }
                     let index = self.list.len() - 1;
                     let objindex = DrawObjectIndex(index as i32);
                     self.map.insert(init, objindex);
@@ -124,13 +134,13 @@ impl<T: MaybeInitFromCache<Init>, Init: Hash+Eq> DrawObjectList<T, Init> {
         }
     }
 
-    pub fn get_object<'a>(&'a self, i: DrawObjectIndex<T>) -> &T {
+    pub fn get_object(&self, i: DrawObjectIndex<T>) -> &'a T {
         let DrawObjectIndex(idx) = i;
-        &self.list[idx as uint]
+        self.list[idx as uint]
     }
 }
 
-impl<T: InitFromCache<Init>+MaybeInitFromCache<Init>, Init: Hash+Eq> DrawObjectList<T, Init> {
+impl<'a, T: InitFromCache<Init>+MaybeInitFromCache<Init>, Init: Hash+Eq> DrawObjectList<'a, T, Init> {
     pub fn safe_push_object(&mut self, init: Init) -> DrawObjectIndex<T> {
         self.push_object(init).unwrap()
     }

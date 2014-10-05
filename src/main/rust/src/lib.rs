@@ -10,6 +10,7 @@ extern crate core;
 extern crate collections;
 extern crate alloc;
 extern crate std;
+extern crate arena;
 
 pub mod bindgen_builtins;
 pub mod android;

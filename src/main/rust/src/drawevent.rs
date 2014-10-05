@@ -36,10 +36,10 @@ enum DrawEvent {
 
 pub struct Events<'a> {
     eventlist: Vec<DrawEvent>,
-    pointshaders: DrawObjectList<PointShader, ShaderInitValues>,
-    copyshaders: DrawObjectList<CopyShader, ShaderInitValues>,
-    textures: DrawObjectList<Texture, BrushInitValues>,
-    luascripts: DrawObjectList<LuaScript, LuaInitValues>,
+    pointshaders: DrawObjectList<'a, PointShader, ShaderInitValues>,
+    copyshaders: DrawObjectList<'a, CopyShader, ShaderInitValues>,
+    textures: DrawObjectList<'a, Texture, BrushInitValues>,
+    luascripts: DrawObjectList<'a, LuaScript, LuaInitValues>,
     pub pointshader: Option<&'a PointShader>,
     pub animshader: Option<&'a CopyShader>,
     pub copyshader: Option<&'a CopyShader>,
@@ -71,14 +71,14 @@ impl<'a> Events<'a> {
         self.copyshaders.push_object(initargs)
     }
 
-    pub fn use_copyshader(&'a mut self, idx: DrawObjectIndex<CopyShader>) -> &CopyShader {
+    pub fn use_copyshader(&mut self, idx: DrawObjectIndex<CopyShader>) -> &CopyShader {
         self.eventlist.push(UseCopyShader(idx));
         let shader = self.copyshaders.get_object(idx);
         self.copyshader = Some(shader);
         shader
     }
 
-    pub fn use_animshader(&'a mut self, idx: DrawObjectIndex<CopyShader>) -> &CopyShader {
+    pub fn use_animshader(&mut self, idx: DrawObjectIndex<CopyShader>) -> &CopyShader {
         self.eventlist.push(UseAnimShader(idx));
         let shader = self.copyshaders.get_object(idx);
         self.animshader = Some(shader);
@@ -88,7 +88,7 @@ impl<'a> Events<'a> {
         let initargs = (vert, frag);
         self.pointshaders.push_object(initargs)
     }
-    pub fn use_pointshader(&'a mut self, idx: DrawObjectIndex<PointShader>) -> &PointShader {
+    pub fn use_pointshader(&mut self, idx: DrawObjectIndex<PointShader>) -> &PointShader {
         self.eventlist.push(UsePointShader(idx));
         let shader = self.pointshaders.get_object(idx);
         self.pointshader = Some(shader);
@@ -99,7 +99,7 @@ impl<'a> Events<'a> {
         let init: BrushInitValues = (format, (w, h), ownedpixels);
         self.textures.safe_push_object(init)
     }
-    pub fn use_brush(&'a mut self, idx: DrawObjectIndex<Texture>) -> &Texture {
+    pub fn use_brush(&mut self, idx: DrawObjectIndex<Texture>) -> &Texture {
         self.eventlist.push(UseBrush(idx));
         let brush = self.textures.get_object(idx);
         self.brush = Some(brush);
