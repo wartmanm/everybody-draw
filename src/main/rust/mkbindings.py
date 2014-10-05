@@ -8,6 +8,7 @@ from itertools import chain
 import sys
 import argparse
 import json
+import re
 
 platformpath = '{ANDROID_NDK_ROOT}/platforms/{PLATFORM_NAME}/arch-arm'.format(**os.environ)
 includes = [
@@ -23,21 +24,25 @@ prelude_lints = [
     'non_uppercase_statics',
 ]
 
-builtins_name = "bindgen_builtins"
+builtins_name = 'bindgen_builtins'
+fnptr_re = re.compile('::std::option::Option<(extern "C" fn.*?[^-])>', re.DOTALL)
 
 prefix = None
 
 class Binding:
   def __init__(self, **kwargs):
-    self.path = kwargs["path"]
-    self.match = kwargs.get("match") or []
-    self.deps = kwargs.get("deps") or [builtins_name]
+    self.path = kwargs['path']
+    self.match = kwargs.get('match') or []
+    self.deps = kwargs.get('deps') or []
+    self.deps.append(builtins_name)
+    self.remove_fnptr_opts = kwargs.get('remove_fnptr_opts') or False
     self.preexisting = False
   def is_preexisting(self):
     return self.preexisting
 
 class Module:
-  def __init__(self):
+  def __init__(self, basename):
+    self.path = basename
     self.mods = set()
   def is_preexisting(self):
     return all(map(lambda x: x.is_preexisting(), self.mods))
@@ -48,8 +53,8 @@ def flatten(x):
 def run_bindgen(args, outfile):
   allargs = ['bindgen'] + args
   #print('running ' + ' '.join(allargs))
-  outfile.flush()
-  subprocess.call(allargs, stdout=outfile)
+  p = subprocess.Popen(allargs, stdout=subprocess.PIPE)
+  return p.communicate()[0]
 
 def append_allow_prelude(outfile):
   for lint in prelude_lints:
@@ -60,7 +65,7 @@ def gen_bindings(binding):
   if os.path.exists(dest):
     binding.preexisting = True
     return
-  matches = binding.get('match')
+  matches = binding.match
   matches = [['-match', x] for x in matches] if matches else []
   includeargs = [['-I', x] for x in includes]
   header = '{}/usr/include/{}.h'.format(platformpath, binding.path)
@@ -72,7 +77,10 @@ def gen_bindings(binding):
     for dep in binding.deps:
       outfile.write('use {}::*;\n'.format(dep))
     args = flatten(includeargs + matches + [[header]])
-    run_bindgen(args, outfile)
+    stdout = run_bindgen(args, outfile)
+    if binding.remove_fnptr_opts:
+      stdout = re.sub(fnptr_re, '\\1', stdout)
+    outfile.write(stdout)
 
 def gen_builtins():
   dest = joinprefix(builtins_name + '.rs')
@@ -89,8 +97,9 @@ def gen_modfile(path, mod):
   if mod.is_preexisting():
     return
   with open(joinprefix(path, 'mod.rs'), 'w') as outfile:
-    for mod in mods:
-      outfile.write('pub mod {};\n'.format(mod.replace('/', '::')))
+    for submod in mods.mods:
+      relative_mod = os.path.relpath(submod.path, path)
+      outfile.write('pub mod {};\n'.format(relative_mod.replace('/', '::')))
 
 def gathermods(bindings):
   dirs = {}
@@ -100,7 +109,7 @@ def gathermods(bindings):
     while True:
       parent = os.path.dirname(modpath)
       if parent in ['/', '']: break
-      mod = dirs.setdefault(parent, Module())
+      mod = dirs.setdefault(parent, Module(parent))
       mod.mods.add(submod)
       modpath = parent
       submod = mod
@@ -133,10 +142,10 @@ if __name__ == '__main__':
       gen_modfile(path, mods)
 
   elif args.mode == 'clean':
-    deletes = [x["path"] for x in bindings] + [builtins_name]
-    for path in [x["path"] for x in bindings] + [builtins_name]:
+    deletes = [x.path for x in bindings] + [builtins_name]
+    for path in [x.path for x in bindings] + [builtins_name]:
       sloppy_delete(joinprefix(path + '.rs'))
-    for path, mods in gathermods([x["path"] for x in bindings]).items():
-      sloppy_delete(joinprefix(path, "mod.rs"))
+    for path, mods in gathermods(bindings).items():
+      sloppy_delete(joinprefix(path, 'mod.rs'))
 
 

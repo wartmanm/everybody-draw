@@ -60,7 +60,7 @@ unsafe extern "C" fn finish_gl(env: *mut JNIEnv, thiz: jobject, data: jint) {
 
 unsafe extern "C" fn native_draw_queued_points(env: *mut JNIEnv, thiz: jobject, data: i32, handler: i32, java_matrix: jfloatArray) {
     let mut matrix: Matrix = mem::uninitialized();
-    get_float_array_region(env, java_matrix, 0, 16, matrix.as_mut_ptr());
+    ((**env).GetFloatArrayRegion)(env, java_matrix, 0, 16, matrix.as_mut_ptr());
     glinit::draw_queued_points(data as GLInit, handler as *mut MotionEventConsumer, matrix.as_mut_ptr());
 }
 
@@ -70,23 +70,23 @@ unsafe extern "C" fn native_update_gl(env: *mut JNIEnv, thiz: jobject, data: i32
 
 unsafe extern "C" fn init_motion_event_handler(env: *mut JNIEnv, thiz: jobject) -> jobject {
     let (consumer, producer) = glpoint::create_motion_event_handler();
-    let pairclass = find_class(env, cstr!("com/github/wartman4404/gldraw/MotionEventHandlerPair"));
-    let constructor = get_methodid(env, pairclass, cstr!("<init>"), cstr!("(II)V"));
+    let pairclass = ((**env).FindClass)(env, cstr!("com/github/wartman4404/gldraw/MotionEventHandlerPair"));
+    let constructor = ((**env).GetMethodID)(env, pairclass, cstr!("<init>"), cstr!("(II)V"));
     let newobj: extern "C" fn(*mut JNIEnv, jclass, jmethodID, ...) -> jobject = mem::transmute((**env).NewObject);
     newobj(env, pairclass, constructor, consumer as int, producer as int)
 }
 
 unsafe extern "C" fn destroy_motion_event_handler(env: *mut JNIEnv, thiz: jobject, pairobj: jobject) {
-    let pairclass = find_class(env, cstr!("com/github/wartman4404/gldraw/MotionEventHandlerPair"));
-    let consumerfield = get_fieldid(env, pairclass, cstr!("consumer"), cstr!("I"));
-    let producerfield = get_fieldid(env, pairclass, cstr!("producer"), cstr!("I"));
-    let consumer = get_int_field(env, pairobj, consumerfield) as *mut MotionEventConsumer;
-    let producer = get_int_field(env, pairobj, producerfield) as *mut MotionEventProducer;
+    let pairclass = ((**env).FindClass)(env, cstr!("com/github/wartman4404/gldraw/MotionEventHandlerPair"));
+    let consumerfield = ((**env).GetFieldID)(env, pairclass, cstr!("consumer"), cstr!("I"));
+    let producerfield = ((**env).GetFieldID)(env, pairclass, cstr!("producer"), cstr!("I"));
+    let consumer = ((**env).GetIntField)(env, pairobj, consumerfield) as *mut MotionEventConsumer;
+    let producer = ((**env).GetIntField)(env, pairobj, producerfield) as *mut MotionEventProducer;
     glpoint::destroy_motion_event_handler(consumer, producer);
 }
 
 unsafe extern "C" fn native_append_motion_event(env: *mut JNIEnv, thiz: jobject, handler: jint, evtobj: jobject) {
-    let evtptr = get_int_field(env, evtobj, MOTIONEVENT_NATIVE_PTR_FIELD);
+    let evtptr = ((**env).GetIntField)(env, evtobj, MOTIONEVENT_NATIVE_PTR_FIELD);
     glpoint::jni_append_motion_event(mem::transmute(handler), evtptr as *const AInputEvent);
 }
 
@@ -161,12 +161,12 @@ unsafe extern "C" fn draw_image(env: *mut JNIEnv, thiz: jobject, data: i32, bitm
 unsafe extern "C" fn export_pixels(env: *mut JNIEnv, thiz: jobject, data: i32) -> jobject {
     glinit::with_pixels(data as GLInit, |w, h, pixels| {
         logi!("in callback!");
-        let bitmapclass = find_class(env, cstr!("android/graphics/Bitmap"));
+        let bitmapclass = ((**env).FindClass)(env, cstr!("android/graphics/Bitmap"));
         let bitmap = AndroidBitmap::new(env, w, h);
         let outpixels = bitmap.as_slice();
         ptr::copy_nonoverlapping_memory(outpixels.as_mut_ptr(), pixels as *const u8, outpixels.len());
         let bitmap = bitmap.obj;
-        let premult = get_methodid(env, bitmapclass, cstr!("setPremultiplied"), cstr!("(Z)V"));
+        let premult = ((**env).GetMethodID)(env, bitmapclass, cstr!("setPremultiplied"), cstr!("(Z)V"));
         let voidmethod: extern "C" fn(*mut JNIEnv, jobject, jmethodID, ...) = mem::transmute((**env).CallVoidMethod);
         voidmethod(env, bitmap, premult, JNI_TRUE);
         logi!("done with callback");
@@ -191,13 +191,12 @@ impl AndroidBitmap {
     }
 
     unsafe fn new(env: *mut JNIEnv, w: i32, h: i32) -> AndroidBitmap {
-        let bitmapclass = find_class(env, cstr!("android/graphics/Bitmap"));
-        let configclass = find_class(env, cstr!("android/graphics/Bitmap$Config"));
-        let argbfield = ((**env).GetStaticFieldID).unwrap()(env, configclass, cstr!("ARGB_8888"), cstr!("Landroid/graphics/Bitmap$Config;"));
-        let argb = ((**env).GetStaticObjectField).unwrap()(env, configclass, argbfield);
-        let createbitmap = ((**env).GetStaticMethodID).unwrap()(env, bitmapclass, cstr!("createBitmap"), cstr!("(IILandroid/graphics/Bitmap$Config;)Landroid/graphics/Bitmap;"));
-        let callstatic: extern "C" fn(*mut JNIEnv, jclass, jmethodID, ...) -> jobject = mem::transmute((**env).GetStaticMethodID);
-        let bitmap = callstatic(env, bitmapclass, createbitmap, w, h, argb);
+        let bitmapclass = ((**env).FindClass)(env, cstr!("android/graphics/Bitmap"));
+        let configclass = ((**env).FindClass)(env, cstr!("android/graphics/Bitmap$Config"));
+        let argbfield = ((**env).GetStaticFieldID)(env, configclass, cstr!("ARGB_8888"), cstr!("Landroid/graphics/Bitmap$Config;"));
+        let argb = ((**env).GetStaticObjectField)(env, configclass, argbfield);
+        let createbitmap = ((**env).GetStaticMethodID)(env, bitmapclass, cstr!("createBitmap"), cstr!("(IILandroid/graphics/Bitmap$Config;)Landroid/graphics/Bitmap;"));
+        let bitmap = ((**env).CallStaticObjectMethod)(env, bitmapclass, createbitmap, w, h, argb);
         logi!("created bitmap");
         AndroidBitmap::from_jobject(env, bitmap)
     }
@@ -250,40 +249,9 @@ unsafe extern "C" fn jni_clear_layers(env: *mut JNIEnv, thiz: jobject, data: jin
     glinit::clear_layers(data as GLInit);
 }
 
-#[inline(always)]
-unsafe fn find_class(env: *mut JNIEnv, name: *const c_char) -> jclass {
-    let findclass: extern "C" fn(*mut JNIEnv, *const c_char) -> jclass = mem::transmute((**env).FindClass);
-    findclass(env, name)
-}
-
-#[inline(always)]
-unsafe fn get_fieldid(env: *mut JNIEnv, class: jclass, name: *const c_char, sig: *const c_char) -> jfieldID {
-    let getfieldid: extern "C" fn(*mut JNIEnv, jclass, *const c_char, *const c_char) -> jfieldID = mem::transmute((**env).GetFieldID);
-    getfieldid(env, class, name, sig)
-}
-
-#[inline(always)]
-unsafe fn get_int_field(env: *mut JNIEnv, obj: jobject, field: jfieldID) -> jint {
-    let getintfield: extern "C" fn(*mut JNIEnv, jobject, jfieldID) -> jint = mem::transmute((**env).GetIntField);
-    getintfield(env, obj, field)
-}
-
-#[inline(always)]
-unsafe fn get_float_array_region(env: *mut JNIEnv, array: jfloatArray, start: jsize, end: jsize, target: *mut jfloat) {
-    let getfloatarrayregion: extern "C" fn(*mut JNIEnv, jfloatArray, jsize, jsize, *mut jfloat) = mem::transmute((**env).GetFloatArrayRegion);
-    getfloatarrayregion(env, array, start, end, target)
-}
-
-#[inline(always)]
-unsafe fn get_methodid(env: *mut JNIEnv, class: jclass, name: *const c_char, sig: *const c_char) -> jmethodID {
-    let getmethodid: extern "C" fn(*mut JNIEnv, jclass, *const c_char, *const c_char) -> jmethodID = mem::transmute((**env).GetMethodID);
-    getmethodid(env, class, name, sig)
-}
-
 unsafe fn register_classmethods(env: *mut JNIEnv, classname: *const i8, methods: &[JNINativeMethod]) {
-    let registernatives: extern "C" fn(*mut JNIEnv, jclass, *const JNINativeMethod, jint) = mem::transmute((**env).RegisterNatives);
-    let class = find_class(env, classname);
-    registernatives(env, class, methods.as_ptr(), methods.len() as i32);
+    let class = ((**env).FindClass)(env, classname);
+    ((**env).RegisterNatives)(env, class, methods.as_ptr(), methods.len() as i32);
 }
 
 #[allow(non_snake_case)]
@@ -291,13 +259,13 @@ unsafe fn register_classmethods(env: *mut JNIEnv, classname: *const i8, methods:
 pub unsafe extern "C" fn JNI_OnLoad(vm: *mut JavaVM, reserved: *mut libc::c_void) -> jint {
     logi!("jni onload!!");
     let mut env: *mut libc::c_void = ptr::null_mut();
-    if ((**vm).GetEnv).unwrap()(vm, (&mut env as *mut *mut libc::c_void), JNI_VERSION_1_6) != JNI_OK {
+    if ((**vm).GetEnv)(vm, (&mut env as *mut *mut libc::c_void), JNI_VERSION_1_6) != JNI_OK {
         return -1;
     }
     let env = env as *mut JNIEnv;
     logi!("got environment!: {}", env);
-    MOTION_CLASS = find_class(env, cstr!("android/view/MotionEvent"));
-    MOTIONEVENT_NATIVE_PTR_FIELD = get_fieldid(env, MOTION_CLASS, cstr!("mNativePtr"), cstr!("I"));
+    MOTION_CLASS = ((**env).FindClass)(env, cstr!("android/view/MotionEvent"));
+    MOTIONEVENT_NATIVE_PTR_FIELD = ((**env).GetFieldID)(env, MOTION_CLASS, cstr!("mNativePtr"), cstr!("I"));
     logi!("got motion classes");
 
     let mainmethods = [
@@ -364,12 +332,3 @@ pub unsafe extern "C" fn JNI_OnLoad(vm: *mut JavaVM, reserved: *mut libc::c_void
     logi!("finished jni_onload");
     JNI_VERSION_1_2
 }
-
-
-
-
-
-
-
-
-
