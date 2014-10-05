@@ -7,6 +7,7 @@ use alloc::boxed::Box;
 use libc;
 use libc::{c_void, c_char};
 use collections::string::String;
+use collections::vec::Vec;
 
 use jni;
 use jni::{jobject, jclass, jfieldID, jmethodID, JNIEnv, jint, jfloat, jstring, jfloatArray, JNINativeMethod, JavaVM, jboolean, jchar, jsize};
@@ -15,6 +16,7 @@ use android::bitmap::{AndroidBitmap_getInfo, AndroidBitmap_lockPixels, AndroidBi
 use android::bitmap::{ANDROID_BITMAP_FORMAT_RGBA_8888, ANDROID_BITMAP_FORMAT_A_8};
 use android::native_window_jni::{ANativeWindow_fromSurface};//, ANativeWindow_release};
 use android::native_window::ANativeWindow_release;
+use glcommon::GLResult;
 
 use log::logi;
 
@@ -49,6 +51,41 @@ macro_rules! native_method(
 static mut MOTION_CLASS: jclass = 0 as jclass;
 static mut MOTIONEVENT_NATIVE_PTR_FIELD: jfieldID = 0 as jfieldID;
 
+struct CaseClass {
+    constructor: jmethodID,
+    class: jclass,
+}
+
+impl CaseClass {
+    pub unsafe fn new(env: *mut JNIEnv, name: *const c_char, sig: *const c_char) -> CaseClass {
+        let class = ((**env).FindClass)(env, name);
+        let constructor = ((**env).GetMethodID)(env, class, cstr!("<init>"), sig);
+        CaseClass { constructor: constructor, class: class }
+    }
+    pub unsafe fn construct<T>(&self, env: *mut JNIEnv, arg: T) -> jobject {
+        ((**env).NewObject)(env, self.class, self.constructor, arg)
+    }
+}
+
+static mut SCALA_LEFT: CaseClass = CaseClass { constructor: 0 as jmethodID, class: 0 as jclass };
+static mut SCALA_RIGHT: CaseClass = CaseClass { constructor: 0 as jmethodID, class: 0 as jclass };
+static mut BOXED_JINT: CaseClass = CaseClass { constructor: 0 as jmethodID, class: 0 as jclass };
+
+unsafe fn glresult_to_either<T>(env: *mut JNIEnv, result: GLResult<DrawObjectIndex<T>>) -> jobject {
+    match result {
+        Err(msg) => {
+            let u16msg: Vec<u16> = msg.as_slice().utf16_units().collect();
+            let jmsg = ((**env).NewString)(env, u16msg.as_ptr(), u16msg.len() as i32);
+            SCALA_LEFT.construct(env, jmsg)
+        },
+        Ok(idx) => {
+            let idx: jint = mem::transmute(idx);
+            let boxedidx = BOXED_JINT.construct(env, idx);
+            SCALA_RIGHT.construct(env, boxedidx)
+        }
+    }
+}
+
 fn get_safe_data<'a>(data: i32) -> &'a mut GLInit<'a> {
     unsafe { mem::transmute(data) }
 }
@@ -77,7 +114,6 @@ unsafe extern "C" fn init_motion_event_handler(env: *mut JNIEnv, thiz: jobject) 
     let (consumer, producer) = glpoint::create_motion_event_handler();
     let pairclass = ((**env).FindClass)(env, cstr!("com/github/wartman4404/gldraw/MotionEventHandlerPair"));
     let constructor = ((**env).GetMethodID)(env, pairclass, cstr!("<init>"), cstr!("(II)V"));
-    let newobj: extern "C" fn(*mut JNIEnv, jclass, jmethodID, ...) -> jobject = mem::transmute((**env).NewObject);
     let (consumer, producer): (i32, i32) = (mem::transmute(consumer), mem::transmute(producer));
     ((**env).NewObject)(env, pairclass, constructor, consumer, producer)
 }
@@ -112,12 +148,12 @@ unsafe extern "C" fn set_brush_texture(env: *mut JNIEnv, thiz: jobject, data: ji
     get_safe_data(data).set_brush_texture(mem::transmute(texture));
 }
 
-unsafe extern "C" fn create_texture(env: *mut JNIEnv, thiz: jobject, data: jint, bitmap: jobject) -> jint {
+unsafe extern "C" fn create_texture(env: *mut JNIEnv, thiz: jobject, data: jint, bitmap: jobject) -> jobject {
     let bitmap = AndroidBitmap::from_jobject(env, bitmap);
     let (w, h) = (bitmap.info.width, bitmap.info.height);
     let format = mem::transmute(bitmap.info.format);
     let texture = get_safe_data(data).load_texture(w as i32, h as i32, bitmap.as_slice(), format);
-    mem::transmute(texture.unwrap_or(DrawObjectIndex::error()))
+    glresult_to_either(env, texture)
 }
 
 unsafe extern "C" fn clear_framebuffer(env: *mut JNIEnv, thiz: jobject, data: jint) {
@@ -143,12 +179,12 @@ unsafe fn get_string(env: *mut JNIEnv, string: jstring) -> Option<String> {
     }
 }
 
-unsafe extern "C" fn compile_copyshader(env: *mut JNIEnv, thiz: jobject, data: i32, vec: jstring, frag: jstring) -> jint {
-    mem::transmute(get_safe_data(data).compile_copy_shader(get_string(env, vec), get_string(env, frag)).unwrap_or(DrawObjectIndex::error()))
+unsafe extern "C" fn compile_copyshader(env: *mut JNIEnv, thiz: jobject, data: i32, vec: jstring, frag: jstring) -> jobject {
+    glresult_to_either(env, get_safe_data(data).compile_copy_shader(get_string(env, vec), get_string(env, frag)))
 }
 
-unsafe extern "C" fn compile_pointshader(env: *mut JNIEnv, thiz: jobject, data: i32, vec: jstring, frag: jstring) -> jint {
-    mem::transmute(get_safe_data(data).compile_point_shader(get_string(env, vec), get_string(env, frag)).unwrap_or(DrawObjectIndex::error()))
+unsafe extern "C" fn compile_pointshader(env: *mut JNIEnv, thiz: jobject, data: i32, vec: jstring, frag: jstring) -> jobject {
+    glresult_to_either(env, get_safe_data(data).compile_point_shader(get_string(env, vec), get_string(env, frag)))
 }
 
 unsafe extern "C" fn draw_image(env: *mut JNIEnv, thiz: jobject, data: i32, bitmap: jobject) {
@@ -232,9 +268,9 @@ unsafe extern "C" fn jni_egl_init(env: *mut JNIEnv, thiz: jobject, surface: jobj
     ANativeWindow_release(window);
 }
 
-unsafe extern "C" fn jni_lua_compile_script(env: *mut JNIEnv, thiz: jobject, data: i32, script: jstring) -> jint {
+unsafe extern "C" fn jni_lua_compile_script(env: *mut JNIEnv, thiz: jobject, data: i32, script: jstring) -> jobject {
     let scriptstr = get_string(env, script);
-    mem::transmute(get_safe_data(data).compile_luascript(scriptstr).unwrap_or(DrawObjectIndex::error()))
+    glresult_to_either(env, get_safe_data(data).compile_luascript(scriptstr))
 }
 
 unsafe extern "C" fn jni_lua_set_interpolator(env: *mut JNIEnv, thiz: jobject, data: jint, scriptid: jint) {
@@ -267,6 +303,9 @@ pub unsafe extern "C" fn JNI_OnLoad(vm: *mut JavaVM, reserved: *mut libc::c_void
     MOTION_CLASS = ((**env).FindClass)(env, cstr!("android/view/MotionEvent"));
     MOTIONEVENT_NATIVE_PTR_FIELD = ((**env).GetFieldID)(env, MOTION_CLASS, cstr!("mNativePtr"), cstr!("I"));
     logi!("got motion classes");
+    SCALA_LEFT = CaseClass::new(env, cstr!("scala/util/Left"), cstr!("(Ljava/lang/Object;)V"));
+    SCALA_RIGHT = CaseClass::new(env, cstr!("scala/util/Right"), cstr!("(Ljava/lang/Object;)V"));
+    BOXED_JINT = CaseClass::new(env, cstr!("java/lang/Integer"), cstr!("(I)V"));
 
     let mainmethods = [
         native_method!("nativeAppendMotionEvent", "(ILandroid/view/MotionEvent;)V", native_append_motion_event),
@@ -291,10 +330,10 @@ pub unsafe extern "C" fn JNI_OnLoad(vm: *mut JavaVM, reserved: *mut libc::c_void
     logi!("registered texture thread methods!");
 
     let pointshaderstaticmethods = [
-        native_method!("compile", "(ILjava/lang/String;Ljava/lang/String;)I", compile_pointshader),
+        native_method!("compile", "(ILjava/lang/String;Ljava/lang/String;)Lscala/util/Either;", compile_pointshader),
     ];
     let copyshaderstaticmethods = [
-        native_method!("compile", "(ILjava/lang/String;Ljava/lang/String;)I", compile_copyshader),
+        native_method!("compile", "(ILjava/lang/String;Ljava/lang/String;)Lscala/util/Either;", compile_copyshader),
     ];
     let texturestaticmethods = [
         native_method!("init", "(ILandroid/graphics/Bitmap;)I", create_texture),
@@ -312,7 +351,7 @@ pub unsafe extern "C" fn JNI_OnLoad(vm: *mut JavaVM, reserved: *mut libc::c_void
     logi!("registered egl methods!");
 
     let luastaticmethods = [
-        native_method!("init", "(ILjava/lang/String;)I", jni_lua_compile_script),
+        native_method!("init", "(ILjava/lang/String;)Lscala/util/Either;", jni_lua_compile_script),
     ];
     register_classmethods(env, cstr!("com/github/wartman4404/gldraw/LuaScript$"), luastaticmethods);
     logi!("registered lua methods!");
