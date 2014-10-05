@@ -57,7 +57,7 @@ unsafe extern "C" fn init_gl(env: *mut JNIEnv, thiz: jobject, w: jint, h: jint) 
 }
 
 unsafe extern "C" fn finish_gl(env: *mut JNIEnv, thiz: jobject, data: jint) {
-    glinit::deinit_gl(get_safe_data(data));
+    glinit::deinit_gl(mem::transmute(data));
     logi!("finished deinit");
 }
 
