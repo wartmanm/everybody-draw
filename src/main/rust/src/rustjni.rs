@@ -113,7 +113,8 @@ unsafe extern "C" fn set_brush_texture(env: *mut JNIEnv, thiz: jobject, data: ji
 unsafe extern "C" fn create_texture(env: *mut JNIEnv, thiz: jobject, data: jint, bitmap: jobject) -> jint {
     let bitmap = AndroidBitmap::from_jobject(env, bitmap);
     let (w, h) = (bitmap.info.width, bitmap.info.height);
-    let texture = glinit::load_texture(get_safe_data(data), w as i32, h as i32, bitmap.as_slice(), bitmap.info.format);
+    let format = mem::transmute(bitmap.info.format);
+    let texture = glinit::load_texture(get_safe_data(data), w as i32, h as i32, bitmap.as_slice(), format);
     mem::transmute(texture.unwrap_or(DrawObjectIndex::error()))
 }
 
@@ -157,7 +158,8 @@ unsafe extern "C" fn compile_pointshader(env: *mut JNIEnv, thiz: jobject, data: 
 unsafe extern "C" fn draw_image(env: *mut JNIEnv, thiz: jobject, data: i32, bitmap: jobject) {
     // TODO: ensure rgba_8888 format and throw error
     let bitmap = AndroidBitmap::from_jobject(env, bitmap);
-    glinit::draw_image(get_safe_data(data), bitmap.info.width as i32, bitmap.info.height as i32, bitmap.pixels as *const u8);
+    let pixels = bitmap.as_slice();
+    glinit::draw_image(get_safe_data(data), bitmap.info.width as i32, bitmap.info.height as i32, pixels);
 }
 
 unsafe extern "C" fn export_pixels(env: *mut JNIEnv, thiz: jobject, data: i32) -> jobject {
@@ -166,7 +168,7 @@ unsafe extern "C" fn export_pixels(env: *mut JNIEnv, thiz: jobject, data: i32) -
         let bitmapclass = ((**env).FindClass)(env, cstr!("android/graphics/Bitmap"));
         let bitmap = AndroidBitmap::new(env, w, h);
         let outpixels = bitmap.as_slice();
-        ptr::copy_nonoverlapping_memory(outpixels.as_mut_ptr(), pixels as *const u8, outpixels.len());
+        ptr::copy_nonoverlapping_memory(outpixels.as_mut_ptr(), pixels.as_ptr(), outpixels.len());
         let bitmap = bitmap.obj;
         let premult = ((**env).GetMethodID)(env, bitmapclass, cstr!("setPremultiplied"), cstr!("(Z)V"));
         let voidmethod: extern "C" fn(*mut JNIEnv, jobject, jmethodID, ...) = mem::transmute((**env).CallVoidMethod);

@@ -36,7 +36,7 @@ static DRAW_INDEXES: [GLubyte, ..6] = [
 //#[deriving(FromPrimitive)]
 #[repr(i32)]
 #[allow(non_camel_case_types, dead_code)]
-enum AndroidBitmapFormat {
+pub enum AndroidBitmapFormat {
     ANDROID_BITMAP_FORMAT_NONE      = 0,
     ANDROID_BITMAP_FORMAT_RGBA_8888 = 1,
     ANDROID_BITMAP_FORMAT_RGB_565   = 4,
@@ -83,7 +83,7 @@ fn perform_copy(dest_framebuffer: GLuint, source_texture: &Texture, shader: &Cop
     check_gl_error("drew elements");
 }
 
-pub fn draw_image(data: &mut Data, w: i32, h: i32, pixels: *const u8) -> () {
+pub fn draw_image(data: &mut Data, w: i32, h: i32, pixels: &[u8]) -> () {
     logi("drawing image...");
     let target = get_current_texturetarget(&data.targetdata);
     let (tw, th) = target.texture.dimensions;
@@ -100,39 +100,35 @@ pub fn draw_image(data: &mut Data, w: i32, h: i32, pixels: *const u8) -> () {
                   (1f32 - glratiox) / 2f32, (1f32 + glratioy) / 2f32, 0f32, 0f32];
     logi!("drawing with ratio: {:5.3f}, glratio {:5.3f}, {:5.3f}, matrix:\n{}", ratio, glratiox, glratioy, matrix::log(matrix.as_slice()));
 
-    unsafe {
-        pixels.as_ref().map(|x| ::core::slice::raw::buf_as_slice(x, (w*h*4) as uint, |pixelvec| {
-            data.events.copyshader.map(|shader| {
-                let intexture = Texture::with_image(w, h, Some(pixelvec), gltexture::RGBA);
-                check_gl_error("creating texture");
-                perform_copy(target.framebuffer, &intexture, shader, matrix.as_slice());
-            });
-        }));
-    }
+    data.events.copyshader.map(|shader| {
+        let intexture = Texture::with_image(w, h, Some(pixels), gltexture::RGBA);
+        check_gl_error("creating texture");
+        perform_copy(target.framebuffer, &intexture, shader, matrix.as_slice());
+    });
 }
 
-pub unsafe fn with_pixels<T>(data: &mut Data, callback: |i32, i32, *const u8|->T) -> T {
+pub fn with_pixels<T>(data: &mut Data, callback: |i32, i32, &[u8]|->T) -> T {
     logi("in with_pixels");
     let oldtarget = get_current_texturetarget(&data.targetdata);
     let (x,y) = oldtarget.texture.dimensions;
-    let saveshader = Shader::new(None, Some(copyshader::NOALPHA_FRAGMENT_SHADER));
-    saveshader.map(|shader| {
-        let newtarget = TextureTarget::new(x, y, gltexture::RGB);
-        let matrix = [1f32,  0f32,  0f32,  0f32,
-                      0f32, -1f32,  0f32,  0f32,
-                      0f32,  0f32,  1f32,  0f32,
-                      0f32,  1f32,  0f32,  1f32,];
-        perform_copy(newtarget.framebuffer, &oldtarget.texture, &shader, matrix.as_slice());
-        gl2::finish();
-        let pixels = gl2::read_pixels(0, 0, x, y, gl2::RGBA, gl2::UNSIGNED_BYTE);
-        check_gl_error("read_pixels");
-        logi("gl2::read_pixels()");
-        let pixptr = pixels.as_ptr();
-        logi!("calling callback");
-        let result = callback(x, y, pixptr);
-        logi!("returning pixels: {}", pixptr);
-        result
-    }).unwrap()
+    gl2::bind_framebuffer(gl2::FRAMEBUFFER, oldtarget.framebuffer);
+    let pixels = gl2::read_pixels(0, 0, x, y, gl2::RGBA, gl2::UNSIGNED_BYTE);
+    check_gl_error("read_pixels");
+    // The only purpose of the shader copy is to flip the image from gl coords to bitmap coords.
+    // it might be better to finagle the output copy matrix so the rest of the targets
+    // can stay in bitmap coords?  Or have a dedicated target for this.
+    let saveshader = Shader::new(None, Some(copyshader::NOALPHA_FRAGMENT_SHADER)).unwrap();
+    let newtarget = TextureTarget::new(x, y, gltexture::RGB);
+    let matrix = [1f32,  0f32,  0f32,  0f32,
+                  0f32, -1f32,  0f32,  0f32,
+                  0f32,  0f32,  1f32,  0f32,
+                  0f32,  1f32,  0f32,  1f32,];
+    perform_copy(newtarget.framebuffer, &oldtarget.texture, &shader, matrix.as_slice());
+    gl2::finish();
+    let pixels = gl2::read_pixels(0, 0, x, y, gl2::RGBA, gl2::UNSIGNED_BYTE);
+    check_gl_error("read_pixels");
+    logi("gl2::read_pixels()");
+    result
 }
 
 pub fn compile_copy_shader(data: &mut Data, vert: Option<String>, frag: Option<String>) -> Option<DrawObjectIndex<CopyShader>> {
@@ -229,8 +225,7 @@ pub fn draw_queued_points(data: &mut Data, handler: &mut MotionEventConsumer, ma
             gl2::blend_func(gl2::ONE, gl2::ONE_MINUS_SRC_ALPHA);
             let (target, source) = get_texturetargets(&data.targetdata);
 
-            let safe_matrix: &matrix::Matrix = unsafe { mem::transmute(matrix) };
-            let safe_matrix = safe_matrix.as_slice();
+            let matrix = matrix.as_slice();
             let drawvecs = data.points.as_mut_slice();
             let color = [1f32, 1f32, 0f32]; // TODO: brush color selection
             let back_buffer = &source.texture;
@@ -245,12 +240,12 @@ pub fn draw_queued_points(data: &mut Data, handler: &mut MotionEventConsumer, ma
                 pointshader: point_shader,
                 target: target,
             };
-            draw_layer(baselayer, safe_matrix, color, brush, back_buffer, drawvecs[0].as_slice());
+            draw_layer(baselayer, matrix, color, brush, back_buffer, drawvecs[0].as_slice());
 
             for layer in data.events.layers.iter() {
                 let completed = layer.complete(copy_shader, point_shader);
                 let points = drawvecs[layer.pointidx as uint].as_slice();
-                draw_layer(completed, safe_matrix, color, brush, back_buffer, points);
+                draw_layer(completed, matrix, color, brush, back_buffer, points);
 
                 if should_copy {
                     let copymatrix = matrix::IDENTITY.as_slice();
@@ -266,7 +261,7 @@ pub fn draw_queued_points(data: &mut Data, handler: &mut MotionEventConsumer, ma
     }
 }
 
-pub fn load_texture(data: &mut Data, w: i32, h: i32, pixels: &[u8], format: i32) -> Option<DrawObjectIndex<Texture>> {
+pub fn load_texture(data: &mut Data, w: i32, h: i32, pixels: &[u8], format: AndroidBitmapFormat) -> Option<DrawObjectIndex<Texture>> {
     let formatenum: AndroidBitmapFormat = unsafe { mem::transmute(format) };
     let format = match formatenum {
         ANDROID_BITMAP_FORMAT_RGBA_8888 => Some(gltexture::RGBA),
@@ -324,6 +319,7 @@ pub unsafe fn deinit_gl(data: Box<Data>) {
 fn test_all() {
     let mut boxdata = setup_graphics(0, 0);
     {
+        let data = &mut *boxdata;
         let (mut consumer, producer) = create_motion_event_handler();
         let copyshader = compile_copy_shader(data, None, None).unwrap();
         let pointshader = compile_point_shader(data, None, None).unwrap();
@@ -338,7 +334,7 @@ fn test_all() {
         set_brush_texture(data, brush);
         clear_layers(data);
         add_layer(data, copyshader, pointshader, 0);
-        draw_image(data, 1, 1, brushpixels.as_ptr());
+        draw_image(data, 1, 1, brushpixels);
         
         clear_buffer(data);
         draw_queued_points(data, &mut *consumer, &matrix::IDENTITY);
