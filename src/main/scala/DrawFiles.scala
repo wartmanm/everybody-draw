@@ -113,8 +113,8 @@ def withFilename[T](reader: MaybeRead[T]): ((String, (Unit)=>ManagedResource[Inp
 
   def halfShaderPair(shader: String) = {
     if (shader.contains("gl_Position")) Some((shader, null))
-      else if (shader.contains("gl_FragColor")) Some((null, shader))
-      else None
+    else if (shader.contains("gl_FragColor")) Some((null, shader))
+    else None
   }
 
   def readShader[T](constructor: (String, String)=>GLResult[T])(src: InputStream): GLResult[T] = {

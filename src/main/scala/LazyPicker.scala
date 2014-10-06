@@ -26,9 +26,14 @@ class LazyPicker[T](context: Context, thread: TextureSurfaceThread, content: Seq
     } else {
       holder = view.getTag().asInstanceOf[Holder]
     }
-    holder.nameView.setText(item._1)
+    val nameview = holder.nameView
+    nameview.setText(item._1)
+    val ok = item._2.isNotFailed
+    nameview.setEnabled(ok)
+    view.setEnabled(ok)
     view
   }
+
   def getState(pos: Int, cb: (GLResult[T])=>Any) = {
     lazified(pos)._2.get(cb)
   }
@@ -36,18 +41,22 @@ class LazyPicker[T](context: Context, thread: TextureSurfaceThread, content: Seq
   class LoadedState[T](var loader: (Unit)=>GLResult[T]) {
     def get(cb: (GLResult[T])=>Any) = {
       thread.runHere {
-        val value = loader(())
-        _value = value.right.toOption
-        cb(value)
+        cachedValue match {
+          case None => {
+            val value = loader(())
+            cachedValue = Some(value)
+            cb(value)
+          }
+          case Some(value) => cb(value)
+        }
       }
     }
 
-    private var _value: Option[T] = None
+    private var cachedValue: Option[GLResult[T]] = None
+
+    def isNotFailed = cachedValue match {
+      case None => true
+      case Some(x) => x.isRight
+    }
   }
 }
-
-
-  //abstract sealed class InitState[T]
-  //case class NotLoaded[T](loader: (Unit)=>Option[T]) extends InitState(T)
-  //case class Loaded[T](value: T) extends InitState[T]
-  //case class 

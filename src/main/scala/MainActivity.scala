@@ -244,12 +244,24 @@ class MainActivity extends Activity with TypedActivity with AndroidImplicits {
     }
   }
 
+  def disableEntry[U](picker: NamedPicker[U], pos: Int) = {
+  }
+
   def populatePicker[U, T <: (String, (Unit)=>GLResult[U])](picker: NamedPicker[U], arr: Array[T], cb: (U)=>Unit, thread: TextureSurfaceThread) = {
     val adapter = new LazyPicker(this, thread, arr)
     picker.control.setAdapter(adapter)
     picker.control.setOnItemSelectedListener(new AdapterView.OnItemSelectedListener() {
         override def onItemSelected(parent: AdapterView[_], view: View, pos: Int, id: Long) = {
-          adapter.getState(pos, loadAndSet(cb, _))
+          adapter.getState(pos, (result: GLResult[U]) => result match {
+              case Right(value) => cb(value)
+              case Left(errmsg) => {
+                //adapter.getState(0, (result: GLResult[U]) => cb(result.right.get))
+                MainActivity.this.runOnUiThread(() => {
+                  Toast.makeText(MainActivity.this, "unable to load item!\n" + errmsg, Toast.LENGTH_LONG).show()
+                  picker.control.setSelection(0)
+                })
+              }
+            })
         }
         override def onNothingSelected(parent: AdapterView[_]) = { }
       })
@@ -281,15 +293,6 @@ class MainActivity extends Activity with TypedActivity with AndroidImplicits {
       }
     }
   }
-
-  //TODO: caching, seriously!
-  def loadAndSet[T](setter: (T)=>Unit, value: GLResult[T]) = {
-    value match {
-      case Right(value) => setter(value)
-      case Left(errmsg) => Toast.makeText(this, "unable to load item!\n" + errmsg, Toast.LENGTH_LONG)
-    }
-  }
-    
 
   // TODO: fewer callbacks
   def loadUniBrushItem[T](setter: (T)=>Unit, item: Option[T], picker: NamedPicker[T]) = {
