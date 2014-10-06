@@ -17,22 +17,9 @@
         "path": "jni", 
         "remove_fnptr_opts": true
     }, {
-        "deps": [ "lua::lua" ], 
-        "match": [ "lualib" ], 
-        "path": "lua/lualib", 
-        "root": "../jni/lua"
-    }, {
-        "deps": [ "lua::lua" ], 
+        "deps": [ "lua::raw" ], 
         "match": [ "luajit" ], 
-        "path": "lua/luajit", 
-        "root": "../jni"
-    }, {
-        "deps": [ "lua::lua" ], 
-        "match": [ "lauxlib" ], 
-        "path": "lua/lauxlib", 
-        "root": "../jni"
-    }, {
-        "path": "lua/lua", 
-        "root": "../jni"
+        "path": "luajit", 
+        "root": "../jni/lua"
     }
 ]

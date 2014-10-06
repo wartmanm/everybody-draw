@@ -18,15 +18,11 @@ pub struct LuaScript {
 
 impl LuaScript {
     pub fn new(script: Option<&str>) -> GLResult<LuaScript> {
-        let (ptr, len) = script.map_or((ptr::null(), 0), |x| (x.as_bytes().as_ptr(), x.as_bytes().len()));
-        match unsafe { load_lua_script(ptr, len as i32) } {
-            -1 => Err("something went wrong loading the script!".into_string()),
-            x  => {
-                let script = LuaScript { registry_id: x };
-                logi!("created {}", script);
-                Ok(script)
-            }
-        }
+        //let (ptr, len) = script.map_or((ptr::null(), 0), |x| (x.as_bytes().as_ptr(), x.as_bytes().len()));
+        let registry_id = unsafe { try!(load_lua_script(script)) };
+        let script = LuaScript { registry_id: registry_id };
+        logi!("created {}", script);
+        Ok(script)
     }
 
     pub fn prep(&self) {

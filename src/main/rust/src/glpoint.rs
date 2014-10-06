@@ -1,16 +1,10 @@
-//extern crate core;
 use core::prelude::*;
 use core::mem;
-//use core::clone::Clone;
+use collections::vec::Vec;
+use collections::{SmallIntMap, MutableMap, MutableSeq, Mutable, Map};
+use alloc::boxed::Box;
 
 use std::sync::spsc_queue;
-
-use collections::vec::Vec;
-use collections::SmallIntMap;
-use collections::MutableMap;
-use collections::MutableSeq;
-use collections::Mutable;
-use collections::Map;
 
 use log::logi;
 use motionevent;
@@ -22,8 +16,8 @@ use point::{ShaderPaintPoint, Coordinate, PointEntry, PointConsumer, PointProduc
 use activestate;
 use drawevent::Events;
 use luascript::LuaScript;
+use lua_geom::do_interpolate_lua;
 
-use alloc::boxed::Box;
 
 rolling_average_count!(RollingAverage16, 16)
 
@@ -181,14 +175,8 @@ fn next_point(s: &mut MotionEventConsumer, e: &mut Events) -> Option<(ShaderPain
 fn run_lua_shader(dimensions: (i32, i32), mut data: LuaCallbackType) {
     let (x,y) = dimensions;
     unsafe {
-        doInterpolateLua(x, y, &mut data);
+        do_interpolate_lua(x, y, &mut data as *mut LuaCallbackType as *mut ::libc::c_void);
     }
-}
-
-#[allow(non_snake_case)]
-#[allow(ctypes)]
-extern "C" {
-    pub fn doInterpolateLua(x: i32, y: i32, data: *mut LuaCallbackType);
 }
 
 #[no_mangle]
