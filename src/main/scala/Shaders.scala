@@ -8,6 +8,7 @@ class Texture private (private val nativePtr: Int) extends AnyVal
 class LuaScript private (private val nativePtr: Int) extends AnyVal
 class MotionEventHandler private (private val nativePtr: Int) extends AnyVal
 class MotionEventProducer private (private val nativePtr: Int) extends AnyVal
+class LuaException(msg: String) extends RuntimeException(msg)
 class GLInit private (private val nativePtr: Int) extends AnyVal {
   def toMessage(m: Message) = {
     m.arg1 = nativePtr

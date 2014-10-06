@@ -118,7 +118,7 @@ unsafe fn init_lua() -> GLResult<*mut lua_State> {
         Ok(L)
     } else {
         lua_close(L);
-        Err(format!("ffi init script failed to load: {}", err_to_str(L)))
+        Err(format!("ffi init script failed to load: {}\nThis should never happen!", err_to_str(L)))
     }
 }
 
@@ -161,7 +161,7 @@ pub unsafe fn load_lua_script(script: Option<&str>) -> GLResult<i32> {
 
     // FIXME compile runner once
     if !runstring(L, lua_runner) {
-        let err = Err(format!("lua runner failed to load: {}", err_to_str(L)));
+        let err = Err(format!("lua runner failed to load: {}\n This should never happen!", err_to_str(L)));
         lua_pop(L, 1);
         return err;
     }
@@ -169,7 +169,7 @@ pub unsafe fn load_lua_script(script: Option<&str>) -> GLResult<i32> {
     lua_getglobal(L, cstr!("runmain"));
     if !lua_isfunction(L, -1) {
         lua_pop(L, 2);
-        return Err("runmain not defined :(".into_string());
+        return Err("runmain not defined.\n  This should never happen!".into_string());
     }
     luaJIT_setmode(L, 0, LUAJIT_MODE_ENGINE as i32|LUAJIT_MODE_ON as i32);
 
@@ -207,11 +207,12 @@ unsafe fn interpolate_lua(L: *mut lua_State, x: i32, y: i32, output: *mut c_void
     }
 }
 
-pub unsafe fn do_interpolate_lua(x: i32, y: i32, output: *mut c_void) {
+pub unsafe fn do_interpolate_lua(x: i32, y: i32, output: *mut c_void) -> GLResult<()> {
     let L = STATIC_LUA;
     if let Some(L) = STATIC_LUA {
-        interpolate_lua(L, x, y, output);
+        interpolate_lua(L, x, y, output)
     } else {
         logi!("lua state doesn't exist!");
+        Ok(())
     }
 }

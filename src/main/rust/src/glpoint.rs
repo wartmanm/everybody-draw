@@ -17,6 +17,7 @@ use activestate;
 use drawevent::Events;
 use luascript::LuaScript;
 use lua_geom::do_interpolate_lua;
+use glcommon::GLResult;
 
 
 rolling_average_count!(RollingAverage16, 16)
@@ -81,7 +82,8 @@ fn manhattan_distance(a: Coordinate, b: Coordinate) -> f32 {
     return if x > y { x } else { y };
 }
 
-pub fn run_interpolators(dimensions: (i32, i32), s: &mut MotionEventConsumer, events: & mut Events, interpolator: Option<&LuaScript>, drawvecs: & mut [Vec<ShaderPaintPoint>]) -> bool {
+pub fn run_interpolators(dimensions: (i32, i32), s: &mut MotionEventConsumer, events: & mut Events, interpolator: Option<&LuaScript>, drawvecs: & mut [Vec<ShaderPaintPoint>]) -> (GLResult<()>, bool) {
+    let interp_error =
     match interpolator {
         Some(interpolator) => {
             interpolator.prep();
@@ -89,12 +91,12 @@ pub fn run_interpolators(dimensions: (i32, i32), s: &mut MotionEventConsumer, ev
                 consumer: s,
                 events: events,
                 drawvecs: drawvecs,
-            });
+            })
         },
-        None => { },
+        None => { Ok(()) },
     };
     s.all_pointer_state = s.all_pointer_state.push(s.point_count > 0);
-    s.all_pointer_state == activestate::STOPPING
+    (interp_error, s.all_pointer_state == activestate::STOPPING)
 }
 
 #[no_mangle]
@@ -172,10 +174,10 @@ fn next_point(s: &mut MotionEventConsumer, e: &mut Events) -> Option<(ShaderPain
     }
 }
 
-fn run_lua_shader(dimensions: (i32, i32), mut data: LuaCallbackType) {
+fn run_lua_shader(dimensions: (i32, i32), mut data: LuaCallbackType) -> GLResult<()> {
     let (x,y) = dimensions;
     unsafe {
-        do_interpolate_lua(x, y, &mut data as *mut LuaCallbackType as *mut ::libc::c_void);
+        do_interpolate_lua(x, y, &mut data as *mut LuaCallbackType as *mut ::libc::c_void)
     }
 }
 

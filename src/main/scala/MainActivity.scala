@@ -63,7 +63,7 @@ class MainActivity extends Activity with TypedActivity with AndroidImplicits {
 
   def createTextureThread(handlers: MotionEventHandlerPair)(s: SurfaceTexture, x: Int, y: Int): Unit = {
     Log.i("main", "got surfacetexture");
-    val thread = new TextureSurfaceThread(s, handlers.consumer, onTextureThreadStarted(x,y, handlers.producer));
+    val thread = new TextureSurfaceThread(s, handlers.consumer, onTextureThreadStarted(x,y, handlers.producer), onTextureThreadError);
     thread.start()
     Log.i("main", "started thread");
   }
@@ -369,6 +369,18 @@ class MainActivity extends Activity with TypedActivity with AndroidImplicits {
       Log.i("main", s"got unidentified activity result: ${resultCode}, request code ${requestCode}, data: ${data}")
     }
   }
+
+  def onTextureThreadError(e: Exception) = MainActivity.this.runOnUiThread(() => {
+      val prefix = (
+        e match {
+          case _: LuaException => {
+            controls.interppicker.control.setSelection(0)
+            "An error occurred in the interpolator:\n" 
+          }
+          case _ => "An error occurred:\n" 
+        })
+      Toast.makeText(MainActivity.this, prefix + e.getMessage(), Toast.LENGTH_LONG).show()
+    })
 }
 
 object MainActivity {

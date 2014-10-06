@@ -32,12 +32,6 @@ use eglinit;
 use jni_constants::*;
 
 //type GLInit<'a> = *mut glinit::Data<'a>;
-
-macro_rules! cstr(
-    ($str:expr) => (
-        concat!($str, "\0").as_ptr() as *const ::libc::c_char
-    )
-)
 macro_rules! native_method(
     ($name:expr, $sig:expr, $fn_ptr:expr) => (
         JNINativeMethod {
@@ -81,8 +75,7 @@ unsafe fn glresult_to_either<T>(env: *mut JNIEnv, result: GLResult<DrawObjectInd
     match result {
         Err(msg) => {
             logi!("creating scala.util.Left for message: \"{}\"", msg);
-            let u16msg: Vec<u16> = msg.as_slice().utf16_units().collect();
-            let jmsg = ((**env).NewString)(env, u16msg.as_ptr(), u16msg.len() as i32);
+            let jmsg = str_to_jstring(env, msg.as_slice());
             SCALA_LEFT.construct(env, jmsg)
         },
         Ok(idx) => {
@@ -93,6 +86,11 @@ unsafe fn glresult_to_either<T>(env: *mut JNIEnv, result: GLResult<DrawObjectInd
             result
         }
     }
+}
+
+unsafe fn str_to_jstring(env: *mut JNIEnv, s: &str) -> jstring {
+    let u16msg: Vec<u16> = s.utf16_units().collect();
+    ((**env).NewString)(env, u16msg.as_ptr(), u16msg.len() as i32)
 }
 
 fn get_safe_data<'a>(data: i32) -> &'a mut GLInit<'a> {
@@ -112,7 +110,12 @@ unsafe extern "C" fn finish_gl(env: *mut JNIEnv, thiz: jobject, data: jint) {
 unsafe extern "C" fn native_draw_queued_points(env: *mut JNIEnv, thiz: jobject, data: i32, handler: i32, java_matrix: jfloatArray) {
     let mut matrix: Matrix = mem::uninitialized();
     ((**env).GetFloatArrayRegion)(env, java_matrix, 0, 16, matrix.as_mut_ptr());
-    get_safe_data(data).draw_queued_points(mem::transmute(handler), &matrix);
+    if let Err(msg) = get_safe_data(data).draw_queued_points(mem::transmute(handler), &matrix) {
+        let luaerr_class = ((**env).FindClass)(env, cstr!("com/github/wartman4404/gldraw/LuaException"));
+        let luaerr_init = ((**env).GetMethodID)(env, luaerr_class, cstr!("<init>"), cstr!("(Ljava/lang/string;)V"));
+        let err = ((**env).NewObject)(env, luaerr_class, luaerr_init, str_to_jstring(env, msg.as_slice()));
+        ((**env).Throw)(env, err);
+    }
 }
 
 unsafe extern "C" fn native_update_gl(env: *mut JNIEnv, thiz: jobject, data: i32) {

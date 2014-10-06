@@ -252,7 +252,7 @@ impl<'a> GLInit<'a> {
         data
     }
 
-    pub fn draw_queued_points(&mut self, handler: &mut MotionEventConsumer, matrix: &matrix::Matrix) {
+    pub fn draw_queued_points(&mut self, handler: &mut MotionEventConsumer, matrix: &matrix::Matrix) -> GLResult<()> {
         match (self.paintstate.pointshader, self.paintstate.copyshader, self.paintstate.brush) {
             (Some(point_shader), Some(copy_shader), Some(brush)) => {
                 gl2::enable(gl2::BLEND);
@@ -267,7 +267,7 @@ impl<'a> GLInit<'a> {
                 for drawvec in drawvecs.iter_mut() {
                     drawvec.clear();
                 }
-                let should_copy = run_interpolators(self.dimensions, handler, &mut self.events, self.paintstate.interpolator, drawvecs);
+                let (interp_error, should_copy) = run_interpolators(self.dimensions, handler, &mut self.events, self.paintstate.interpolator, drawvecs);
 
                 let baselayer = CompletedLayer {
                     copyshader: copy_shader,
@@ -290,8 +290,9 @@ impl<'a> GLInit<'a> {
                         logi!("copied brush layer down");
                     }
                 }
+                interp_error
             },
-            _ => { }
+            _ => { Ok(()) }
         }
     }
 
