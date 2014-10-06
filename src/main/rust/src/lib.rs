@@ -16,6 +16,7 @@ pub mod bindgen_builtins;
 pub mod android;
 pub mod jni;
 pub mod jni_constants;
+pub mod lua;
 
 pub mod log;
 
@@ -38,3 +39,4 @@ pub mod glstore;
 pub mod luascript;
 pub mod paintlayer;
 pub mod rustjni;
+pub mod lua_geom;
