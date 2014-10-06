@@ -83,7 +83,7 @@ def withFilename[T](reader: MaybeRead[T]): ((String, (Unit)=>ManagedResource[Inp
   }
 
   def loadBrushes(c: Context, data: GLInit): Array[(String, (Unit)=>GLResult[Texture])] = {
-    val decoder: (InputStream=>GLResult[Texture]) = (is: InputStream) => (decodeBitmap(Bitmap.Config.ALPHA_8)(is).right.map(Texture(data, _)))
+    val decoder: (InputStream=>GLResult[Texture]) = (is: InputStream) => (decodeBitmap(Bitmap.Config.ALPHA_8)(is).right.flatMap(Texture(data, _)))
     loadShader[Texture](c, decoder, "brushes", null, None)
   }
 

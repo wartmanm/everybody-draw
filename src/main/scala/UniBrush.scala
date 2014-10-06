@@ -121,7 +121,7 @@ object UniBrush extends AutoProductFormat {
           files.get(bp)
           .map(new ByteArrayInputStream(_))
           .flatMap(x => DrawFiles.decodeBitmap(Bitmap.Config.ALPHA_8)(x).right.toOption)
-          .map(Texture.apply(data, _))
+          .flatMap(Texture.apply(data, _).right.toOption)
           .getOrElse(return logAbort(s"missing brush file ${bp}"))
         })
     }
