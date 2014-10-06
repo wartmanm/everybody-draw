@@ -1,3 +1,4 @@
+#include <string.h>
 #include <android/log.h>
 
 #include "lua/lua.h"
@@ -88,10 +89,30 @@ void finishLua(lua_State *L) {
   lua_close(L);
 }
 
-int loadLuaScript(const char *script) {
-  if (script == NULL) {
-    script = defaultscript;
+struct sized_script {
+  const char *data;
+  int len;
+  char done;
+};
+
+const char* plainreader(lua_State *L, void *data, size_t *size) {
+  struct sized_script* scriptdata = (struct sized_script*) data;
+  if (scriptdata->done) return NULL;
+  *size = scriptdata->len;
+  scriptdata->done = 1;
+  return scriptdata->data;
+}
+
+int loadLuaScript(const char *scriptchars, int len) {
+  if (scriptchars == NULL) {
+    scriptchars = defaultscript;
+    len = strlen(defaultscript);
   }
+  struct sized_script script = {
+    .data = scriptchars,
+    .len = len,
+    .done = 0,
+  };
 
   if (L == NULL) {
     L = initLua();
@@ -106,13 +127,20 @@ int loadLuaScript(const char *script) {
   int key = ((int) &glstuff_lua_key) + glstuff_lua_key;
   lua_pushlightuserdata(L, (void*)key);
 
-  LOGI("loading script:\n%s", script);
+  LOGI("loading script:\n%s", scriptchars);
 
-  if (1 == luaL_dostring(L, script)) {
+  if (0 != lua_load(L, plainreader, &script, "loadLuaScript() input")) {
     LOGE("script failed to load: %s", lua_tostring(L, -1));
     lua_pop(L, 1);
     return -1;
   }
+
+  if (0 != lua_pcall(L, 0, LUA_MULTRET, 0)) {
+    LOGE("script failed to run: %s", lua_tostring(L, -1));
+    lua_pop(L, 1);
+    return -1;
+  }
+
   LOGI("script loaded :)");
 
   lua_getglobal(L, "main");
