@@ -11,10 +11,11 @@ import json
 import re
 
 platformpath = '{ANDROID_NDK_ROOT}/platforms/{PLATFORM_NAME}/arch-arm'.format(**os.environ)
-includes = [
-  '{}/usr/include'.format(platformpath),
+default_header_path = '{}/usr/include/'.format(platformpath)
+includes = set([
+  default_header_path,
   '{ANDROID_NDK_ROOT}/toolchains/arm-linux-androideabi-4.6/prebuilt/linux-x86_64/lib/gcc/arm-linux-androideabi/4.6/include/'.format(**os.environ)
-]
+])
 
 prelude_lints = [
     'unused_attribute',
@@ -37,6 +38,7 @@ class Binding:
     self.deps.append(builtins_name)
     self.remove_fnptr_opts = kwargs.get('remove_fnptr_opts') or False
     self.preexisting = False
+    self.root = kwargs.get('root') or default_header_path
   def is_preexisting(self):
     return self.preexisting
 
@@ -68,10 +70,13 @@ def gen_bindings(binding):
   matches = binding.match
   matches = [['-match', x] for x in matches] if matches else []
   includeargs = [['-I', x] for x in includes]
-  header = '{}/usr/include/{}.h'.format(platformpath, binding.path)
+  header = os.path.join(binding.root, binding.path + '.h')
 
   print('writing bindings for {}'.format(binding.path))
 
+  destdir = os.path.dirname(dest)
+  if not os.path.exists(destdir):
+    os.makedirs(destdir)
   with open(dest, 'w') as outfile:
     append_allow_prelude(outfile)
     for dep in binding.deps:
@@ -124,6 +129,10 @@ def sloppy_delete(path):
 def joinprefix(*args):
   return os.path.join(prefix, *args)
 
+def add_include_roots(bindings):
+  for binding in bindings:
+    includes.add(binding.root)
+
 if __name__ == '__main__':
   parser = argparse.ArgumentParser(description='Generate android bindings using bindgen.')
   parser.add_argument('--prefix', help='prefix for rust source directory', default='.')
@@ -135,6 +144,7 @@ if __name__ == '__main__':
     bindings = [Binding(**x) for x in json.load(bindingfile)]
 
   if args.mode == 'build':
+    add_include_roots(bindings)
     gen_builtins()
     for binding in bindings:
       gen_bindings(binding)
