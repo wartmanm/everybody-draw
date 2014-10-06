@@ -200,7 +200,9 @@ impl<'a> GLInit<'a> {
 
     pub fn set_interpolator(&mut self, interpolator: DrawObjectIndex<LuaScript>) -> () {
         logi("setting interpolator");
-        self.paintstate.interpolator = Some(self.events.use_interpolator(interpolator));
+        let interpolator = self.events.use_interpolator(interpolator);
+        interpolator.prep();
+        self.paintstate.interpolator = Some(interpolator);
     }
 
     pub fn set_brush_texture(&mut self, texture: DrawObjectIndex<Texture>) {

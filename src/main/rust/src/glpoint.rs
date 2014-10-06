@@ -86,7 +86,6 @@ pub fn run_interpolators(dimensions: (i32, i32), s: &mut MotionEventConsumer, ev
     let interp_error =
     match interpolator {
         Some(interpolator) => {
-            interpolator.prep();
             run_lua_shader(dimensions, LuaCallbackType {
                 consumer: s,
                 events: events,
