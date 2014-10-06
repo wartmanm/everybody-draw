@@ -15,6 +15,8 @@ import com.github.wartman4404.gldraw._
 
 import GLResultTypeDef._
 
+import scala.collection.mutable.ArraySeq
+
 case class ShaderSource(
   fragmentshader: Option[String],
   vertexshader: Option[String]
@@ -114,29 +116,80 @@ object UniBrush extends AutoProductFormat {
     }
   }
 
+  def compileShaders[T](data: GLInit, shaders: Option[Array[ShaderSource]], compiler: Shader[T], files: Map[String, Array[Byte]]): GLResult[ArraySeq[T]] = {
+    Right(shaders.getOrElse(Array.empty).map(x => x.compile(data, compiler, files) match {
+        case Left(x) => return Left(x)
+        case Right(x) => x
+      }))
+  }
+
+  def getLayers(data: GLInit, pointshaders: Array[PointShader], copyshaders: Array[CopyShader], layers: Option[Array[LayerSource]]): GLResult[Array[Layer]] = {
+    Right(layers.getOrElse(Array.empty).map(l => {
+        val point = l.pointshader.map(x => pointshaders.lift(x).getOrElse(return Left(s"no point shader numbered ${x}"))).getOrElse(PointShader(data, null, null).right.get)
+        val copy = l.copyshader.map(x => copyshaders.lift(x).getOrElse(return Left(s"no copy shader numbered ${x}"))).getOrElse(CopyShader(data, null, null).right.get)
+        val idx = l.pointsrc.getOrElse(0)
+        Layer(point, copy, idx)
+      }))
+  }
+
+  def flipoption[T,U,V](opt: Option[T], cb: (T)=>Either[U,V]): Either[U,Option[V]] = {
+    opt match {
+      case None => Right(None)
+      case Some(x) => cb(x) match {
+        case Left(y) => Left(y)
+        case Right(z) => Right(Some(z))
+      }
+    }
+  }
+
+
   def compile(data: GLInit, s: UniBrushSource, files: Map[String, Array[Byte]]): GLResult[UniBrush] = {
     Log.i("unibrush", "compiling unibrush");
     val brush = {
-      s.brushpath.map(bp => {
-          files.get(bp)
-          .map(new ByteArrayInputStream(_))
-          .flatMap(x => DrawFiles.decodeBitmap(Bitmap.Config.ALPHA_8)(x).right.toOption)
-          .flatMap(Texture.apply(data, _).right.toOption)
-          .getOrElse(return logAbort(s"missing brush file ${bp}"))
+      flipoption(s.brushpath, (bp: String) => {
+          (files.get(bp)
+          .map(new ByteArrayInputStream(_)) match {
+            case None => Left(s"unable to load bitmap in unibrush: {bp}")
+            case Some(x) => Right(x)
+          }).right
+          .flatMap(x => DrawFiles.decodeBitmap(Bitmap.Config.ALPHA_8)(x)).right
+          .flatMap(Texture.apply(data, _))
         })
+    } match {
+      case Left(x) => return Left(x)
+      case Right(x) => x
     }
-    val pointshaders: Array[PointShader] = s.pointshaders.getOrElse(Array.empty).map(_.compile(data, PointShader, files).right.getOrElse(return logAbort ("pointshader failed to compile")))
-    val copyshaders: Array[CopyShader] = s.animshaders.getOrElse(Array.empty).map(_.compile(data, CopyShader, files).right.getOrElse(return logAbort ("copyshader failed to compile")))
-    val baseanimshader = s.baseanimshader.map(_.compile(data, CopyShader, files).right.getOrElse(return logAbort("base animation shader failed to compile")))
-    val basepointshader = s.basepointshader.map(_.compile(data, PointShader, files).right.getOrElse(return logAbort("base point shader failed to compile")))
-    val interpolator = s.interpolator.map(x => new String(files.get(x).getOrElse(return logAbort (s"missing interpolator file ${x}")))).map(LuaScript(data, _).right.getOrElse(return logAbort("interpolator failed to compile")))
-    val layers = s.layers.getOrElse(Array.empty).map(l => {
-        val point = l.pointshader.map(x => pointshaders.lift(x).getOrElse(return logAbort(s"no point shader numbered ${x}"))).getOrElse(PointShader(data, null, null).right.get)
-        val copy = l.copyshader.map(x => copyshaders.lift(x).getOrElse(return logAbort(s"no copy shader numbered ${x}"))).getOrElse(CopyShader(data, null, null).right.get)
-        val idx = l.pointsrc.getOrElse(0)
-        Layer(point, copy, idx)
+    val pointshaderopt: Either[String, ArraySeq[PointShader]] = compileShaders(data, s.pointshaders, PointShader, files)
+    val pointshaders = pointshaderopt match {
+      case Left(x) => return Left(x)
+      case Right(x) => x.toArray
+    }
+    val copyshaders = compileShaders(data, s.animshaders, CopyShader, files) match {
+      case Left(x) => return Left(x)
+      case Right(x) => x.toArray
+    }
+    val baseanimshader = flipoption(s.baseanimshader, (x: ShaderSource) => x.compile(data, CopyShader, files)) match {
+      case Left(x) => return Left(x)
+      case Right(x) => x
+    }
+    val basepointshader = flipoption(s.basepointshader, (x: ShaderSource) => x.compile(data, PointShader, files)) match {
+      case Left(x) => return Left(x)
+      case Right(x) => x
+    }
+    val interpolator = flipoption(s.interpolator, (path: String) => {
+        files.get(path) match {
+          case None => Left(s"missing interpolator file ${path}")
+          case Some(x) => LuaScript(data, new String(x))
+        }
       })
-
+    match {
+      case Left(x) => return Left(x)
+      case Right(x) => x
+    }
+    val layers = getLayers(data, pointshaders, copyshaders, s.layers) match {
+      case Left(x) => return Left(x)
+      case Right(x) => x
+    }
     Log.i("unibrush", s"have interpolator: ${interpolator.nonEmpty}");
     Log.i("unibrush", s"have pointshader: ${basepointshader.nonEmpty}");
     Log.i("unibrush", s"have animshader: ${baseanimshader.nonEmpty}");
