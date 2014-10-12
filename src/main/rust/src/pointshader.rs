@@ -3,7 +3,7 @@ use core::{mem, fmt};
 use core::fmt::Show;
 use collections::str::StrAllocating;
 
-use log::{logi, loge};
+use log::{logi};
 
 use opengles::gl2;
 use opengles::gl2::{GLint, GLuint};
@@ -13,43 +13,8 @@ use glcommon::{check_gl_error, get_shader_handle, get_uniform_handle_option, Sha
 use point::ShaderPaintPoint;
 use gltexture::Texture;
 
-static DEFAULT_VERTEX_SHADER: &'static str =
-   "precision lowp float;
-    uniform mat4 textureMatrix;
-    attribute float vSize;
-    attribute float vTime;
-    attribute vec4 vPosition;
-    attribute float vPointer;
-    attribute float vSpeed;
-    attribute float vDistance;
-    uniform vec3 vColor;
-    varying float time;
-    varying float size;
-    varying vec3 color;
-    varying vec2 position;
-  
-    void main() {
-        time = vTime;
-        float tmpSize = vSize * 1500.0;
-        size = clamp(tmpSize, 7.5, 60.0);
-        color = vec3(1.0, 1.0, 0.0);
-        gl_PointSize = 30.0;
-        gl_Position = (textureMatrix * vPosition);
-        position = vec2(textureMatrix * vPosition);
-    }";
-static DEFAULT_FRAGMENT_SHADER: &'static str =
-   "precision lowp float;
-    varying float time;
-    varying float size;
-    varying vec3 color;
-    uniform sampler2D texture;
-    uniform sampler2D backbuffer;
-    void main() {
-        float ctime = clamp(time, 0.0, 1.0);
-        float csize = clamp(size, 0.0, 1.0);
-        float alpha = texture2D(texture, gl_PointCoord).a;
-        gl_FragColor = vec4(color * alpha, alpha);
-    }";
+static DEFAULT_VERTEX_SHADER: &'static str = include_str!("../includes/shaders/default_point.vsh");
+static DEFAULT_FRAGMENT_SHADER: &'static str = include_str!("../includes/shaders/default_point.fsh");
 
 pub struct PointShader {
     program: GLuint,

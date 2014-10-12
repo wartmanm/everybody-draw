@@ -1,16 +1,14 @@
-#![allow(unused_imports, unused_variable, dead_code)]
+#![allow(unused_variable)]
 use core::prelude::*;
 use core::{ptr, mem};
 use core::ptr::RawMutPtr;
 use core::raw;
 use alloc::boxed::Box;
-use libc;
 use libc::{c_void, c_char};
 use collections::string::String;
 use collections::vec::Vec;
 
-use jni;
-use jni::{jobject, jclass, jfieldID, jmethodID, JNIEnv, jint, jfloat, jstring, jfloatArray, JNINativeMethod, JavaVM, jboolean, jchar, jsize};
+use jni::{jobject, jclass, jfieldID, jmethodID, JNIEnv, jint, jstring, jfloatArray, JNINativeMethod, JavaVM};
 use android::input::AInputEvent;
 use android::bitmap::{AndroidBitmap_getInfo, AndroidBitmap_lockPixels, AndroidBitmap_unlockPixels, AndroidBitmapInfo};
 use android::bitmap::{ANDROID_BITMAP_FORMAT_RGBA_8888, ANDROID_BITMAP_FORMAT_A_8};
@@ -21,23 +19,18 @@ use glcommon::GLResult;
 use log::logi;
 
 use glstore::DrawObjectIndex;
-use copyshader::CopyShader;
-use pointshader::PointShader;
 use glinit::GLInit;
 use glpoint;
-use glpoint::{MotionEventConsumer, MotionEventProducer};
-use motionevent;
 use matrix::Matrix;
 use eglinit;
 use jni_constants::*;
 
-//type GLInit<'a> = *mut glinit::Data<'a>;
 macro_rules! native_method(
     ($name:expr, $sig:expr, $fn_ptr:expr) => (
         JNINativeMethod {
             name: cstr!($name),
             signature: cstr!($sig),
-            fnPtr: $fn_ptr as *mut libc::c_void,
+            fnPtr: $fn_ptr as *mut c_void,
         }
     )
 )
@@ -230,7 +223,7 @@ struct AndroidBitmap {
 }
 impl AndroidBitmap {
     unsafe fn from_jobject(env: *mut JNIEnv, bitmap: jobject) -> AndroidBitmap {
-        let mut pixels: *mut libc::c_void = ptr::null_mut();
+        let mut pixels: *mut c_void = ptr::null_mut();
         AndroidBitmap_lockPixels(env, bitmap, &mut pixels);
         logi!("locked pixels in {}", pixels);
         let mut result = AndroidBitmap { env: env, obj: bitmap, pixels: pixels as *mut u8, info: mem::zeroed() };
@@ -276,7 +269,7 @@ unsafe extern "C" fn jni_egl_finish(env: *mut JNIEnv, thiz: jobject) {
 unsafe extern "C" fn jni_egl_init(env: *mut JNIEnv, thiz: jobject, surface: jobject) {
     let window = ANativeWindow_fromSurface(env, surface);
     logi!("got ANAtiveWindow: 0x{:x}", window as u32);
-    eglinit::egl_init(window as *mut libc::c_void);
+    eglinit::egl_init(window as *mut c_void);
     ANativeWindow_release(window);
 }
 
@@ -304,10 +297,10 @@ unsafe fn register_classmethods(env: *mut JNIEnv, classname: *const i8, methods:
 
 #[allow(non_snake_case)]
 #[no_mangle]
-pub unsafe extern "C" fn JNI_OnLoad(vm: *mut JavaVM, reserved: *mut libc::c_void) -> jint {
+pub unsafe extern "C" fn JNI_OnLoad(vm: *mut JavaVM, reserved: *mut c_void) -> jint {
     logi!("jni onload!!");
-    let mut env: *mut libc::c_void = ptr::null_mut();
-    if ((**vm).GetEnv)(vm, (&mut env as *mut *mut libc::c_void), JNI_VERSION_1_6) != JNI_OK {
+    let mut env: *mut c_void = ptr::null_mut();
+    if ((**vm).GetEnv)(vm, (&mut env as *mut *mut c_void), JNI_VERSION_1_6) != JNI_OK {
         return -1;
     }
     let env = env as *mut JNIEnv;
@@ -382,4 +375,18 @@ pub unsafe extern "C" fn JNI_OnLoad(vm: *mut JavaVM, reserved: *mut libc::c_void
     logi!("registered motionevent methods!");
     logi!("finished jni_onload");
     JNI_VERSION_1_2
+}
+
+#[allow(non_snake_case)]
+#[no_mangle]
+pub unsafe extern "C" fn JNI_OnUnload(vm: *mut JavaVM, reserved: *mut c_void) {
+    logi!("jni onload!!");
+    let mut env: *mut c_void = ptr::null_mut();
+    if ((**vm).GetEnv)(vm, (&mut env as *mut *mut c_void), JNI_VERSION_1_6) != JNI_OK {
+        return;
+    }
+    let env = env as *mut JNIEnv;
+    SCALA_LEFT.destroy(env);
+    SCALA_RIGHT.destroy(env);
+    BOXED_JINT.destroy(env);
 }

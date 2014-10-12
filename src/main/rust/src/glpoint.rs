@@ -15,7 +15,6 @@ use point;
 use point::{ShaderPaintPoint, Coordinate, PointEntry, PointConsumer, PointProducer};
 use activestate;
 use drawevent::Events;
-use luascript::LuaScript;
 use lua_geom::do_interpolate_lua;
 use glcommon::GLResult;
 
@@ -82,18 +81,12 @@ fn manhattan_distance(a: Coordinate, b: Coordinate) -> f32 {
     return if x > y { x } else { y };
 }
 
-pub fn run_interpolators(dimensions: (i32, i32), s: &mut MotionEventConsumer, events: & mut Events, interpolator: Option<&LuaScript>, drawvecs: & mut [Vec<ShaderPaintPoint>]) -> (GLResult<()>, bool) {
-    let interp_error =
-    match interpolator {
-        Some(interpolator) => {
-            run_lua_shader(dimensions, LuaCallbackType {
-                consumer: s,
-                events: events,
-                drawvecs: drawvecs,
-            })
-        },
-        None => { Ok(()) },
-    };
+pub fn run_interpolator(dimensions: (i32, i32), s: &mut MotionEventConsumer, events: & mut Events, drawvecs: & mut [Vec<ShaderPaintPoint>]) -> (GLResult<()>, bool) {
+    let interp_error = run_lua_shader(dimensions, LuaCallbackType {
+        consumer: s,
+        events: events,
+        drawvecs: drawvecs,
+    });
     s.all_pointer_state = s.all_pointer_state.push(s.point_count > 0);
     (interp_error, s.all_pointer_state == activestate::STOPPING)
 }

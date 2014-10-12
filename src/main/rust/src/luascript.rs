@@ -1,16 +1,9 @@
 use core::prelude::*;
-use core::{ptr, fmt};
+use core::fmt;
 use core::fmt::Show;
-use collections::str::StrAllocating;
 use log::logi;
 use glcommon::GLResult;
 use lua_geom::{load_lua_script, unload_lua_script, use_lua_script};
-
-//extern "C" {
-    //fn loadLuaScript(script: *const u8, len: i32) -> i32;
-    //fn unloadLuaScript(key: i32) -> ();
-    //fn useLuaScript(key: i32) -> ();
-//}
 
 pub struct LuaScript {
     registry_id: i32,

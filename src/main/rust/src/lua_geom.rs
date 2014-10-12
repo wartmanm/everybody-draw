@@ -1,8 +1,11 @@
+#![allow(non_snake_case)]
 use core::prelude::*;
 use core::{mem, ptr, raw};
 use collections::str::StrAllocating;
 use collections::string::String;
-use libc::{c_char, c_void, size_t};
+use libc::{c_char, c_void, size_t, c_int};
+
+use android::log::{ANDROID_LOG_INFO, __android_log_write};
 
 use lua::lib::raw::*;
 use lua::aux::raw::*;
@@ -11,64 +14,23 @@ use luajit::*;
 use luajit_constants::*;
 
 use glcommon::GLResult;
-use log::{logi,loge};
+use log::logi;
 
 static mut gldraw_lua_key: i32 = 0;
-static lua_ffi_script: &'static str = "
-ffi = require(\"ffi\")
-ffi.cdef[[
-  struct ShaderPaintPoint {
-    float x;
-    float y;
-    float time;
-    float size;
-    float speed;
-    float distance;
-    float counter;
-  };
+static LUA_FFI_SCRIPT: &'static str = include_str!("../includes/lua/ffi_loader.lua");
+static LUA_RUNNER: &'static str = include_str!("../includes/lua/lua_runner.lua");
+static DEFAULT_SCRIPT: &'static str = include_str!("../includes/lua/default_interpolator.lua");
 
-  void pushrustvec(void *output, int queue, struct ShaderPaintPoint *point);
-  char next_point_from_lua(void *output, struct ShaderPaintPoint *points);
-  void loglua(const char *message);
-
-]]
-
-pushpoint=ffi.C.pushrustvec
-loglua=ffi.C.loglua
-ShaderPaintPoint=ffi.typeof(\"struct ShaderPaintPoint\")";
-
-static lua_runner: &'static str = "
-local _main = main
-local _onframe = onframe
-if type(main) ~= \"function\" then
-  loglua(\"main not defined for runmain()!!\")
-  return
-end
-
-function runmain(x, y, output)
-  if type(_onframe) == \"function\" then
-    onframe(x, y, output)
-  end
-  if type(_main) ~= \"function\" then
-    loglua(\"main doesn't exist!!\")
-    return
-  end
-  local pointpair = ffi.new(\"struct ShaderPaintPoint[2]\")
-  while ffi.C.next_point_from_lua(output, pointpair) ~= 0 do
-    _main(pointpair[0], pointpair[1], x, y, output)
-  end
-end";
-
-static default_script: &'static str = "
-function main(a, b, x, y, points)
-  pushpoint(points, 0, a)
-  pushpoint(points, 0, b)
-end";
+#[no_mangle]
+pub unsafe extern "C" fn loglua(message: *const c_char) {
+    __android_log_write(ANDROID_LOG_INFO as c_int, cstr!("luascript"), message);
+}
 
 static mut STATIC_LUA: Option<*mut lua_State> = None;
 
 type ReaderState<'a> = (&'a str, bool);
 
+#[allow(unused)]
 extern "C" fn stringreader(L: *mut lua_State, data: *mut c_void, size: *mut size_t) -> *const c_char {
     unsafe {
         let state: &mut ReaderState = mem::transmute(data);
@@ -113,7 +75,7 @@ unsafe fn init_lua() -> GLResult<*mut lua_State> {
 
     luaJIT_setmode(L, 0, LUAJIT_MODE_ENGINE as i32|LUAJIT_MODE_ON as i32);
 
-    if runstring(L, lua_ffi_script) {
+    if runstring(L, LUA_FFI_SCRIPT) {
         logi!("ffi init script loaded");
         Ok(L)
     } else {
@@ -144,7 +106,7 @@ pub unsafe fn load_lua_script(script: Option<&str>) -> GLResult<i32> {
     let key = (&gldraw_lua_key) as *const i32 as i32 + gldraw_lua_key;
     lua_pushlightuserdata(L, key as *mut c_void);
 
-    let script = script.unwrap_or(default_script);
+    let script = script.unwrap_or(DEFAULT_SCRIPT);
     if !runstring(L, script) {
         let err = Err(format!("script failed to load: {}", err_to_str(L)));
         lua_pop(L, 1);
@@ -160,7 +122,7 @@ pub unsafe fn load_lua_script(script: Option<&str>) -> GLResult<i32> {
     lua_pop(L, 1);
 
     // FIXME compile runner once
-    if !runstring(L, lua_runner) {
+    if !runstring(L, LUA_RUNNER) {
         let err = Err(format!("lua runner failed to load: {}\n This should never happen!", err_to_str(L)));
         lua_pop(L, 1);
         return err;
@@ -208,7 +170,6 @@ unsafe fn interpolate_lua(L: *mut lua_State, x: i32, y: i32, output: *mut c_void
 }
 
 pub unsafe fn do_interpolate_lua(x: i32, y: i32, output: *mut c_void) -> GLResult<()> {
-    let L = STATIC_LUA;
     if let Some(L) = STATIC_LUA {
         interpolate_lua(L, x, y, output)
     } else {

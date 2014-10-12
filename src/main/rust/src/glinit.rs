@@ -12,11 +12,10 @@ use opengles::gl2;
 use opengles::gl2::{GLuint, GLenum, GLubyte};
 
 use glcommon::{Shader, check_gl_error, GLResult};
-use glpoint::{MotionEventConsumer, run_interpolators, create_motion_event_handler, destroy_motion_event_handler};
+use glpoint::{MotionEventConsumer, run_interpolator, create_motion_event_handler, destroy_motion_event_handler};
 use point::ShaderPaintPoint;
 use pointshader::PointShader;
 use paintlayer::{TextureTarget, CompletedLayer};
-use copyshader;
 use copyshader::*;
 use gltexture;
 use gltexture::Texture;
@@ -153,7 +152,7 @@ impl<'a> GLInit<'a> {
         // The only purpose of the shader copy is to flip the image from gl coords to bitmap coords.
         // it might be better to finagle the output copy matrix so the rest of the targets
         // can stay in bitmap coords?  Or have a dedicated target for this.
-        let saveshader = Shader::new(None, Some(copyshader::NOALPHA_FRAGMENT_SHADER)).unwrap();
+        let saveshader = Shader::new(None, Some(include_str!("../includes/shaders/noalpha_copy.fsh"))).unwrap();
         let newtarget = TextureTarget::new(x, y, gltexture::RGB);
         let matrix = [1f32,  0f32,  0f32,  0f32,
                       0f32, -1f32,  0f32,  0f32,
@@ -269,7 +268,12 @@ impl<'a> GLInit<'a> {
                 for drawvec in drawvecs.iter_mut() {
                     drawvec.clear();
                 }
-                let (interp_error, should_copy) = run_interpolators(self.dimensions, handler, &mut self.events, self.paintstate.interpolator, drawvecs);
+                let (interp_error, should_copy) =
+                if self.paintstate.interpolator.is_some() {
+                    run_interpolator(self.dimensions, handler, &mut self.events, drawvecs)
+                } else {
+                    (Ok(()), false)
+                };
 
                 let baselayer = CompletedLayer {
                     copyshader: copy_shader,
@@ -348,7 +352,7 @@ impl<'a> GLInit<'a> {
     }
 }
 
-#[allow(dead_code)]
+#[allow(dead_code, unused_must_use)]
 fn test_all() {
     {
         let mut data = GLInit::setup_graphics(0, 0);
@@ -369,7 +373,11 @@ fn test_all() {
         data.draw_image(1, 1, brushpixels);
         
         data.clear_buffer();
-        data.draw_queued_points(&mut *consumer, &matrix::IDENTITY);
+        let result = data.draw_queued_points(&mut *consumer, &matrix::IDENTITY);
+        match result {
+            Err(err) => logi!("error drawing points: {}", err),
+            Ok(_)    => logi!("drew points successfully)"),
+        };
         data.render_frame();
         unsafe {
             destroy_motion_event_handler(consumer, producer);
