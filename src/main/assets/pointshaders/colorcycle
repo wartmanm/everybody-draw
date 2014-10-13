@@ -4,7 +4,7 @@ attribute float vSize;
 attribute float vTime;
 attribute vec4 vPosition;
 attribute float vPointer;
-attribute float vSpeed;
+attribute vec2 vSpeed;
 attribute float vDistance;
 uniform vec3 vColor;
 varying float time;

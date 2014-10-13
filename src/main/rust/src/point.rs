@@ -1,7 +1,8 @@
 // TODO: more meaningful names
 use std::sync::spsc_queue;
+use core::ops::{Add, Div, Sub};
 
-#[deriving(Clone, Show, PartialEq)]
+#[deriving(Clone, Show, PartialEq, Zero)]
 #[repr(C)]
 pub struct Coordinate {
     pub x: f32,
@@ -26,7 +27,7 @@ pub struct ShaderPaintPoint {
     pub pos: Coordinate,
     pub time: f32,
     pub size: f32,
-    pub speed: f32,
+    pub speed: Coordinate,
     pub distance: f32,
     pub counter: f32, // could become a uniform? only floating-point allowed for attribs
 }
@@ -56,3 +57,22 @@ pub struct PointEntry {
 
 pub type PointConsumer = spsc_queue::Consumer<PointEntry>;
 pub type PointProducer = spsc_queue::Producer<PointEntry>;
+
+impl Add<Coordinate, Coordinate> for Coordinate {
+    #[inline(always)]
+    fn add(&self, rhs: &Coordinate) -> Coordinate {
+        Coordinate { x: self.x + rhs.x, y: self.y + rhs.y }
+    }
+}
+impl Sub<Coordinate, Coordinate> for Coordinate {
+    #[inline(always)]
+    fn sub(&self, rhs: &Coordinate) -> Coordinate {
+        Coordinate { x: self.x - rhs.x, y: self.y - rhs.y }
+    }
+}
+impl Div<f32, Coordinate> for Coordinate {
+    #[inline(always)]
+    fn div(&self, rhs: &f32) -> Coordinate {
+        Coordinate { x: self.x / *rhs, y: self.y / *rhs }
+    }
+}

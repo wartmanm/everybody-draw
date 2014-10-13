@@ -25,7 +25,7 @@ rolling_average_count!(RollingAverage16, 16)
 struct PointStorage {
     info: Option<ShaderPaintPoint>,
     sizeavg: RollingAverage16<f32>,
-    speedavg: RollingAverage16<f32>,
+    speedavg: RollingAverage16<Coordinate>,
 }
 
 #[allow(ctypes)]
@@ -125,7 +125,7 @@ fn next_point(s: &mut MotionEventConsumer, e: &mut Events) -> Option<(ShaderPain
                     (Some(op), point::Point(np)) => {
                         let dist = manhattan_distance(op.pos, np.pos);
                         let avgsize = oldpoint.sizeavg.push(np.size);
-                        let avgspeed = oldpoint.speedavg.push(dist);
+                        let avgspeed = oldpoint.speedavg.push(op.pos - np.pos);
                         let npdata = ShaderPaintPoint {
                             pos: np.pos,
                             time: np.time,
@@ -152,7 +152,7 @@ fn next_point(s: &mut MotionEventConsumer, e: &mut Events) -> Option<(ShaderPain
                             time: p.time,
                             size: p.size,
                             distance: 0f32,
-                            speed: 0f32,
+                            speed: Coordinate { x: 0f32, y: 0f32 },
                             counter: old_counter as f32,
                         };
                         oldpoint.info = Some(npdata);
@@ -177,3 +177,34 @@ fn run_lua_shader(dimensions: (i32, i32), mut data: LuaCallbackType) -> GLResult
 pub unsafe extern "C" fn pushrustvec(data: &mut LuaCallbackType, queue: i32, point: *const ShaderPaintPoint) {
     data.drawvecs[queue as uint].push(*point);
 }
+
+#[no_mangle]
+pub unsafe extern "C" fn lua_pushline(data: &mut LuaCallbackType, queue: i32, a: *const ShaderPaintPoint, b: *const ShaderPaintPoint) {
+    let drawvec = &mut data.drawvecs[queue as uint];
+    let distx = if (*a).pos.x > (*b).pos.x { (*a).pos.x - (*b).pos.x } else { (*b).pos.x - (*a).pos.x };
+    let disty = if (*a).pos.y > (*b).pos.y { (*a).pos.y - (*b).pos.y } else { (*b).pos.y - (*a).pos.y };
+    let count = if distx > disty { distx } else { disty } as i32;
+    let timescale = 10f32;
+    let stepx = ((*b).pos.x - (*a).pos.x) / count as f32;
+    let stepy = ((*b).pos.y - (*a).pos.y) / count as f32;
+    let steptime = ((*b).time - (*a).time) / (count as f32 * timescale);
+    let stepsize = ((*b).size - (*a).size) / count as f32;
+    let stepspeedx = ((*b).speed.x - (*a).speed.x) / count as f32;
+    let stepspeedy = ((*b).speed.y - (*a).speed.y) / count as f32;
+    let stepdistance = ((*b).distance - (*a).distance) / count as f32;
+    let mut addpoint = *a;
+    addpoint.time = (addpoint.time / timescale) % 1f32;
+    for _ in range(0, count) {
+        drawvec.push(addpoint);
+        addpoint.pos.x += stepx;
+        addpoint.pos.y += stepy;
+        addpoint.time += steptime;
+        addpoint.time = if addpoint.time > 1f32 { addpoint.time - 1f32 } else { addpoint.time };
+        addpoint.size += stepsize;
+        addpoint.speed.x += stepspeedx;
+        addpoint.speed.y += stepspeedy;
+        addpoint.distance += stepdistance;
+    }
+}
+
+

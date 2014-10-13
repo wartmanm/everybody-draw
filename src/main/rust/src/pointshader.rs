@@ -94,7 +94,7 @@ impl PointShader {
         });
 
         self.speed_handle.map(|sh| {
-            glattrib_f32!(sh, 1, points, speed);
+            glattrib_f32!(sh, 2, points, speed);
         });
 
         self.distance_handle.map(|dh| {

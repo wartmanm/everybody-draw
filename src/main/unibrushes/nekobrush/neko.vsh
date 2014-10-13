@@ -4,13 +4,13 @@ attribute float vSize;
 attribute float vTime;
 attribute vec4 vPosition;
 attribute float vPointer;
-attribute float vSpeed;
 attribute float vDistance;
+attribute vec2 vSpeed;
 uniform vec3 vColor;
 varying vec2 texcoord;
 
 void main() {
-  texcoord = vec2(vSize, vSpeed);
+  texcoord = vSpeed;
   gl_PointSize = 64.0;
   gl_Position = (textureMatrix * vPosition);
 }

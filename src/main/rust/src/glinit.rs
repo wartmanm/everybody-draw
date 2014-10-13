@@ -371,6 +371,8 @@ fn test_all() {
         data.clear_layers();
         data.add_layer(copyshader, pointshader, 0);
         data.draw_image(1, 1, brushpixels);
+        //let point = ShaderPaintPoint { pos: ::point::Coordinate { x: 0f32, y: 0f32 }, time: 0f32, size: 0f32, speed: ::point::Coordinate { x: 0f32, y: 0f32 }, distance: 0f32, counter: 0f32 };
+        //data.points[0].push(point);
         
         data.clear_buffer();
         let result = data.draw_queued_points(&mut *consumer, &matrix::IDENTITY);
