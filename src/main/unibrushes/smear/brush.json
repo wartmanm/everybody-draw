@@ -1,0 +1,6 @@
+{
+  "basepointshader": {
+    "fragmentshader": "smear.fsh",
+    "vertexshader": "smear.vsh"
+  }
+}
