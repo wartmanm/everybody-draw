@@ -12,7 +12,7 @@ ffi.cdef[[
   };
 
   void pushrustvec(void *output, int queue, struct ShaderPaintPoint *point);
-  char next_point_from_lua(void *output, struct ShaderPaintPoint *points);
+  short next_point_from_lua(void *output, struct ShaderPaintPoint *points);
   void loglua(const char *message);
   void lua_pushline(void *output, int queue, struct ShaderPaintPoint *pointa, struct ShaderPaintPoint *pointb);
 ]]

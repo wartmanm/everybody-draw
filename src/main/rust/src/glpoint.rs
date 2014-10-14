@@ -17,6 +17,7 @@ use activestate;
 use drawevent::Events;
 use lua_geom::do_interpolate_lua;
 use glcommon::GLResult;
+//use lua_pointer_state::LuaPointerState;
 
 
 rolling_average_count!(RollingAverage16, 16)
@@ -46,6 +47,17 @@ pub struct LuaCallbackType<'a, 'b, 'c, 'd: 'b> {
     consumer: &'a mut MotionEventConsumer,
     events: &'b mut Events<'d>,
     drawvecs: &'c mut [Vec<ShaderPaintPoint>],
+}
+
+// there is afaict no official representation of rust's tagged-union enums
+// plus, i'm not certain how well luajit deals with unions
+pub mod lua_pointer_state {
+    #[repr(C)]
+    pub struct LuaPointerState(u8);
+        pub static MOVE: LuaPointerState = LuaPointerState(0u8);
+        pub static DONE: LuaPointerState = LuaPointerState(1u8);
+        pub static DOWN: LuaPointerState = LuaPointerState(2u8);
+        pub static UP: LuaPointerState = LuaPointerState(3u8);
 }
 
 pub fn create_motion_event_handler() -> (Box<MotionEventConsumer>, Box<MotionEventProducer>) {
@@ -92,19 +104,21 @@ pub fn run_interpolator(dimensions: (i32, i32), s: &mut MotionEventConsumer, eve
 }
 
 #[no_mangle]
-pub extern "C" fn next_point_from_lua(data: &mut LuaCallbackType, points: &mut (ShaderPaintPoint, ShaderPaintPoint)) -> bool {
-    match next_point(data.consumer, data.events) {
-        Some(newpoints) => {
+pub extern "C" fn next_point_from_lua(data: &mut LuaCallbackType, points: &mut (ShaderPaintPoint, ShaderPaintPoint)) -> u16 {
+    let (state, pointer) = match next_point(data.consumer, data.events) {
+        Some((newpoints, state, pointer)) => {
             *points = newpoints;
-            true
+            (state, pointer)
         },
         None => {
-            false
+            (lua_pointer_state::DONE, 0u8)
         },
-    }
+    };
+    let state: u8 = unsafe { mem::transmute(state) };
+    ((state as u16) << 8) | (pointer as u16)
 }
 
-fn next_point(s: &mut MotionEventConsumer, e: &mut Events) -> Option<(ShaderPaintPoint, ShaderPaintPoint)> {
+fn next_point(s: &mut MotionEventConsumer, e: &mut Events) -> Option<((ShaderPaintPoint, ShaderPaintPoint), lua_pointer_state::LuaPointerState, u8)> {
     let ref mut queue = s.consumer;
     let ref mut current_points = s.current_points;
     loop {
@@ -135,13 +149,16 @@ fn next_point(s: &mut MotionEventConsumer, e: &mut Events) -> Option<(ShaderPain
                             counter: op.counter,
                         };
                         oldpoint.info = Some(npdata);
-                        return Some((op, npdata));
+                        return Some(((op, npdata), lua_pointer_state::MOVE, idx as u8));
                     },
                     (_, point::Stop) => {
                         oldpoint.info = None;
                         oldpoint.sizeavg.clear();
                         oldpoint.speedavg.clear();
                         s.point_count -= 1;
+                        unsafe {
+                            return Some(((mem::uninitialized(), mem::uninitialized()), lua_pointer_state::UP, idx as u8));
+                        }
                     },
                     (_, point::Point(p)) => {
                         let old_counter = s.point_counter;
@@ -156,6 +173,9 @@ fn next_point(s: &mut MotionEventConsumer, e: &mut Events) -> Option<(ShaderPain
                             counter: old_counter as f32,
                         };
                         oldpoint.info = Some(npdata);
+                        unsafe {
+                            return Some(((npdata, mem::uninitialized()), lua_pointer_state::DOWN, idx as u8));
+                        }
                     },
                 }
             },
