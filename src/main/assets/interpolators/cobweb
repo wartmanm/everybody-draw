@@ -13,40 +13,28 @@ function ondown(a)
   loglua("done ondown")
 end
 
-local function drawintra(intrapoint, a, b, points)
-  intra.x = (a.x + b.x) / 2
-  intra.y = (a.y + b.y) / 2
-  lua_pushline(points, 0, a, intra)
-  lua_pushline(points, 0, intra, b)
-end
-
 function main(a, b, screenx, screeny, points)
+  pushline(points, 0, a, b)
   local counter = a.counter
-  backlogcounter[counter] = backlogcounter[counter] + 1
-  if backlogcounter[counter] == 30 then
-    loglua("in backlog")
-    backlogcounter[counter] = 0
-    local pos = (backlogpos[counter] + 1) % 8
+  local olddist = backlogcounter[counter]
+  if b.distance - olddist >= 10 then
+    backlogcounter[counter] = olddist + 25
+    local pos = (backlogpos[counter] + 1) % 16
     backlogpos[counter] = pos
-    local intra = ShaderPaintPoint((a.x + b.x) / 2, (a.y + b.y) / 2, 0, 30, 0, 0, 0, 0)
-    local asub = ShaderPaintPoint(a.x, a.y, a.time, a.size, a.speedx, a.speedy, a.distance, a.counter)
-    loglua("created intras")
-    local oldpos = pos
     local logx = backlogx[counter]
     local logy = backlogy[counter]
-    if logx == nil or logy == nil then return end
+    local curpos = pos
+    local poscounter = 0
     repeat
-      if logx[oldpos] ~= nil and logy[oldpos] ~= nil then
-        loglua(string.format("drawing %d", oldpos))
-        asub.x = logx[oldpos]
-        asub.y = logy[oldpos]
-        loglua("got backlog positions")
-        drawintra(intra, asub, b, points)
-        loglua("drew intra")
-        oldpos = (oldpos + 1) % 8
+      pos = (pos + 2) % 16
+      if logx[pos] ~= nil and logy[pos] ~= nil then
+        a.x = logx[pos]
+        a.y = logy[pos]
+        pushline(points, 0, a, b)
       end
-    until oldpos == pos
-    logx[pos] = a.x
-    logy[pos] = a.y
+      poscounter = poscounter + 1
+    until poscounter == 8
+    logx[pos] = b.x
+    logy[pos] = b.y
   end
 end
