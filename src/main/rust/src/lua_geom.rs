@@ -3,9 +3,7 @@ use core::prelude::*;
 use core::{mem, ptr, raw};
 use collections::str::StrAllocating;
 use collections::string::String;
-use libc::{c_char, c_void, size_t, c_int};
-
-use android::log::{ANDROID_LOG_INFO, __android_log_write};
+use libc::{c_char, c_void, size_t};
 
 use lua::lib::raw::*;
 use lua::aux::raw::*;
@@ -16,15 +14,12 @@ use luajit_constants::*;
 use glcommon::GLResult;
 use log::logi;
 
+use lua_callbacks::LuaCallbackType;
+
 static mut gldraw_lua_key: i32 = 0;
 static LUA_FFI_SCRIPT: &'static str = include_str!("../includes/lua/ffi_loader.lua");
 static LUA_RUNNER: &'static str = include_str!("../includes/lua/lua_runner.lua");
 static DEFAULT_SCRIPT: &'static str = include_str!("../includes/lua/default_interpolator.lua");
-
-#[no_mangle]
-pub unsafe extern "C" fn loglua(message: *const c_char) {
-    __android_log_write(ANDROID_LOG_INFO as c_int, cstr!("luascript"), message);
-}
 
 static mut STATIC_LUA: Option<*mut lua_State> = None;
 
@@ -155,23 +150,19 @@ pub unsafe fn use_lua_script(key: i32) {
     lua_setglobal(L, cstr!("runmain"));
 }
 
-unsafe fn interpolate_lua(L: *mut lua_State, x: i32, y: i32, output: *mut c_void) -> GLResult<()> {
-    lua_getglobal(L, cstr!("runmain"));
-    
-    lua_pushnumber(L, x as f64);
-    lua_pushnumber(L, y as f64);
-    lua_pushlightuserdata(L, output);
-
-    if lua_pcall(L, 3, 0, 0) != 0 {
-        Err(format!("script failed to run: {}", err_to_str(L)))
-    } else {
-        Ok(())
-    }
-}
-
-pub unsafe fn do_interpolate_lua(x: i32, y: i32, output: *mut c_void) -> GLResult<()> {
+pub unsafe fn do_interpolate_lua(dimensions: (i32, i32), output: &mut LuaCallbackType) -> GLResult<()> {
     if let Some(L) = STATIC_LUA {
-        interpolate_lua(L, x, y, output)
+        lua_getglobal(L, cstr!("runmain"));
+        
+        let (x, y) = dimensions;
+        lua_pushnumber(L, x as f64);
+        lua_pushnumber(L, y as f64);
+        lua_pushlightuserdata(L, output as *mut LuaCallbackType as *mut c_void);
+
+        match lua_pcall(L, 3, 0, 0) {
+            0 => Ok(()),
+            _ => Err(format!("script failed to run: {}", err_to_str(L))),
+        }
     } else {
         logi!("lua state doesn't exist!");
         Ok(())

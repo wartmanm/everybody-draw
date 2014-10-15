@@ -15,10 +15,6 @@ use point;
 use point::{ShaderPaintPoint, Coordinate, PointEntry, PointConsumer, PointProducer};
 use activestate;
 use drawevent::Events;
-use lua_geom::do_interpolate_lua;
-use glcommon::GLResult;
-//use lua_pointer_state::LuaPointerState;
-
 
 rolling_average_count!(RollingAverage16, 16)
 
@@ -41,23 +37,6 @@ pub struct MotionEventConsumer {
 pub struct MotionEventProducer {
     pointer_data: motionevent::Data,
     producer: PointProducer,
-}
-
-pub struct LuaCallbackType<'a, 'b, 'c, 'd: 'b> {
-    consumer: &'a mut MotionEventConsumer,
-    events: &'b mut Events<'d>,
-    drawvecs: &'c mut [Vec<ShaderPaintPoint>],
-}
-
-// there is afaict no official representation of rust's tagged-union enums
-// plus, i'm not certain how well luajit deals with unions
-pub mod lua_pointer_state {
-    #[repr(C)]
-    pub struct LuaPointerState(u8);
-        pub static MOVE: LuaPointerState = LuaPointerState(0u8);
-        pub static DONE: LuaPointerState = LuaPointerState(1u8);
-        pub static DOWN: LuaPointerState = LuaPointerState(2u8);
-        pub static UP: LuaPointerState = LuaPointerState(3u8);
 }
 
 pub fn create_motion_event_handler() -> (Box<MotionEventConsumer>, Box<MotionEventProducer>) {
@@ -93,114 +72,79 @@ fn manhattan_distance(a: Coordinate, b: Coordinate) -> f32 {
     return if x > y { x } else { y };
 }
 
-pub fn run_interpolator(dimensions: (i32, i32), s: &mut MotionEventConsumer, events: & mut Events, drawvecs: & mut [Vec<ShaderPaintPoint>]) -> (GLResult<()>, bool) {
-    let interp_error = run_lua_shader(dimensions, LuaCallbackType {
-        consumer: s,
-        events: events,
-        drawvecs: drawvecs,
-    });
-    s.all_pointer_state = s.all_pointer_state.push(s.point_count > 0);
-    (interp_error, s.all_pointer_state == activestate::STOPPING)
+impl MotionEventConsumer {
+    pub fn frame_done(&mut self) -> bool {
+        self.all_pointer_state = self.all_pointer_state.push(self.point_count > 0);
+        self.all_pointer_state == activestate::STOPPING
+    }
 }
-
-#[no_mangle]
-pub extern "C" fn next_point_from_lua(data: &mut LuaCallbackType, points: &mut (ShaderPaintPoint, ShaderPaintPoint)) -> u16 {
-    let (state, pointer) = match next_point(data.consumer, data.events) {
-        Some((newpoints, state, pointer)) => {
-            *points = newpoints;
-            (state, pointer)
-        },
-        None => {
-            (lua_pointer_state::DONE, 0u8)
-        },
-    };
-    let state: u8 = unsafe { mem::transmute(state) };
-    ((state as u16) << 8) | (pointer as u16)
-}
-
-fn next_point(s: &mut MotionEventConsumer, e: &mut Events) -> Option<((ShaderPaintPoint, ShaderPaintPoint), lua_pointer_state::LuaPointerState, u8)> {
+        
+#[inline]
+pub fn next_point(s: &mut MotionEventConsumer, e: &mut Events) -> (point::ShaderPointEvent, u8) {
     let ref mut queue = s.consumer;
     let ref mut current_points = s.current_points;
-    loop {
-        match queue.pop() {
-            Some(point) => {
-                e.pushpoint(point);
-                let idx = point.index;
-                let newpoint = point.entry;
-                if !current_points.contains_key(&(idx as uint)) {
-                    current_points.insert(idx as uint, PointStorage {
-                        info: None,
-                        sizeavg: RollingAverage16::new(),
-                        speedavg: RollingAverage16::new(),
-                    });
-                }
-                let oldpoint = current_points.find_mut(&(idx as uint)).unwrap();
-                match (oldpoint.info, newpoint) {
-                    (Some(op), point::Point(np)) => {
-                        let dist = manhattan_distance(op.pos, np.pos);
-                        let avgsize = oldpoint.sizeavg.push(np.size);
-                        let avgspeed = oldpoint.speedavg.push(op.pos - np.pos);
-                        let npdata = ShaderPaintPoint {
-                            pos: np.pos,
-                            time: np.time,
-                            size: avgsize,
-                            speed: avgspeed,
-                            distance: op.distance + dist,
-                            counter: op.counter,
-                        };
-                        oldpoint.info = Some(npdata);
-                        return Some(((op, npdata), lua_pointer_state::MOVE, idx as u8));
-                    },
-                    (_, point::Stop) => {
-                        oldpoint.info = None;
-                        oldpoint.sizeavg.clear();
-                        oldpoint.speedavg.clear();
-                        s.point_count -= 1;
-                        unsafe {
-                            return Some(((mem::uninitialized(), mem::uninitialized()), lua_pointer_state::UP, idx as u8));
-                        }
-                    },
-                    (_, point::Point(p)) => {
-                        let old_counter = s.point_counter;
-                        s.point_counter += 1;
-                        s.point_count += 1;
-                        let npdata = ShaderPaintPoint {
-                            pos: p.pos,
-                            time: p.time,
-                            size: p.size,
-                            distance: 0f32,
-                            speed: Coordinate { x: 0f32, y: 0f32 },
-                            counter: old_counter as f32,
-                        };
-                        oldpoint.info = Some(npdata);
-                        unsafe {
-                            return Some(((npdata, mem::uninitialized()), lua_pointer_state::DOWN, idx as u8));
-                        }
-                    },
-                }
-            },
-            None => {
-                return None;
+    match queue.pop() {
+        Some(point) => {
+            e.pushpoint(point);
+            let idx = point.index;
+            let newpoint = point.entry;
+            if !current_points.contains_key(&(idx as uint)) {
+                current_points.insert(idx as uint, PointStorage {
+                    info: None,
+                    sizeavg: RollingAverage16::new(),
+                    speedavg: RollingAverage16::new(),
+                });
             }
+            let oldpoint = current_points.find_mut(&(idx as uint)).unwrap();
+            let pointevent = match (oldpoint.info, newpoint) {
+                (Some(op), point::Point(np)) => {
+                    let dist = manhattan_distance(op.pos, np.pos);
+                    let avgsize = oldpoint.sizeavg.push(np.size);
+                    let avgspeed = oldpoint.speedavg.push(op.pos - np.pos);
+                    let npdata = ShaderPaintPoint {
+                        pos: np.pos,
+                        time: np.time,
+                        size: avgsize,
+                        speed: avgspeed,
+                        distance: op.distance + dist,
+                        counter: op.counter,
+                    };
+                    oldpoint.info = Some(npdata);
+                    point::Move(op, npdata)
+                },
+                (_, point::Stop) => {
+                    oldpoint.info = None;
+                    oldpoint.sizeavg.clear();
+                    oldpoint.speedavg.clear();
+                    s.point_count -= 1;
+                    point::Up
+                },
+                (_, point::Point(p)) => {
+                    let old_counter = s.point_counter;
+                    s.point_counter += 1;
+                    s.point_count += 1;
+                    let npdata = ShaderPaintPoint {
+                        pos: p.pos,
+                        time: p.time,
+                        size: p.size,
+                        distance: 0f32,
+                        speed: Coordinate { x: 0f32, y: 0f32 },
+                        counter: old_counter as f32,
+                    };
+                    oldpoint.info = Some(npdata);
+                    point::Down(npdata)
+                },
+            };
+            (pointevent, idx as u8)
+        },
+        None => {
+            (point::NoEvent, 0u8)
         }
     }
 }
 
-fn run_lua_shader(dimensions: (i32, i32), mut data: LuaCallbackType) -> GLResult<()> {
-    let (x,y) = dimensions;
-    unsafe {
-        do_interpolate_lua(x, y, &mut data as *mut LuaCallbackType as *mut ::libc::c_void)
-    }
-}
-
-#[no_mangle]
-pub unsafe extern "C" fn pushrustvec(data: &mut LuaCallbackType, queue: i32, point: *const ShaderPaintPoint) {
-    data.drawvecs[queue as uint].push(*point);
-}
-
-#[no_mangle]
-pub unsafe extern "C" fn lua_pushline(data: &mut LuaCallbackType, queue: i32, a: *const ShaderPaintPoint, b: *const ShaderPaintPoint) {
-    let drawvec = &mut data.drawvecs[queue as uint];
+#[inline]
+pub fn push_line(drawvec: &mut Vec<ShaderPaintPoint>, a: &ShaderPaintPoint, b: &ShaderPaintPoint) {
     let distx = if (*a).pos.x > (*b).pos.x { (*a).pos.x - (*b).pos.x } else { (*b).pos.x - (*a).pos.x };
     let disty = if (*a).pos.y > (*b).pos.y { (*a).pos.y - (*b).pos.y } else { (*b).pos.y - (*a).pos.y };
     let count = if distx > disty { distx } else { disty } as i32;
@@ -226,5 +170,3 @@ pub unsafe extern "C" fn lua_pushline(data: &mut LuaCallbackType, queue: i32, a:
         addpoint.distance += stepdistance;
     }
 }
-
-

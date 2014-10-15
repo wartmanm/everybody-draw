@@ -38,15 +38,17 @@ pub struct ShaderPaintPoint {
 /// it's arguably simpler than ensuring each pointer gets a unique queue for its entire
 /// lifetime and maintaining an up-to-date pointer id -> queue mapping
 #[deriving(PartialEq)]
-pub enum GenericPointInfo<T> {
+pub enum PointInfo {
     Stop,
-    Point(T),
+    Point(PaintPoint),
 }
-pub type PointInfo = GenericPointInfo<PaintPoint>;
 
-/// Preprocessed queues for multiple interpolators have the same need.  This design choice
-/// is probably worth reevaluating.
-pub type ShaderPointInfo = GenericPointInfo<ShaderPaintPoint>;
+pub enum ShaderPointEvent {
+    Move(ShaderPaintPoint, ShaderPaintPoint),
+    Down(ShaderPaintPoint),
+    Up,
+    NoEvent,
+}
 
 /// A single entry in the point queue.
 #[deriving(PartialEq)]

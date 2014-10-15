@@ -12,7 +12,7 @@ use opengles::gl2;
 use opengles::gl2::{GLuint, GLenum, GLubyte};
 
 use glcommon::{Shader, check_gl_error, GLResult};
-use glpoint::{MotionEventConsumer, run_interpolator, create_motion_event_handler, destroy_motion_event_handler};
+use glpoint::{MotionEventConsumer, create_motion_event_handler, destroy_motion_event_handler};
 use point::ShaderPaintPoint;
 use pointshader::PointShader;
 use paintlayer::{TextureTarget, CompletedLayer};
@@ -25,6 +25,8 @@ use drawevent::Events;
 use glstore::DrawObjectIndex;
 use luascript::LuaScript;
 use paintlayer::PaintLayer;
+use lua_callbacks::LuaCallbackType;
+use lua_geom::do_interpolate_lua;
 
 
 static DRAW_INDEXES: [GLubyte, ..6] = [
@@ -48,10 +50,10 @@ pub enum AndroidBitmapFormat {
 pub struct GLInit<'a> {
     #[allow(dead_code)]
     dimensions: (i32, i32),
-    events: Events<'a>,
+    pub events: Events<'a>,
     pub paintstate: PaintState<'a>,
     targetdata: TargetData,
-    points: Vec<Vec<ShaderPaintPoint>>,
+    pub points: Vec<Vec<ShaderPaintPoint>>,
 }
 
 pub struct TargetData {
@@ -258,23 +260,23 @@ impl<'a> GLInit<'a> {
             (Some(point_shader), Some(copy_shader), Some(brush)) => {
                 gl2::enable(gl2::BLEND);
                 gl2::blend_func(gl2::ONE, gl2::ONE_MINUS_SRC_ALPHA);
-                let (target, source) = self.targetdata.get_texturetargets();
 
-                let matrix = matrix.as_slice();
-                let drawvecs = self.points.as_mut_slice();
-                let color = [1f32, 1f32, 0f32]; // TODO: brush color selection
-                let back_buffer = &source.texture;
-
-                for drawvec in drawvecs.iter_mut() {
-                    drawvec.clear();
-                }
                 let (interp_error, should_copy) =
                 if self.paintstate.interpolator.is_some() {
-                    run_interpolator(self.dimensions, handler, &mut self.events, drawvecs)
+                    let interp_error = unsafe {
+                        do_interpolate_lua(self.dimensions, &mut LuaCallbackType::new(self, handler))
+                    };
+                    let should_copy = handler.frame_done();
+                    (interp_error, should_copy)
                 } else {
                     (Ok(()), false)
                 };
 
+                let (target, source) = self.targetdata.get_texturetargets();
+                let back_buffer = &source.texture;
+                let drawvecs = self.points.as_mut_slice();
+                let matrix = matrix.as_slice();
+                let color = [1f32, 1f32, 0f32]; // TODO: brush color selection
                 let baselayer = CompletedLayer {
                     copyshader: copy_shader,
                     pointshader: point_shader,
@@ -296,6 +298,11 @@ impl<'a> GLInit<'a> {
                         logi!("copied brush layer down");
                     }
                 }
+
+                for drawvec in drawvecs.iter_mut() {
+                    drawvec.clear();
+                }
+
                 interp_error
             },
             _ => { Ok(()) }
