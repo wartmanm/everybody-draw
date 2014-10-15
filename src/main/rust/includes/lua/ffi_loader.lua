@@ -17,7 +17,7 @@ ffi.cdef[[
   void lua_pushline(void *output, int queue, struct ShaderPaintPoint *pointa, struct ShaderPaintPoint *pointb);
 ]]
 
-pushpoint=ffi.C.pushrustvec
+pushpoint=ffi.C.lua_pushpoint
 pushline=ffi.C.lua_pushline
-loglua=ffi.C.loglua
+loglua=ffi.C.lua_log
 ShaderPaintPoint=ffi.typeof("struct ShaderPaintPoint")

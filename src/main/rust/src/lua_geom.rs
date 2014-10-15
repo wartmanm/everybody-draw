@@ -12,7 +12,7 @@ use luajit::*;
 use luajit_constants::*;
 
 use glcommon::GLResult;
-use log::logi;
+use log::{logi, loge};
 
 use lua_callbacks::LuaCallbackType;
 
@@ -75,7 +75,8 @@ unsafe fn init_lua() -> GLResult<*mut lua_State> {
         Ok(L)
     } else {
         lua_close(L);
-        Err(format!("ffi init script failed to load: {}\nThis should never happen!", err_to_str(L)))
+        let err = format!("ffi init script failed to load: {}\nThis should never happen!", err_to_str(L));
+        log_err(err)
     }
 }
 
@@ -103,30 +104,30 @@ pub unsafe fn load_lua_script(script: Option<&str>) -> GLResult<i32> {
 
     let script = script.unwrap_or(DEFAULT_SCRIPT);
     if !runstring(L, script) {
-        let err = Err(format!("script failed to load: {}", err_to_str(L)));
+        let err = format!("script failed to load: {}", err_to_str(L));
         lua_pop(L, 1);
-        return err;
+        return log_err(err);
     }
 
     lua_getglobal(L, cstr!("main"));
     if !lua_isfunction(L, -1) {
         lua_pop(L, 2);
-        return Err("no main function defined :(".into_string());
+        return log_err("no main function defined :(".into_string());
     }
     luaJIT_setmode(L, 0, LUAJIT_MODE_ENGINE as i32|LUAJIT_MODE_ON as i32);
     lua_pop(L, 1);
 
     // FIXME compile runner once
     if !runstring(L, LUA_RUNNER) {
-        let err = Err(format!("lua runner failed to load: {}\n This should never happen!", err_to_str(L)));
+        let err = format!("lua runner failed to load: {}\n This should never happen!", err_to_str(L));
         lua_pop(L, 1);
-        return err;
+        return log_err(err);
     }
 
     lua_getglobal(L, cstr!("runmain"));
     if !lua_isfunction(L, -1) {
         lua_pop(L, 2);
-        return Err("runmain not defined.\n  This should never happen!".into_string());
+        return log_err("runmain not defined.\n  This should never happen!".into_string());
     }
     luaJIT_setmode(L, 0, LUAJIT_MODE_ENGINE as i32|LUAJIT_MODE_ON as i32);
 
@@ -150,6 +151,11 @@ pub unsafe fn use_lua_script(key: i32) {
     lua_setglobal(L, cstr!("runmain"));
 }
 
+fn log_err<T>(message: String) -> GLResult<T> {
+    loge(message.as_slice());
+    Err(message)
+}
+
 pub unsafe fn do_interpolate_lua(dimensions: (i32, i32), output: &mut LuaCallbackType) -> GLResult<()> {
     if let Some(L) = STATIC_LUA {
         lua_getglobal(L, cstr!("runmain"));
@@ -161,7 +167,7 @@ pub unsafe fn do_interpolate_lua(dimensions: (i32, i32), output: &mut LuaCallbac
 
         match lua_pcall(L, 3, 0, 0) {
             0 => Ok(()),
-            _ => Err(format!("script failed to run: {}", err_to_str(L))),
+            _ => log_err(format!("script failed to run: {}", err_to_str(L))),
         }
     } else {
         logi!("lua state doesn't exist!");

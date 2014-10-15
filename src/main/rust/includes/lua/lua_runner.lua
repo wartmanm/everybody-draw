@@ -17,7 +17,7 @@ function runmain(x, y, output)
   end
   local pointpair = ffi.new("struct ShaderPaintPoint[2]")
   while true do
-    local pointstatus = ffi.C.next_point_from_lua(output, pointpair)
+    local pointstatus = ffi.C.lua_nextpoint(output, pointpair)
     local status = bit.band(0xff00, pointstatus)
     if status == 0x0000 then
       _main(pointpair[0], pointpair[1], x, y, output)
