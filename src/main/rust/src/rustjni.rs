@@ -105,7 +105,7 @@ unsafe extern "C" fn native_draw_queued_points(env: *mut JNIEnv, thiz: jobject, 
     ((**env).GetFloatArrayRegion)(env, java_matrix, 0, 16, matrix.as_mut_ptr());
     if let Err(msg) = get_safe_data(data).draw_queued_points(mem::transmute(handler), &matrix) {
         let luaerr_class = ((**env).FindClass)(env, cstr!("com/github/wartman4404/gldraw/LuaException"));
-        let luaerr_init = ((**env).GetMethodID)(env, luaerr_class, cstr!("<init>"), cstr!("(Ljava/lang/string;)V"));
+        let luaerr_init = ((**env).GetMethodID)(env, luaerr_class, cstr!("<init>"), cstr!("(Ljava/lang/String;)V"));
         let err = ((**env).NewObject)(env, luaerr_class, luaerr_init, str_to_jstring(env, msg.as_slice()));
         ((**env).Throw)(env, err);
     }

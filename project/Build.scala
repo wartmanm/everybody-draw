@@ -100,10 +100,15 @@ object General {
         "io.spray" %%  "spray-json" % "1.2.7-A" changing()
       ),
       proguardOptions ++= Seq(
-        """-keepclassmembers class com.github.wartman4404.gldraw.MotionEventHandlerPair {
+        """
+        -keepclassmembers class com.github.wartman4404.gldraw.MotionEventHandlerPair {
           <fields>;
           <init>(int, int);
-        }"""
+        }
+        -keepclassmembers class com.github.wartman4404.gldraw.LuaException {
+          <init>(java.lang.String);
+        }
+        """
       )
     )
 }
