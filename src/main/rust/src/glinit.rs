@@ -227,6 +227,17 @@ impl<'a> GLInit<'a> {
         self.points.truncate(1);
     }
 
+    #[inline]
+    pub fn erase_layer(&mut self, layer: i32) {
+        let target = match layer {
+            0 => self.targetdata.get_current_texturetarget().framebuffer,
+            _ => self.paintstate.layers[(layer - 1) as uint].target.framebuffer
+        };
+        gl2::bind_framebuffer(gl2::FRAMEBUFFER, target);
+        gl2::clear_color(0f32, 0f32, 0f32, 0f32);
+        gl2::clear(gl2::COLOR_BUFFER_BIT);
+    }
+
     pub fn setup_graphics<'a>(w: i32, h: i32) -> GLInit<'a> {
         print_gl_string("Version", gl2::VERSION);
         print_gl_string("Vendor", gl2::VENDOR);
