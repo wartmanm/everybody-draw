@@ -1,12 +1,12 @@
 #![allow(unused_variable, dead_code)]
 
-static NEWMASK: u8 = 0x01;
-static OLDMASK: u8 = 0x02;
+const NEWMASK: u8 = 0x01;
+const OLDMASK: u8 = 0x02;
 
-pub static STARTING: ActiveState = ActiveState(NEWMASK);
-pub static STOPPING: ActiveState  = ActiveState(OLDMASK);
-pub static CONTINUING: ActiveState  = ActiveState(NEWMASK | OLDMASK);
-pub static INACTIVE: ActiveState = ActiveState(0);
+pub const STARTING: ActiveState = ActiveState(NEWMASK);
+pub const STOPPING: ActiveState  = ActiveState(OLDMASK);
+pub const CONTINUING: ActiveState  = ActiveState(NEWMASK | OLDMASK);
+pub const INACTIVE: ActiveState = ActiveState(0);
 #[deriving(Eq, PartialEq)]
 pub struct ActiveState(u8);
 
