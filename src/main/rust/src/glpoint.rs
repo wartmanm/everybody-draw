@@ -36,19 +36,19 @@ pub struct MotionEventConsumer {
 
 pub struct MotionEventProducer {
     pointer_data: motionevent::Data,
-    producer: PointProducer,
+    pub producer: PointProducer,
 }
 
-pub fn create_motion_event_handler() -> (Box<MotionEventConsumer>, Box<MotionEventProducer>) {
+pub fn create_motion_event_handler() -> (MotionEventConsumer, MotionEventProducer) {
     let (consumer, producer) = spsc_queue::queue::<PointEntry>(0);
-    let handler = box MotionEventConsumer {
+    let handler = MotionEventConsumer {
         consumer: consumer,
         current_points: SmallIntMap::new(),
         point_counter: 0, // unique value for each new pointer
         point_count: 0, // # of currently active pointers
         all_pointer_state: activestate::INACTIVE,
     };
-    let producer = box MotionEventProducer {
+    let producer = MotionEventProducer {
         producer: producer,
         pointer_data: motionevent::Data::new(),
     };

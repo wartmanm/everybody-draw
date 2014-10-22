@@ -9,6 +9,7 @@ use point::{Move, Down, Up, NoEvent};
 use glpoint;
 use glpoint::MotionEventConsumer;
 use glinit::GLInit;
+use drawevent::Events;
 
 static MOVE: u8 = 0u8;
 static DONE: u8 = 1u8;
@@ -17,13 +18,15 @@ static UP:   u8 = 3u8;
 
 pub struct LuaCallbackType<'a, 'b, 'c: 'b> {
     consumer: &'a mut MotionEventConsumer,
+    events: &'c mut Events<'c>,
     glinit: &'b mut GLInit<'c>,
 }
 
 impl<'a, 'b, 'c> LuaCallbackType<'a, 'b, 'c> {
-    pub fn new(glinit: &'b mut GLInit<'c>, s: &'a mut MotionEventConsumer) -> LuaCallbackType<'a, 'b, 'c> {
+    pub fn new(glinit: &'b mut GLInit<'c>, events: &'c mut Events<'c>, s: &'a mut MotionEventConsumer) -> LuaCallbackType<'a, 'b, 'c> {
         LuaCallbackType {
             consumer: s,
+            events: events,
             glinit: glinit,
         }
     }
@@ -31,7 +34,7 @@ impl<'a, 'b, 'c> LuaCallbackType<'a, 'b, 'c> {
 
 #[no_mangle]
 pub extern "C" fn lua_nextpoint(data: &mut LuaCallbackType, points: &mut (ShaderPaintPoint, ShaderPaintPoint)) -> u16 {
-    let events = &mut data.glinit.events;
+    let events: &mut Events = data.events;
     let (state, pointer) = glpoint::next_point(data.consumer, events);
     let (newpoints, luastate) = match state {
         Move(a, b) => ((a,b), MOVE),

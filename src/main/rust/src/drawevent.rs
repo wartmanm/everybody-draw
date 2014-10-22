@@ -119,46 +119,72 @@ impl<'a> Events<'a> {
     pub fn clear(&mut self) {
         self.eventlist.clear();
     }
-    fn get_event(&self, idx: uint) -> DrawEvent {
-        self.eventlist[idx]
-    }
-    pub fn get_eventcount(&self) -> uint {
-        self.eventlist.len()
+    fn get_event(&self, idx: uint) -> Option<&DrawEvent> {
+        self.eventlist.as_slice().get(idx)
     }
 }
 
-pub struct EventStream {
-    position: uint,
+#[inline]
+pub fn handle_event<'a>(gl: &mut ::glinit::GLInit<'a>, events: &mut Events<'a>, queue: &mut ::point::PointProducer, eventidx: i32) -> event_stream::EventState {
+
+    // FIXME do this without exposing Events or GLInit internal details
+    match events.get_event(eventidx as uint) {
+        Some(&event) => match event {
+            UseAnimShader(idx) => gl.set_anim_shader(events.copyshaders.get_object(idx)),
+            UseCopyShader(idx) => gl.set_copy_shader(events.copyshaders.get_object(idx)),
+            UsePointShader(idx) => gl.set_point_shader(events.pointshaders.get_object(idx)),
+            UseBrush(idx) => gl.set_brush_texture(events.textures.get_object(idx)),
+            UseInterpolator(idx) => gl.set_interpolator(events.luascripts.get_object(idx)),
+            Point(p) => queue.push(p),
+            AddLayer(copyshader, pointshader, pointidx) => {
+                let copyshader = match copyshader { Some(x) => Some(events.copyshaders.get_object(x)), None => None };
+                let pointshader = match pointshader { Some(x) => Some(events.pointshaders.get_object(x)), None => None };
+                let layer = PaintLayer::new(gl.dimensions, copyshader, pointshader, pointidx);
+                gl.add_layer(layer);
+            },
+            ClearLayers => gl.clear_layers(),
+            Frame => return event_stream::Frame,
+        },
+        None => return event_stream::Done,
+    }
+    return event_stream::NoFrame;
 }
 
-impl EventStream {
-    pub fn new() -> EventStream {
-        EventStream { position: 0 }
+pub mod event_stream {
+    use core::prelude::*;
+    use drawevent::{Events, handle_event};
+
+    pub enum EventState {
+        Done,
+        Frame,
+        NoFrame,
     }
-    pub fn advance<'a>(&mut self, events: &'a mut Events<'a>, mut framecount: u32, playback: bool, m: &mut ::point::PointProducer, gl: &'a mut ::glinit::GLInit<'a>) {
-        if framecount == 0 || self.position >= events.get_eventcount() {
-            return;
+
+
+    pub struct EventStream {
+        position: i32,
+        producer: ::glpoint::MotionEventProducer,
+        pub consumer: ::glpoint::MotionEventConsumer,
+    }
+
+    impl EventStream {
+
+        pub fn new() -> EventStream {
+            let (consumer, producer) = ::glpoint::create_motion_event_handler();
+            EventStream {
+                position: 0,
+                producer: producer,
+                consumer: consumer
+            }
         }
-        let limit = events.get_eventcount();
-        self.position += 1;
-        let event = events.get_event(self.position);
-        while framecount > 0 && self.position < limit {
-            match event {
-                // FIXME do this without exposing Events or GLInit internal details
-                UseAnimShader(idx) => gl.paintstate.animshader = Some(events.copyshaders.get_object(idx)),
-                UseCopyShader(idx) => gl.paintstate.copyshader = Some(events.copyshaders.get_object(idx)),
-                UsePointShader(idx) => gl.paintstate.pointshader = Some(events.pointshaders.get_object(idx)),
-                UseBrush(idx) => gl.paintstate.brush = Some(events.textures.get_object(idx)),
-                UseInterpolator(idx) => gl.paintstate.interpolator = Some(events.luascripts.get_object(idx)),
-                Frame => {
-                    framecount -= 1;
-                    if playback {
-                        gl.render_frame();
-                    }
-                },
-                Point(p) => m.push(p),
-                AddLayer(_, _, _) => { },
-                ClearLayers => { },
+
+        pub fn advance_frame<'a>(&mut self, init: &mut ::glinit::GLInit<'a>, events: &mut Events<'a>) -> bool {
+            loop {
+                match handle_event(init, events, &mut self.producer.producer, self.position) {
+                    Done => return true,
+                    Frame => return false,
+                    NoFrame => { },
+                }
             }
         }
     }

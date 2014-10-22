@@ -5,7 +5,7 @@ use core::fmt::Show;
 use opengles::gl2;
 use opengles::gl2::GLuint;
 
-use glcommon::check_gl_error;
+use glcommon::{check_gl_error, GLResult};
 
 use log::logi;
 
@@ -14,6 +14,10 @@ pub enum PixelFormat {
     RGBA = gl2::RGBA as int,
     RGB = gl2::RGB as int,
     ALPHA = gl2::ALPHA as int,
+}
+
+pub trait ToPixelFormat {
+    fn to_pixelformat(&self) -> GLResult<PixelFormat>;
 }
 
 pub struct Texture {

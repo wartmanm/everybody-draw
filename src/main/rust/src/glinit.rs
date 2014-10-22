@@ -1,8 +1,6 @@
 extern crate opengles;
 use core::prelude::*;
-use core::mem;
 use collections::vec::Vec;
-use collections::string::String;
 use collections::str::StrAllocating;
 use collections::{Mutable, MutableSeq};
 
@@ -12,7 +10,7 @@ use opengles::gl2;
 use opengles::gl2::{GLuint, GLenum, GLubyte};
 
 use glcommon::{Shader, check_gl_error, GLResult};
-use glpoint::{MotionEventConsumer, create_motion_event_handler, destroy_motion_event_handler};
+use glpoint::{MotionEventConsumer};
 use point::ShaderPaintPoint;
 use pointshader::PointShader;
 use paintlayer::{TextureTarget, CompletedLayer};
@@ -21,12 +19,11 @@ use gltexture;
 use gltexture::Texture;
 use matrix;
 use eglinit;
-use drawevent::Events;
-use glstore::DrawObjectIndex;
 use luascript::LuaScript;
 use paintlayer::PaintLayer;
 use lua_callbacks::LuaCallbackType;
 use lua_geom::do_interpolate_lua;
+use drawevent::Events;
 
 
 static DRAW_INDEXES: [GLubyte, ..6] = [
@@ -45,12 +42,12 @@ pub enum AndroidBitmapFormat {
     ANDROID_BITMAP_FORMAT_A_8       = 8,
 }
 
+
 /// struct for storage of data that stays on rust side
 /// should probably be given a meaningful name like PaintContext, but w/e
 pub struct GLInit<'a> {
     #[allow(dead_code)]
-    dimensions: (i32, i32),
-    pub events: Events<'a>,
+    pub dimensions: (i32, i32),
     pub paintstate: PaintState<'a>,
     targetdata: TargetData,
     pub points: Vec<Vec<ShaderPaintPoint>>,
@@ -169,60 +166,45 @@ impl<'a> GLInit<'a> {
         result
     }
 
-    pub fn compile_copy_shader(&mut self, vert: Option<String>, frag: Option<String>) -> GLResult<DrawObjectIndex<CopyShader>> {
-        self.events.load_copyshader(vert, frag)
-    }
-
-    pub fn compile_point_shader(&mut self, vert: Option<String>, frag: Option<String>) -> GLResult<DrawObjectIndex<PointShader>> {
-        self.events.load_pointshader(vert, frag)
-    }
-
-    pub fn compile_luascript(&mut self, luastr: Option<String>) -> GLResult<DrawObjectIndex<LuaScript>> {
-        self.events.load_interpolator(luastr)
-    }
-
     // TODO: make an enum for these with a scala counterpart
-    pub fn set_copy_shader(&mut self, shader: DrawObjectIndex<CopyShader>) -> () {
+    pub fn set_copy_shader(&mut self, shader: &'a CopyShader) -> () {
         logi("setting copy shader");
-        self.paintstate.copyshader = Some(self.events.use_copyshader(shader));
+        self.paintstate.copyshader = Some(shader);
     }
 
     // these can also be null to unset the shader
     // TODO: document better from scala side
-    pub fn set_anim_shader(&mut self, shader: DrawObjectIndex<CopyShader>) -> () {
+    pub fn set_anim_shader(&mut self, shader: &'a CopyShader) -> () {
         logi("setting anim shader");
-        self.paintstate.animshader = Some(self.events.use_animshader(shader));
+        self.paintstate.animshader = Some(shader);
     }
 
-    pub fn set_point_shader(&mut self, shader: DrawObjectIndex<PointShader>) -> () {
+    pub fn set_point_shader(&mut self, shader: &'a PointShader) -> () {
         logi("setting point shader");
-        self.paintstate.pointshader = Some(self.events.use_pointshader(shader));
+        self.paintstate.pointshader = Some(shader);
     }
 
-    pub fn set_interpolator(&mut self, interpolator: DrawObjectIndex<LuaScript>) -> () {
+    pub fn set_interpolator(&mut self, interpolator: &'a LuaScript) -> () {
         logi("setting interpolator");
-        let interpolator = self.events.use_interpolator(interpolator);
         interpolator.prep();
         self.paintstate.interpolator = Some(interpolator);
     }
 
-    pub fn set_brush_texture(&mut self, texture: DrawObjectIndex<Texture>) {
-        self.paintstate.brush = Some(self.events.use_brush(texture));
+    pub fn set_brush_texture(&mut self, texture: &'a Texture) {
+        self.paintstate.brush = Some(texture);
     }
 
-    pub fn add_layer(&mut self, copyshader: DrawObjectIndex<CopyShader>, pointshader: DrawObjectIndex<PointShader>, pointidx: i32) -> () {
+    pub fn add_layer(&mut self, layer: PaintLayer<'a>) -> () {
         logi("adding layer");
-        let extra: i32 = (pointidx as i32 + 1) - self.points.len() as i32;
+        let extra: i32 = (layer.pointidx as i32 + 1) - self.points.len() as i32;
         if extra > 0 {
             self.points.grow(extra as uint, Vec::new());
         }
-        let layer = self.events.add_layer(self.dimensions, Some(copyshader), Some(pointshader) , pointidx);
         self.paintstate.layers.push(layer);
     }
 
     pub fn clear_layers(&mut self) {
         logi!("setting layer count to 0");
-        self.events.clear_layers();
         self.paintstate.layers.clear();
         self.points.truncate(1);
     }
@@ -250,7 +232,6 @@ impl<'a> GLInit<'a> {
         points.push(Vec::new());
         let data = GLInit {
             dimensions: (w, h),
-            events: Events::new(),
             targetdata: TargetData {
                 targets: targets,
                 current_target: 0,
@@ -266,7 +247,7 @@ impl<'a> GLInit<'a> {
         data
     }
 
-    pub fn draw_queued_points(&mut self, handler: &mut MotionEventConsumer, matrix: &matrix::Matrix) -> GLResult<()> {
+    pub fn draw_queued_points(&mut self, handler: &mut MotionEventConsumer, events: &'a mut Events<'a>, matrix: &matrix::Matrix) -> GLResult<()> {
         match (self.paintstate.pointshader, self.paintstate.copyshader, self.paintstate.brush) {
             (Some(point_shader), Some(copy_shader), Some(brush)) => {
                 gl2::enable(gl2::BLEND);
@@ -275,7 +256,7 @@ impl<'a> GLInit<'a> {
                 let (interp_error, should_copy) =
                 if self.paintstate.interpolator.is_some() {
                     let interp_error = unsafe {
-                        do_interpolate_lua(self.dimensions, &mut LuaCallbackType::new(self, handler))
+                        do_interpolate_lua(self.dimensions, &mut LuaCallbackType::new(self, events, handler))
                     };
                     let should_copy = handler.frame_done();
                     (interp_error, should_copy)
@@ -320,33 +301,18 @@ impl<'a> GLInit<'a> {
         }
     }
 
-    pub fn load_texture(&mut self, w: i32, h: i32, pixels: &[u8], format: AndroidBitmapFormat) -> GLResult<DrawObjectIndex<Texture>> {
-        let formatenum: AndroidBitmapFormat = unsafe { mem::transmute(format) };
-        let format = match formatenum {
-            ANDROID_BITMAP_FORMAT_RGBA_8888 => Ok(gltexture::RGBA),
-            ANDROID_BITMAP_FORMAT_A_8 => Ok(gltexture::ALPHA),
-            _ => Err("Unsupported texture format!".into_string()),
-        };
-        format.map(|texformat| {
-            logi!("setting brush texture for {:x}", pixels.as_ptr() as uint);
-            self.events.load_brush(w, h, pixels, texformat)
-        })
-    }
-
     pub fn clear_buffer(&mut self) {
         for target in self.targetdata.targets.iter() {
             gl2::bind_framebuffer(gl2::FRAMEBUFFER, target.framebuffer);
             gl2::clear_color(0f32, 0f32, 0f32, 0f32);
             gl2::clear(gl2::COLOR_BUFFER_BIT);
             check_gl_error("clear framebuffer");
-            self.events.clear();
         }
     }
 
     pub fn render_frame(&mut self) {
         match (self.paintstate.copyshader, self.paintstate.animshader) {
             (Some(copy_shader), Some(anim_shader)) => {
-                self.events.pushframe();
                 self.targetdata.current_target = self.targetdata.current_target ^ 1;
                 let copymatrix = matrix::IDENTITY.as_slice();
                 gl2::disable(gl2::BLEND);
@@ -370,37 +336,47 @@ impl<'a> GLInit<'a> {
     }
 }
 
+impl gltexture::ToPixelFormat for AndroidBitmapFormat {
+    fn to_pixelformat(&self) -> GLResult<gltexture::PixelFormat> {
+        match *self {
+            ANDROID_BITMAP_FORMAT_RGBA_8888 => Ok(gltexture::RGBA),
+            ANDROID_BITMAP_FORMAT_A_8 => Ok(gltexture::ALPHA),
+            _ => Err("Unsupported texture format!".into_string()),
+        }
+    }
+}
+
 #[allow(dead_code, unused_must_use)]
 fn test_all() {
     {
-        let mut data = GLInit::setup_graphics(0, 0);
-        let (mut consumer, producer) = create_motion_event_handler();
-        let copyshader = data.compile_copy_shader(None, None).unwrap();
-        let pointshader = data.compile_point_shader(None, None).unwrap();
-        let interpolator = data.compile_luascript(None).unwrap();
-        let brushpixels = [1u8, 0, 0, 1];
-        let brush = data.load_texture(1, 1, brushpixels, unsafe { mem::transmute(ANDROID_BITMAP_FORMAT_A_8) }).unwrap();
+        //let mut data = GLInit::setup_graphics(0, 0);
+        //let (mut consumer, producer) = create_motion_event_handler();
+        //let copyshader = data.compile_copy_shader(None, None).unwrap();
+        //let pointshader = data.compile_point_shader(None, None).unwrap();
+        //let interpolator = data.compile_luascript(None).unwrap();
+        //let brushpixels = [1u8, 0, 0, 1];
+        //let brush = data.load_texture(1, 1, brushpixels, unsafe { mem::transmute(ANDROID_BITMAP_FORMAT_A_8) }).unwrap();
 
-        data.set_copy_shader(copyshader);
-        data.set_anim_shader(copyshader);
-        data.set_point_shader(pointshader);
-        data.set_interpolator(interpolator);
-        data.set_brush_texture(brush);
-        data.clear_layers();
-        data.add_layer(copyshader, pointshader, 0);
-        data.draw_image(1, 1, brushpixels);
-        //let point = ShaderPaintPoint { pos: ::point::Coordinate { x: 0f32, y: 0f32 }, time: 0f32, size: 0f32, speed: ::point::Coordinate { x: 0f32, y: 0f32 }, distance: 0f32, counter: 0f32 };
-        //data.points[0].push(point);
+        //data.set_copy_shader(copyshader);
+        //data.set_anim_shader(copyshader);
+        //data.set_point_shader(pointshader);
+        //data.set_interpolator(interpolator);
+        //data.set_brush_texture(brush);
+        //data.clear_layers();
+        //data.add_layer(copyshader, pointshader, 0);
+        //data.draw_image(1, 1, brushpixels);
+        ////let point = ShaderPaintPoint { pos: ::point::Coordinate { x: 0f32, y: 0f32 }, time: 0f32, size: 0f32, speed: ::point::Coordinate { x: 0f32, y: 0f32 }, distance: 0f32, counter: 0f32 };
+        ////data.points[0].push(point);
         
-        data.clear_buffer();
-        let result = data.draw_queued_points(&mut *consumer, &matrix::IDENTITY);
-        match result {
-            Err(err) => logi!("error drawing points: {}", err),
-            Ok(_)    => logi!("drew points successfully)"),
-        };
-        data.render_frame();
-        unsafe {
-            destroy_motion_event_handler(consumer, producer);
-        }
+        //data.clear_buffer();
+        //let result = data.draw_queued_points(&mut *consumer, &matrix::IDENTITY);
+        //match result {
+            //Err(err) => logi!("error drawing points: {}", err),
+            //Ok(_)    => logi!("drew points successfully)"),
+        //};
+        //data.render_frame();
+        //unsafe {
+            //destroy_motion_event_handler(consumer, producer);
+        //}
     }
 }

@@ -8,6 +8,7 @@ class Texture private (private val nativePtr: Int) extends AnyVal
 class LuaScript private (private val nativePtr: Int) extends AnyVal
 class MotionEventHandler private (private val nativePtr: Int) extends AnyVal
 class MotionEventProducer private (private val nativePtr: Int) extends AnyVal
+class Replay private (private val nativePtr: Int) extends AnyVal
 class LuaException(msg: String) extends RuntimeException(msg)
 class GLInit private (private val nativePtr: Int) extends AnyVal {
   def toMessage(m: Message) = {
@@ -75,6 +76,13 @@ object GLInit {
     new GLInit(m.arg1)
   }
   @native def destroy(data: GLInit): Unit
+}
+
+object Replay {
+  @native def init(data: GLInit): Replay
+  @native def destroy(replay: Replay): Unit
+  @native def advanceFrame(data: GLInit, replay: Replay, matrix: Array[Float]): Boolean
+  val nullReplay = new Replay(0)
 }
 
 case class MotionEventHandlerPair(

@@ -48,6 +48,7 @@ class MainActivity extends Activity with TypedActivity with AndroidImplicits {
   lazy val clearbutton = findView(TR.clearbutton)
   lazy val loadbutton = findView(TR.loadbutton)
   lazy val savebutton = findView(TR.savebutton)
+  lazy val replaybutton = findView(TR.replaybutton)
 
   var textureThread: Option[TextureSurfaceThread] = None
   var outputShader: Option[CopyShader] = None
@@ -107,6 +108,7 @@ class MainActivity extends Activity with TypedActivity with AndroidImplicits {
       }) 
     loadbutton.setOnClickListener(() => loadFile())
     savebutton.setOnClickListener(() => saveFile())
+    replaybutton.setOnClickListener(() => startReplay())
 
     // TODO: deal with rotation better
     Option(bundle) match {
@@ -381,6 +383,13 @@ class MainActivity extends Activity with TypedActivity with AndroidImplicits {
         })
       Toast.makeText(MainActivity.this, prefix + e.getMessage(), Toast.LENGTH_LONG).show()
     })
+
+  def startReplay() = {
+    for (thread <- textureThread) {
+      Log.i("main", "starting replay...")
+      thread.beginReplay()
+    }
+  }
 }
 
 object MainActivity {

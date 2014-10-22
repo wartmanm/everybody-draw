@@ -8,7 +8,7 @@ use libc::{c_void, c_char};
 use collections::string::String;
 use collections::vec::Vec;
 
-use jni::{jobject, jclass, jfieldID, jmethodID, JNIEnv, jint, jstring, jfloatArray, JNINativeMethod, JavaVM};
+use jni::{jobject, jclass, jfieldID, jmethodID, JNIEnv, jint, jstring, jboolean, jfloatArray, JNINativeMethod, JavaVM};
 use android::input::AInputEvent;
 use android::bitmap::{AndroidBitmap_getInfo, AndroidBitmap_lockPixels, AndroidBitmap_unlockPixels, AndroidBitmapInfo};
 use android::bitmap::{ANDROID_BITMAP_FORMAT_RGBA_8888, ANDROID_BITMAP_FORMAT_A_8};
@@ -19,11 +19,15 @@ use glcommon::GLResult;
 use log::logi;
 
 use glstore::DrawObjectIndex;
-use glinit::GLInit;
+use glinit::{GLInit, AndroidBitmapFormat};
 use glpoint;
 use matrix::Matrix;
 use eglinit;
 use jni_constants::*;
+use drawevent::Events;
+use drawevent::event_stream::EventStream;
+use gltexture::ToPixelFormat;
+use gltexture::Texture;
 
 macro_rules! native_method(
     ($name:expr, $sig:expr, $fn_ptr:expr) => (
@@ -41,6 +45,11 @@ static mut MOTIONEVENT_NATIVE_PTR_FIELD: jfieldID = 0 as jfieldID;
 struct CaseClass {
     constructor: jmethodID,
     class: jclass,
+}
+
+struct GLInitEvents<'a> {
+    glinit: GLInit<'a>,
+    events: Events<'a>,
 }
 
 impl CaseClass {
@@ -86,24 +95,28 @@ unsafe fn str_to_jstring(env: *mut JNIEnv, s: &str) -> jstring {
     ((**env).NewString)(env, u16msg.as_ptr(), u16msg.len() as i32)
 }
 
-fn get_safe_data<'a>(data: i32) -> &'a mut GLInit<'a> {
+fn get_safe_data<'a>(data: i32) -> &'a mut GLInitEvents<'a> {
     unsafe { mem::transmute(data) }
 }
 
 unsafe extern "C" fn init_gl(env: *mut JNIEnv, thiz: jobject, w: jint, h: jint) -> jint {
-    mem::transmute(box GLInit::setup_graphics(w, h))
+    mem::transmute(box GLInitEvents {
+        glinit: GLInit::setup_graphics(w, h),
+        events: Events::new(),
+    })
 }
 
 unsafe extern "C" fn finish_gl(env: *mut JNIEnv, thiz: jobject, data: jint) {
-    let data: Box<GLInit> = mem::transmute(data);
-    data.destroy();
+    let data: Box<GLInitEvents> = mem::transmute(data);
+    data.glinit.destroy();
     logi!("finished deinit");
 }
 
 unsafe extern "C" fn native_draw_queued_points(env: *mut JNIEnv, thiz: jobject, data: i32, handler: i32, java_matrix: jfloatArray) {
+    let data = get_safe_data(data);
     let mut matrix: Matrix = mem::uninitialized();
     ((**env).GetFloatArrayRegion)(env, java_matrix, 0, 16, matrix.as_mut_ptr());
-    if let Err(msg) = get_safe_data(data).draw_queued_points(mem::transmute(handler), &matrix) {
+    if let Err(msg) = data.glinit.draw_queued_points(mem::transmute(handler), &mut data.events, &matrix) {
         let luaerr_class = ((**env).FindClass)(env, cstr!("com/github/wartman4404/gldraw/LuaException"));
         let luaerr_init = ((**env).GetMethodID)(env, luaerr_class, cstr!("<init>"), cstr!("(Ljava/lang/String;)V"));
         let err = ((**env).NewObject)(env, luaerr_class, luaerr_init, str_to_jstring(env, msg.as_slice()));
@@ -112,11 +125,14 @@ unsafe extern "C" fn native_draw_queued_points(env: *mut JNIEnv, thiz: jobject, 
 }
 
 unsafe extern "C" fn native_update_gl(env: *mut JNIEnv, thiz: jobject, data: i32) {
-    get_safe_data(data).render_frame();
+    let data = get_safe_data(data);
+    data.glinit.render_frame();
+    data.events.pushframe(); // FIXME make sure a frame was actually drawn! No java exceptions, missing copy shader, etc
 }
 
 unsafe extern "C" fn init_motion_event_handler(env: *mut JNIEnv, thiz: jobject) -> jobject {
     let (consumer, producer) = glpoint::create_motion_event_handler();
+    let (consumer, producer) = (box consumer, box producer);
     let pairclass = ((**env).FindClass)(env, cstr!("com/github/wartman4404/gldraw/MotionEventHandlerPair"));
     let constructor = ((**env).GetMethodID)(env, pairclass, cstr!("<init>"), cstr!("(II)V"));
     let (consumer, producer): (i32, i32) = (mem::transmute(consumer), mem::transmute(producer));
@@ -138,31 +154,45 @@ unsafe extern "C" fn native_append_motion_event(env: *mut JNIEnv, thiz: jobject,
 }
 
 unsafe extern "C" fn set_anim_shader(env: *mut JNIEnv, thiz: jobject, data: jint, shader: jint) {
-    get_safe_data(data).set_anim_shader(mem::transmute(shader));
+    let data = get_safe_data(data);
+    let shader = data.events.use_animshader(mem::transmute(shader));
+    data.glinit.set_anim_shader(shader);
 }
 
 unsafe extern "C" fn set_copy_shader(env: *mut JNIEnv, thiz: jobject, data: jint, shader: jint) {
-    get_safe_data(data).set_copy_shader(mem::transmute(shader));
+    let data = get_safe_data(data);
+    let shader = data.events.use_copyshader(mem::transmute(shader));
+    data.glinit.set_copy_shader(shader);
 }
 
 unsafe extern "C" fn set_point_shader(env: *mut JNIEnv, thiz: jobject, data: jint, shader: jint) {
-    get_safe_data(data).set_point_shader(mem::transmute(shader));
+    let data = get_safe_data(data);
+    let shader = data.events.use_pointshader(mem::transmute(shader));
+    data.glinit.set_point_shader(shader);
 }
 
 unsafe extern "C" fn set_brush_texture(env: *mut JNIEnv, thiz: jobject, data: jint, texture: jint) {
-    get_safe_data(data).set_brush_texture(mem::transmute(texture));
+    let data = get_safe_data(data);
+    let brush = data.events.use_brush(mem::transmute(texture));
+    data.glinit.set_brush_texture(brush);
+}
+
+unsafe fn safe_create_texture(env: *mut JNIEnv, data: jint, bitmap: jobject) -> GLResult<DrawObjectIndex<Texture>> {
+    let bitmap = AndroidBitmap::from_jobject(env, bitmap);
+    let (w, h) = (bitmap.info.width, bitmap.info.height);
+    let format: AndroidBitmapFormat = mem::transmute(bitmap.info.format);
+    let texformat = try!(format.to_pixelformat());
+    Ok(get_safe_data(data).events.load_brush(w as i32, h as i32, bitmap.as_slice(), texformat))
 }
 
 unsafe extern "C" fn create_texture(env: *mut JNIEnv, thiz: jobject, data: jint, bitmap: jobject) -> jobject {
-    let bitmap = AndroidBitmap::from_jobject(env, bitmap);
-    let (w, h) = (bitmap.info.width, bitmap.info.height);
-    let format = mem::transmute(bitmap.info.format);
-    let texture = get_safe_data(data).load_texture(w as i32, h as i32, bitmap.as_slice(), format);
-    glresult_to_either(env, texture)
+    glresult_to_either(env, safe_create_texture(env, data, bitmap))
 }
 
 unsafe extern "C" fn clear_framebuffer(env: *mut JNIEnv, thiz: jobject, data: jint) {
-    get_safe_data(data).clear_buffer();
+    let data = get_safe_data(data);
+    data.events.clear();
+    data.glinit.clear_buffer();
 }
 
 unsafe fn get_string(env: *mut JNIEnv, string: jstring) -> Option<String> {
@@ -185,22 +215,22 @@ unsafe fn get_string(env: *mut JNIEnv, string: jstring) -> Option<String> {
 }
 
 unsafe extern "C" fn compile_copyshader(env: *mut JNIEnv, thiz: jobject, data: i32, vec: jstring, frag: jstring) -> jobject {
-    glresult_to_either(env, get_safe_data(data).compile_copy_shader(get_string(env, vec), get_string(env, frag)))
+    glresult_to_either(env, get_safe_data(data).events.load_copyshader(get_string(env, vec), get_string(env, frag)))
 }
 
 unsafe extern "C" fn compile_pointshader(env: *mut JNIEnv, thiz: jobject, data: i32, vec: jstring, frag: jstring) -> jobject {
-    glresult_to_either(env, get_safe_data(data).compile_point_shader(get_string(env, vec), get_string(env, frag)))
+    glresult_to_either(env, get_safe_data(data).events.load_pointshader(get_string(env, vec), get_string(env, frag)))
 }
 
 unsafe extern "C" fn draw_image(env: *mut JNIEnv, thiz: jobject, data: i32, bitmap: jobject) {
     // TODO: ensure rgba_8888 format and throw error
     let bitmap = AndroidBitmap::from_jobject(env, bitmap);
     let pixels = bitmap.as_slice();
-    get_safe_data(data).draw_image(bitmap.info.width as i32, bitmap.info.height as i32, pixels);
+    get_safe_data(data).glinit.draw_image(bitmap.info.width as i32, bitmap.info.height as i32, pixels);
 }
 
 unsafe extern "C" fn export_pixels(env: *mut JNIEnv, thiz: jobject, data: i32) -> jobject {
-    get_safe_data(data).with_pixels(|w, h, pixels| {
+    get_safe_data(data).glinit.with_pixels(|w, h, pixels| {
         logi!("in callback!");
         let bitmapclass = ((**env).FindClass)(env, cstr!("android/graphics/Bitmap"));
         let bitmap = AndroidBitmap::new(env, w, h);
@@ -275,19 +305,50 @@ unsafe extern "C" fn jni_egl_init(env: *mut JNIEnv, thiz: jobject, surface: jobj
 
 unsafe extern "C" fn jni_lua_compile_script(env: *mut JNIEnv, thiz: jobject, data: i32, script: jstring) -> jobject {
     let scriptstr = get_string(env, script);
-    glresult_to_either(env, get_safe_data(data).compile_luascript(scriptstr))
+    glresult_to_either(env, get_safe_data(data).events.load_interpolator(scriptstr))
 }
 
 unsafe extern "C" fn jni_lua_set_interpolator(env: *mut JNIEnv, thiz: jobject, data: jint, scriptid: jint) {
-    get_safe_data(data).set_interpolator(mem::transmute(scriptid));
+    let data = get_safe_data(data);
+    let script = data.events.use_interpolator(mem::transmute(scriptid));
+    data.glinit.set_interpolator(script);
 }
 
 unsafe extern "C" fn jni_add_layer(env: *mut JNIEnv, thiz: jobject, data: jint, copyshader: jint, pointshader: jint, pointidx: jint) {
-    get_safe_data(data).add_layer(mem::transmute(copyshader), mem::transmute(pointshader), mem::transmute(pointidx));
+    let data = get_safe_data(data);
+    let copyshader = Some(mem::transmute(copyshader));
+    let pointshader = Some(mem::transmute(pointshader));
+    let layer = data.events.add_layer(data.glinit.dimensions, copyshader, pointshader, mem::transmute(pointidx));
+    data.glinit.add_layer(layer);
 }
 
 unsafe extern "C" fn jni_clear_layers(env: *mut JNIEnv, thiz: jobject, data: jint) {
-    get_safe_data(data).clear_layers();
+    let data = get_safe_data(data);
+    data.events.clear_layers();
+    data.glinit.clear_layers();
+}
+
+unsafe extern "C" fn jni_replay_begin(env: *mut JNIEnv, thiz: jobject, data: jint) -> jint {
+    let data = get_safe_data(data);
+    data.glinit.clear_layers();
+    data.glinit.clear_buffer();
+    mem::transmute(box EventStream::new())
+}
+
+#[allow(unused)]
+unsafe extern "C" fn jni_replay_advance_frame(env: *mut JNIEnv, thiz: jobject, data: jint, replay: jint, java_matrix: jfloatArray) -> jboolean {
+    let data = get_safe_data(data);
+    let replay: &mut EventStream = mem::transmute(replay);
+    let mut matrix: Matrix = mem::uninitialized();
+    ((**env).GetFloatArrayRegion)(env, java_matrix, 0, 16, matrix.as_mut_ptr());
+    let done = replay.advance_frame(&mut data.glinit, &mut data.events);
+    data.glinit.draw_queued_points(&mut replay.consumer, &mut data.events, &matrix);
+    if done { JNI_TRUE as jboolean } else { JNI_FALSE as jboolean }
+}
+
+unsafe extern "C" fn jni_replay_destroy(env: *mut JNIEnv, thiz: jobject, replay: jint) {
+    let replay: Box<EventStream> = mem::transmute(replay);
+    mem::drop(replay);
 }
 
 unsafe fn register_classmethods(env: *mut JNIEnv, classname: *const i8, methods: &[JNINativeMethod]) {
@@ -373,6 +434,14 @@ pub unsafe extern "C" fn JNI_OnLoad(vm: *mut JavaVM, reserved: *mut c_void) -> j
     ];
     register_classmethods(env, cstr!("com/github/wartman4404/gldraw/MotionEventHandlerPair$"), motioneventhandlerstaticmethods);
     logi!("registered motionevent methods!");
+
+    let replayhandlerstaticmethods = [
+        native_method!("init", "(I)I", jni_replay_begin),
+        native_method!("destroy", "(I)V", jni_replay_destroy),
+        native_method!("advanceFrame", "(II[F)Z", jni_replay_advance_frame),
+    ];
+    register_classmethods(env, cstr!("com/github/wartman4404/gldraw/Replay$"), replayhandlerstaticmethods);
+    logi!("registered replay methods!");
     logi!("finished jni_onload");
     JNI_VERSION_1_2
 }

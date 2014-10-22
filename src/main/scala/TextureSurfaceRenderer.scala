@@ -18,6 +18,7 @@ extends Thread with Handler.Callback with AndroidImplicits {
   private var eglHelper: EGLHelper = null
   private var outputShader: Option[CopyShader] = None
   var glinit: Option[GLInit] = None
+  private var replay = Replay.nullReplay
 
   @native protected def nativeUpdateGL(data: GLInit): Unit
   @native protected def nativeDrawQueuedPoints(data: GLInit, handler: MotionEventHandler, transformMatrix: Array[Float]): Unit
@@ -47,7 +48,11 @@ extends Thread with Handler.Callback with AndroidImplicits {
           val next = SystemClock.uptimeMillis() + 1000 / targetFramerate
           val gl: GLInit = GLInit.fromMessage(msg)
           try {
-            drawQueuedPoints(gl)
+            if (replay == Replay.nullReplay) {
+              drawQueuedPoints(gl)
+            } else {
+              drawReplayFrame(gl, replay)
+            }
           } catch {
             case e: LuaException => {
               nativeSetInterpolator(gl, LuaScript(gl, null).right.get)
@@ -166,6 +171,14 @@ extends Thread with Handler.Callback with AndroidImplicits {
     nativeDrawQueuedPoints(g, motionHandler, matrix)
   }
 
+  private def drawReplayFrame(gl: GLInit, r: Replay) = {
+    val finished = Replay.advanceFrame(gl, r, matrix)
+    if (finished) {
+      Replay.destroy(r)
+      this.replay = Replay.nullReplay
+    }
+  }
+
   private def updateGL(g: GLInit) {
     nativeUpdateGL(g)
   }
@@ -188,6 +201,12 @@ extends Thread with Handler.Callback with AndroidImplicits {
     runHere {
       nativeSetBrushTexture(gl, texture)
     }
+  }
+
+  def beginReplay() {
+    for (gl <- glinit) { runHere {
+      replay = Replay.init(gl)
+    }}
   }
 
   // only set values, could maybe run on main thread
