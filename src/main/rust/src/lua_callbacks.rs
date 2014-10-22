@@ -59,6 +59,6 @@ pub unsafe extern "C" fn lua_log(message: *const c_char) {
 }
 
 #[no_mangle]
-pub unsafe extern "C" fn lua_clear(data: &mut LuaCallbackType, layer: i32) {
+pub unsafe extern "C" fn lua_clearlayer(data: &mut LuaCallbackType, layer: i32) {
     data.glinit.erase_layer(layer);
 }

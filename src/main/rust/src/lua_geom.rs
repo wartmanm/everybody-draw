@@ -74,8 +74,8 @@ unsafe fn init_lua() -> GLResult<*mut lua_State> {
         logi!("ffi init script loaded");
         Ok(L)
     } else {
-        lua_close(L);
         let err = format!("ffi init script failed to load: {}\nThis should never happen!", err_to_str(L));
+        lua_close(L);
         log_err(err)
     }
 }
