@@ -10,6 +10,7 @@ use glpoint;
 use glpoint::MotionEventConsumer;
 use glinit::GLInit;
 use drawevent::Events;
+use log::{logi};
 
 static MOVE: u8 = 0u8;
 static DONE: u8 = 1u8;
@@ -72,6 +73,11 @@ pub unsafe extern "C" fn lua_savelayers(data: &mut LuaCallbackType) {
 }
 
 #[no_mangle]
-pub unsafe extern "C" fn lua_pushcatmullrom(data: &mut LuaCallbackType, queue: i32, points: [&ShaderPaintPoint, ..4]) {
+pub unsafe extern "C" fn lua_pushcatmullrom(data: &mut LuaCallbackType, queue: i32, points: &[ShaderPaintPoint, ..4]) {
     glpoint::push_catmullrom(&mut data.glinit.points.as_mut_slice()[queue as uint], points);
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn lua_pushcubicbezier(data: &mut LuaCallbackType, queue: i32, points: &[ShaderPaintPoint, ..4]) {
+    glpoint::push_cubicbezier(&mut data.glinit.points.as_mut_slice()[queue as uint], points);
 }

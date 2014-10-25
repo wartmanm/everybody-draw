@@ -137,7 +137,7 @@ pub fn next_point(s: &mut MotionEventConsumer, e: &mut Events) -> (point::Shader
 fn get_count(a: &ShaderPaintPoint, b: &ShaderPaintPoint) -> i32 {
     let distx = if (*a).pos.x > (*b).pos.x { (*a).pos.x - (*b).pos.x } else { (*b).pos.x - (*a).pos.x };
     let disty = if (*a).pos.y > (*b).pos.y { (*a).pos.y - (*b).pos.y } else { (*b).pos.y - (*a).pos.y };
-    ((if distx > disty { distx } else { disty }) / 3f32) as i32
+    ((if distx > disty { distx } else { disty }) / 1f32) as i32
 }
 
 
@@ -169,34 +169,77 @@ pub fn push_line(drawvec: &mut Vec<ShaderPaintPoint>, a: &ShaderPaintPoint, b: &
 
 #[inline]
 //pub fn push_catmullrom(drawvec: &mut Vec<ShaderPaintPoint>, a: &ShaderPaintPoint, b: ShaderPaintPoint, c: ShaderPaintPoint, d: ShaderPaintPoint) {
-pub fn push_catmullrom(drawvec: &mut Vec<ShaderPaintPoint>, points: [&ShaderPaintPoint, ..4]) {
+pub fn push_catmullrom(drawvec: &mut Vec<ShaderPaintPoint>, points: &[ShaderPaintPoint, ..4]) {
+    push_bezierpts(drawvec, points, interpolate_catmullrom);
+}
+#[inline]
+pub fn push_cubicbezier(drawvec: &mut Vec<ShaderPaintPoint>, points: &[ShaderPaintPoint, ..4]) {
+    push_bezierpts(drawvec, points, interpolate_cubicbezier);
+}
+#[inline]
+pub fn push_bezierpts(drawvec: &mut Vec<ShaderPaintPoint>, points: &[ShaderPaintPoint, ..4], cb: fn(&[f32, ..4], &[f32, ..4], f32) -> f32) {
     let mut time = [0f32, ..4];
     let mut x = [0f32, ..4];
     let mut y = [0f32, ..4];
     let mut total = 0f32;
-    for i in range(0, 4) {
-        unsafe {
-            let (p, pnext) = (points.unsafe_get(i+1).pos, points.unsafe_get(i).pos);
+    unsafe {
+        for i in range(0, 3) {
+            let (p, pnext) = (points.unsafe_get(i).pos, points.unsafe_get(i+1).pos);
             let Coordinate { x: dx, y: dy } = pnext - p;
             total += (dx * dx + dy * dy).powf(0.25f32);
-            *time.unsafe_mut(i) = total;
+            *time.unsafe_mut(i+1) = total;
             *x.unsafe_mut(i) = p.x;
             *y.unsafe_mut(i) = p.y;
         }
+        let p3 = points.unsafe_get(3).pos;
+        *x.unsafe_mut(3) = p3.x;
+        *y.unsafe_mut(3) = p3.y;
+        for i in range(0, 4) {
+            let p = points[i].pos;
+            let total = time[i];
+            logi!("{:u}: time = {:5.2f} pos = ({:5.1f},{:5.1f})", i, total, p.x, p.y);
+        }
     }
     let (tstart, tend) = (time[1], time[2]);
-    let count = unsafe { get_count(*points.unsafe_get(1), *points.unsafe_get(2)) };
+    let count = unsafe { get_count(points.unsafe_get(1), points.unsafe_get(2)) };
     let timestep = (tend - tstart) / (count as f32);
-    let mut addpoint = *points[0];
+
+    let mut addpoint = points[0];
     let mut curtime = tstart;
+
+    let (a, b) = unsafe { (points.unsafe_get(1), points.unsafe_get(2)) };
+    let timescale = 10f32;
+    let steptime = ((*b).time - (*a).time) / (count as f32 * timescale);
+    let stepsize = ((*b).size - (*a).size) / count as f32;
+    let stepspeedx = ((*b).speed.x - (*a).speed.x) / count as f32;
+    let stepspeedy = ((*b).speed.y - (*a).speed.y) / count as f32;
+    let stepdistance = ((*b).distance - (*a).distance) / count as f32;
+    addpoint.time = (addpoint.time / timescale) % 1f32;
+
     for _ in range(0, count) {
         drawvec.push(addpoint);
-        addpoint.pos.x = interpolate_catmullrom(&x, &time, curtime);
-        addpoint.pos.y = interpolate_catmullrom(&y, &time, curtime);
+        addpoint.pos.x = cb(&x, &time, curtime);
+        addpoint.pos.y = cb(&y, &time, curtime);
         curtime += timestep;
+
+        addpoint.time += steptime;
+        addpoint.time = if addpoint.time > 1f32 { addpoint.time - 1f32 } else { addpoint.time };
+        addpoint.size += stepsize;
+        addpoint.speed.x += stepspeedx;
+        addpoint.speed.y += stepspeedy;
+        addpoint.distance += stepdistance;
     }
 }
 
+fn interpolate_cubicbezier(p: &[f32, ..4], _: &[f32, ..4], t: f32) -> f32 {
+    let negt = 1f32 - t;
+    let (t2, negt2) = (t * t, negt * negt);
+    let p0 = negt * negt2 * p[0];
+    let p1 = negt2 * t * 3f32 * p[1];
+    let p2 = negt * t2 * 3f32 * p[2];
+    let p3 = t * t2 * p[3];
+    p0 + p1 + p2 + p3
+}
 
 #[inline]
 fn interpolate_catmullrom(p: &[f32, ..4], time: &[f32, ..4], t: f32) -> f32 {
