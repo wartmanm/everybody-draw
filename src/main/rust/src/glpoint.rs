@@ -13,7 +13,6 @@ use android::input::AInputEvent;
 
 use point;
 use point::{ShaderPaintPoint, Coordinate, PointEntry, PointConsumer, PointProducer};
-use activestate;
 use drawevent::Events;
 
 rolling_average_count!(RollingAverage16, 16)
@@ -31,7 +30,6 @@ pub struct MotionEventConsumer {
     current_points: SmallIntMap<PointStorage>,
     point_counter: i32,
     point_count: i32,
-    all_pointer_state: activestate::ActiveState,
 }
 
 pub struct MotionEventProducer {
@@ -46,7 +44,6 @@ pub fn create_motion_event_handler() -> (MotionEventConsumer, MotionEventProduce
         current_points: SmallIntMap::new(),
         point_counter: 0, // unique value for each new pointer
         point_count: 0, // # of currently active pointers
-        all_pointer_state: activestate::INACTIVE,
     };
     let producer = MotionEventProducer {
         producer: producer,
@@ -72,13 +69,6 @@ fn manhattan_distance(a: Coordinate, b: Coordinate) -> f32 {
     return if x > y { x } else { y };
 }
 
-impl MotionEventConsumer {
-    pub fn frame_done(&mut self) -> bool {
-        self.all_pointer_state = self.all_pointer_state.push(self.point_count > 0);
-        self.all_pointer_state == activestate::STOPPING
-    }
-}
-        
 #[inline]
 pub fn next_point(s: &mut MotionEventConsumer, e: &mut Events) -> (point::ShaderPointEvent, u8) {
     let ref mut queue = s.consumer;

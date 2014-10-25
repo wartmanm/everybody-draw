@@ -7,6 +7,21 @@ if type(main) ~= "function" then
   return
 end
 
+if onup == nil and ondown == nil then
+  local downcount = 0
+  function default_ondown(pointer)
+    downcount = downcount + 1
+  end
+  function default_onup(pointer)
+    downcount = downcount - 1
+    if downcount == 0 then
+      savelayers()
+    end
+  end
+  _ondown = default_ondown
+  _onup = default_onup
+end
+
 function runmain(x, y, output)
   if type(_onframe) == "function" then
     _onframe(x, y, output)
@@ -19,13 +34,15 @@ function runmain(x, y, output)
   while true do
     local pointstatus = ffi.C.lua_nextpoint(output, pointpair)
     local status = bit.band(0xff00, pointstatus)
-    if status == 0x0000 then
+    if status == 0x0000 then -- pointer move
       _main(pointpair[0], pointpair[1], x, y, output)
-    elseif status == 0x0100 then
+    elseif status == 0x0100 then -- no more points
       break
-    elseif status == 0x0200 then
+    elseif status == 0x0200 then -- pointer down
+      downcount = downcount + 1
       if type(_ondown) == "function" then _ondown(pointpair[0]) end
-    else
+    else -- pointer up
+      downcount = downcount - 1
       if type(_onup) == "function" then
         local pointer = bit.band(0x00ff, pointstatus)
         _onup(pointer)

@@ -22,4 +22,6 @@ pushpoint=ffi.C.lua_pushpoint
 pushline=ffi.C.lua_pushline
 loglua=ffi.C.lua_log
 clearlayer=ffi.C.lua_clearlayer
+savelayers=ffi.C.lua_savelayers
+
 ShaderPaintPoint=ffi.typeof("struct ShaderPaintPoint")

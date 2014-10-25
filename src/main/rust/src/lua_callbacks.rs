@@ -65,3 +65,9 @@ pub unsafe extern "C" fn lua_log(message: *const c_char) {
 pub unsafe extern "C" fn lua_clearlayer(data: &mut LuaCallbackType, layer: i32) {
     data.glinit.erase_layer(layer);
 }
+
+#[no_mangle]
+pub unsafe extern "C" fn lua_savelayers(data: &mut LuaCallbackType) {
+    data.glinit.copy_layers_down();
+}
+
