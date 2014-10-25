@@ -1,6 +1,6 @@
 // TODO: more meaningful names
 use std::sync::spsc_queue;
-use core::ops::{Add, Div, Sub};
+use core::ops::{Add, Div, Sub, Mul};
 
 #[deriving(Clone, Show, PartialEq, Zero)]
 #[repr(C)]
@@ -76,5 +76,11 @@ impl Div<f32, Coordinate> for Coordinate {
     #[inline(always)]
     fn div(&self, rhs: &f32) -> Coordinate {
         Coordinate { x: self.x / *rhs, y: self.y / *rhs }
+    }
+}
+impl Mul<f32, Coordinate> for Coordinate {
+    #[inline(always)]
+    fn mul(&self, rhs: &f32) -> Coordinate {
+        Coordinate { x: self.x * *rhs, y: self.y * *rhs }
     }
 }

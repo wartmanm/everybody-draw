@@ -170,37 +170,23 @@ pub fn push_line(drawvec: &mut Vec<ShaderPaintPoint>, a: &ShaderPaintPoint, b: &
 #[inline]
 //pub fn push_catmullrom(drawvec: &mut Vec<ShaderPaintPoint>, a: &ShaderPaintPoint, b: ShaderPaintPoint, c: ShaderPaintPoint, d: ShaderPaintPoint) {
 pub fn push_catmullrom(drawvec: &mut Vec<ShaderPaintPoint>, points: &[ShaderPaintPoint, ..4]) {
-    push_bezierpts(drawvec, points, interpolate_catmullrom);
+    push_splinepts::<CatmullRom>(drawvec, points);
 }
 #[inline]
 pub fn push_cubicbezier(drawvec: &mut Vec<ShaderPaintPoint>, points: &[ShaderPaintPoint, ..4]) {
-    push_bezierpts(drawvec, points, interpolate_cubicbezier);
+    push_splinepts::<CubicBezier>(drawvec, points);
 }
 #[inline]
-pub fn push_bezierpts(drawvec: &mut Vec<ShaderPaintPoint>, points: &[ShaderPaintPoint, ..4], cb: fn(&[f32, ..4], &[f32, ..4], f32) -> f32) {
-    let mut time = [0f32, ..4];
-    let mut x = [0f32, ..4];
-    let mut y = [0f32, ..4];
-    let mut total = 0f32;
-    unsafe {
-        for i in range(0, 3) {
-            let (p, pnext) = (points.unsafe_get(i).pos, points.unsafe_get(i+1).pos);
-            let Coordinate { x: dx, y: dy } = pnext - p;
-            total += (dx * dx + dy * dy).powf(0.25f32);
-            *time.unsafe_mut(i+1) = total;
-            *x.unsafe_mut(i) = p.x;
-            *y.unsafe_mut(i) = p.y;
-        }
-        let p3 = points.unsafe_get(3).pos;
-        *x.unsafe_mut(3) = p3.x;
-        *y.unsafe_mut(3) = p3.y;
+fn push_splinepts<T: Spline<Coordinate>>(drawvec: &mut Vec<ShaderPaintPoint>, points: &[ShaderPaintPoint, ..4]) {
+    let coords = unsafe {
+        let mut coords: [Coordinate, ..4] = mem::uninitialized();
         for i in range(0, 4) {
-            let p = points[i].pos;
-            let total = time[i];
-            logi!("{:u}: time = {:5.2f} pos = ({:5.1f},{:5.1f})", i, total, p.x, p.y);
+            *coords.unsafe_mut(i) = points.unsafe_get(i).pos;
         }
-    }
-    let (tstart, tend) = (time[1], time[2]);
+        coords
+    };
+    let spline: T = Spline::new(coords);
+    let (tstart, tend) = spline.get_time_scale();
     let count = unsafe { get_count(points.unsafe_get(1), points.unsafe_get(2)) };
     let timestep = (tend - tstart) / (count as f32);
 
@@ -218,8 +204,7 @@ pub fn push_bezierpts(drawvec: &mut Vec<ShaderPaintPoint>, points: &[ShaderPaint
 
     for _ in range(0, count) {
         drawvec.push(addpoint);
-        addpoint.pos.x = cb(&x, &time, curtime);
-        addpoint.pos.y = cb(&y, &time, curtime);
+        addpoint.pos = spline.interpolate(curtime);
         curtime += timestep;
 
         addpoint.time += steptime;
@@ -231,26 +216,85 @@ pub fn push_bezierpts(drawvec: &mut Vec<ShaderPaintPoint>, points: &[ShaderPaint
     }
 }
 
-fn interpolate_cubicbezier(p: &[f32, ..4], _: &[f32, ..4], t: f32) -> f32 {
-    let negt = 1f32 - t;
-    let (t2, negt2) = (t * t, negt * negt);
-    let p0 = negt * negt2 * p[0];
-    let p1 = negt2 * t * 3f32 * p[1];
-    let p2 = negt * t2 * 3f32 * p[2];
-    let p3 = t * t2 * p[3];
-    p0 + p1 + p2 + p3
+trait Spline<T: Mul<f32, T> + Add<T, T> + Sub<T, T>> {
+    fn new(points: [T, ..4]) -> Self;
+    fn get_time_scale(&self) -> (f32, f32);
+    fn interpolate(&self, t: f32) -> T;
 }
 
-#[inline]
-fn interpolate_catmullrom(p: &[f32, ..4], time: &[f32, ..4], t: f32) -> f32 {
-    let l01 = p[0] * (time[1] - t) / (time[1] - time[0]) + p[1] * (t - time[0]) / (time[1] - time[0]);
-    let l12 = p[1] * (time[2] - t) / (time[2] - time[1]) + p[2] * (t - time[1]) / (time[2] - time[1]);
-    let l23 = p[2] * (time[3] - t) / (time[3] - time[2]) + p[3] * (t - time[2]) / (time[3] - time[2]);
-    let l012 = l01 * (time[2] - t) / (time[2] - time[0]) + l12 * (t - time[0]) / (time[2] - time[0]);
-    let l123 = l12 * (time[3] - t) / (time[3] - time[1]) + l23 * (t - time[1]) / (time[3] - time[1]);
-    let c12 = l012 * (time[2] - t) / (time[2] - time[1]) + l123 * (t - time[1]) / (time[2] - time[1]);
-    c12
+struct CatmullRom {
+    points: [Coordinate, ..4],
+    time: [f32, ..4],
 }
 
+impl Spline<Coordinate> for CatmullRom {
+    fn new(points: [Coordinate, ..4]) -> CatmullRom {
+        let mut time = [0f32, ..4];
+        let mut total = 0f32;
+        unsafe {
+            for i in range(0, 3) {
+                let (p, pnext) = (points.unsafe_get(i), points.unsafe_get(i+1));
+                let Coordinate { x: dx, y: dy } = *pnext - *p;
+                total += (dx * dx + dy * dy).powf(0.25f32);
+                *time.unsafe_mut(i+1) = total;
+            }
+        }
+        CatmullRom { points: points, time: time }
+    }
+    fn get_time_scale(&self) -> (f32, f32) {
+        (self.time[1], self.time[2])
+    }
+    fn interpolate(&self, t: f32) -> Coordinate {
+        let (p, time) = (self.points, self.time);
+        let l01 = p[0] * ((time[1] - t) / (time[1] - time[0])) + p[1] * ((t - time[0]) / (time[1] - time[0]));
+        let l12 = p[1] * ((time[2] - t) / (time[2] - time[1])) + p[2] * ((t - time[1]) / (time[2] - time[1]));
+        let l23 = p[2] * ((time[3] - t) / (time[3] - time[2])) + p[3] * ((t - time[2]) / (time[3] - time[2]));
+        let l012 = l01 * ((time[2] - t) / (time[2] - time[0])) + l12  * ((t - time[0]) / (time[2] - time[0]));
+        let l123 = l12 * ((time[3] - t) / (time[3] - time[1])) + l23  * ((t - time[1]) / (time[3] - time[1]));
+        let c12 = l012 * ((time[2] - t) / (time[2] - time[1])) + l123 * ((t - time[1]) / (time[2] - time[1]));
+        c12
+    }
+}
 
+struct CubicBezier {
+    pub points: [Coordinate, ..4],
+}
+
+impl Spline<Coordinate> for CubicBezier {
+    fn new(points: [Coordinate, ..4]) -> CubicBezier {
+        CubicBezier { points: points }
+    }
+    fn get_time_scale(&self) -> (f32, f32) {
+        (0f32, 1f32)
+    }
+    fn interpolate(&self, t: f32) -> Coordinate {
+        let p = self.points;
+        let negt = 1f32 - t;
+        let (t2, negt2) = (t * t, negt * negt);
+        let p0 = p[0] * (negt * negt2);
+        let p1 = p[1] * (negt2 * t * 3f32);
+        let p2 = p[2] * (negt * t2 * 3f32);
+        let p3 = p[3] * (t * t2);
+        p0 + p1 + p2 + p3
+    }
+}
+
+#[allow(dead_code)]
+struct SillyBezier {
+    pub bezier: CubicBezier,
+}
+
+#[allow(dead_code)]
+impl Spline<Coordinate> for SillyBezier {
+    fn new(points: [Coordinate, ..4]) -> SillyBezier {
+        SillyBezier { bezier: Spline::new(points) }
+    }
+    fn get_time_scale(&self) -> (f32, f32) {
+        let catmullrom: CatmullRom = Spline::new(self.bezier.points);
+        catmullrom.get_time_scale()
+    }
+    fn interpolate(&self, t: f32) -> Coordinate {
+        self.bezier.interpolate(t)
+    }
+}
 
