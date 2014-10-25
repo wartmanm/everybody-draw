@@ -233,3 +233,7 @@ function main(a, b, x, y, points)
   mMickey.x = a.x
   mMickey.y = a.y
 end
+
+function onup(pointer, output)
+  -- don't copy neko down
+end

@@ -98,6 +98,10 @@ pub unsafe fn load_lua_script(script: Option<&str>) -> GLResult<i32> {
     lua_setglobal(L, cstr!("main"));
     lua_pushnil(L);
     lua_setglobal(L, cstr!("onframe"));
+    lua_pushnil(L);
+    lua_setglobal(L, cstr!("ondown"));
+    lua_pushnil(L);
+    lua_setglobal(L, cstr!("onup"));
 
     let key = (&gldraw_lua_key) as *const i32 as i32 + gldraw_lua_key;
     lua_pushlightuserdata(L, key as *mut c_void);

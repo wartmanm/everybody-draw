@@ -16,6 +16,7 @@ ffi.cdef[[
   void lua_log(const char *message);
   void lua_pushline(void *output, int queue, struct ShaderPaintPoint *pointa, struct ShaderPaintPoint *pointb);
   void lua_clearlayer(void *output, int layer);
+  void lua_savelayers(void *output);
 ]]
 
 pushpoint=ffi.C.lua_pushpoint

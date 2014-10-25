@@ -8,14 +8,15 @@ if type(main) ~= "function" then
 end
 
 if onup == nil and ondown == nil then
+  loglua("setting default pointer callbacks")
   local downcount = 0
-  function default_ondown(pointer)
+  function default_ondown(pointer, output)
     downcount = downcount + 1
   end
-  function default_onup(pointer)
+  function default_onup(pointer, output)
     downcount = downcount - 1
     if downcount == 0 then
-      savelayers()
+      savelayers(output)
     end
   end
   _ondown = default_ondown
@@ -39,13 +40,11 @@ function runmain(x, y, output)
     elseif status == 0x0100 then -- no more points
       break
     elseif status == 0x0200 then -- pointer down
-      downcount = downcount + 1
-      if type(_ondown) == "function" then _ondown(pointpair[0]) end
+      if type(_ondown) == "function" then _ondown(pointpair[0], output) end
     else -- pointer up
-      downcount = downcount - 1
       if type(_onup) == "function" then
         local pointer = bit.band(0x00ff, pointstatus)
-        _onup(pointer)
+        _onup(pointer, output)
       end
     end
   end
