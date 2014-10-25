@@ -134,10 +134,16 @@ pub fn next_point(s: &mut MotionEventConsumer, e: &mut Events) -> (point::Shader
 }
 
 #[inline]
-pub fn push_line(drawvec: &mut Vec<ShaderPaintPoint>, a: &ShaderPaintPoint, b: &ShaderPaintPoint) {
+fn get_count(a: &ShaderPaintPoint, b: &ShaderPaintPoint) -> i32 {
     let distx = if (*a).pos.x > (*b).pos.x { (*a).pos.x - (*b).pos.x } else { (*b).pos.x - (*a).pos.x };
     let disty = if (*a).pos.y > (*b).pos.y { (*a).pos.y - (*b).pos.y } else { (*b).pos.y - (*a).pos.y };
-    let count = if distx > disty { distx } else { disty } as i32;
+    ((if distx > disty { distx } else { disty }) / 3f32) as i32
+}
+
+
+#[inline]
+pub fn push_line(drawvec: &mut Vec<ShaderPaintPoint>, a: &ShaderPaintPoint, b: &ShaderPaintPoint) {
+    let count = get_count(a, b);
     let timescale = 10f32;
     let stepx = ((*b).pos.x - (*a).pos.x) / count as f32;
     let stepy = ((*b).pos.y - (*a).pos.y) / count as f32;
@@ -160,3 +166,48 @@ pub fn push_line(drawvec: &mut Vec<ShaderPaintPoint>, a: &ShaderPaintPoint, b: &
         addpoint.distance += stepdistance;
     }
 }
+
+#[inline]
+//pub fn push_catmullrom(drawvec: &mut Vec<ShaderPaintPoint>, a: &ShaderPaintPoint, b: ShaderPaintPoint, c: ShaderPaintPoint, d: ShaderPaintPoint) {
+pub fn push_catmullrom(drawvec: &mut Vec<ShaderPaintPoint>, points: [&ShaderPaintPoint, ..4]) {
+    let mut time = [0f32, ..4];
+    let mut x = [0f32, ..4];
+    let mut y = [0f32, ..4];
+    let mut total = 0f32;
+    for i in range(0, 4) {
+        unsafe {
+            let (p, pnext) = (points.unsafe_get(i+1).pos, points.unsafe_get(i).pos);
+            let Coordinate { x: dx, y: dy } = pnext - p;
+            total += (dx * dx + dy * dy).powf(0.25f32);
+            *time.unsafe_mut(i) = total;
+            *x.unsafe_mut(i) = p.x;
+            *y.unsafe_mut(i) = p.y;
+        }
+    }
+    let (tstart, tend) = (time[1], time[2]);
+    let count = unsafe { get_count(*points.unsafe_get(1), *points.unsafe_get(2)) };
+    let timestep = (tend - tstart) / (count as f32);
+    let mut addpoint = *points[0];
+    let mut curtime = tstart;
+    for _ in range(0, count) {
+        drawvec.push(addpoint);
+        addpoint.pos.x = interpolate_catmullrom(&x, &time, curtime);
+        addpoint.pos.y = interpolate_catmullrom(&y, &time, curtime);
+        curtime += timestep;
+    }
+}
+
+
+#[inline]
+fn interpolate_catmullrom(p: &[f32, ..4], time: &[f32, ..4], t: f32) -> f32 {
+    let l01 = p[0] * (time[1] - t) / (time[1] - time[0]) + p[1] * (t - time[0]) / (time[1] - time[0]);
+    let l12 = p[1] * (time[2] - t) / (time[2] - time[1]) + p[2] * (t - time[1]) / (time[2] - time[1]);
+    let l23 = p[2] * (time[3] - t) / (time[3] - time[2]) + p[3] * (t - time[2]) / (time[3] - time[2]);
+    let l012 = l01 * (time[2] - t) / (time[2] - time[0]) + l12 * (t - time[0]) / (time[2] - time[0]);
+    let l123 = l12 * (time[3] - t) / (time[3] - time[1]) + l23 * (t - time[1]) / (time[3] - time[1]);
+    let c12 = l012 * (time[2] - t) / (time[2] - time[1]) + l123 * (t - time[1]) / (time[2] - time[1]);
+    c12
+}
+
+
+

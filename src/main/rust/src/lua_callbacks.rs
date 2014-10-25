@@ -71,3 +71,7 @@ pub unsafe extern "C" fn lua_savelayers(data: &mut LuaCallbackType) {
     data.glinit.copy_layers_down();
 }
 
+#[no_mangle]
+pub unsafe extern "C" fn lua_pushcatmullrom(data: &mut LuaCallbackType, queue: i32, points: [&ShaderPaintPoint, ..4]) {
+    glpoint::push_catmullrom(&mut data.glinit.points.as_mut_slice()[queue as uint], points);
+}
