@@ -1,0 +1,13 @@
+precision lowp float;
+varying float time;
+varying float size;
+varying vec3 color;
+varying vec2 position;
+uniform sampler2D texture;
+void main() {
+  vec2 uv = fract(vec2(gl_FragCoord) / 128.0);
+  uv.y = 1.0 - uv.y;
+  vec3 color = vec3(texture2D(texture, uv));
+  float alpha = texture2D(texture, gl_PointCoord).a;
+  gl_FragColor = vec4(color * alpha, alpha);
+}
