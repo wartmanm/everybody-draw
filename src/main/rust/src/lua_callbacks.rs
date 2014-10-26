@@ -49,7 +49,7 @@ pub extern "C" fn lua_nextpoint(data: &mut LuaCallbackType, points: &mut (Shader
 
 #[no_mangle]
 pub unsafe extern "C" fn lua_pushpoint(data: &mut LuaCallbackType, queue: i32, point: *const ShaderPaintPoint) {
-    data.glinit.points.as_mut_slice()[queue as uint].push(*point)
+    glpoint::push_point(&mut data.glinit.points.as_mut_slice()[queue as uint], &*point);
 }
 
 #[no_mangle]

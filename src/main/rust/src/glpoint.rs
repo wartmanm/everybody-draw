@@ -140,6 +140,13 @@ fn get_count(a: &ShaderPaintPoint, b: &ShaderPaintPoint) -> i32 {
     ((if distx > disty { distx } else { disty }) / 1f32) as i32
 }
 
+#[inline]
+pub fn push_point(drawvec: &mut Vec<ShaderPaintPoint>, a: &ShaderPaintPoint) {
+    let timescale = 10f32;
+    let mut addpoint = *a;
+    addpoint.time = (addpoint.time / timescale) % 1f32;
+    drawvec.push(addpoint);
+}
 
 #[inline]
 pub fn push_line(drawvec: &mut Vec<ShaderPaintPoint>, a: &ShaderPaintPoint, b: &ShaderPaintPoint) {
