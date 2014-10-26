@@ -1,13 +1,13 @@
-local _main = main
-local _onframe = onframe
-local _ondown = ondown
-local _onup = onup
-if type(main) ~= "function" then
+local _main = callbacks.main
+local _onframe = callbacks.onframe
+local _ondown = callbacks.ondown
+local _onup = callbacks.onup
+if type(_main) ~= "function" then
   loglua("main not defined for runmain()!!")
   return
 end
 
-if onup == nil and ondown == nil then
+if _onup == nil and _ondown == nil then
   loglua("setting default pointer callbacks")
   local downcount = 0
   function default_ondown(pointer, output)
@@ -26,10 +26,6 @@ end
 function runmain(x, y, output)
   if type(_onframe) == "function" then
     _onframe(x, y, output)
-  end
-  if type(_main) ~= "function" then
-    loglua("main doesn't exist!!")
-    return
   end
   local pointpair = ffi.new("struct ShaderPaintPoint[2]")
   while true do

@@ -16,6 +16,7 @@ use log::{logi, loge};
 
 use lua_callbacks::LuaCallbackType;
 
+static mut GLDRAW_LUA_SANDBOX: *mut c_void = 0 as *mut c_void;
 static mut gldraw_lua_key: i32 = 0;
 static LUA_FFI_SCRIPT: &'static str = include_str!("../includes/lua/ffi_loader.lua");
 static LUA_RUNNER: &'static str = include_str!("../includes/lua/lua_runner.lua");
@@ -24,6 +25,11 @@ static DEFAULT_SCRIPT: &'static str = include_str!("../includes/lua/default_inte
 static mut STATIC_LUA: Option<*mut lua_State> = None;
 
 type ReaderState<'a> = (&'a str, bool);
+
+enum SandboxMode {
+    Sandboxed(*mut c_void),
+    Unsandboxed,
+}
 
 #[allow(unused)]
 extern "C" fn stringreader(L: *mut lua_State, data: *mut c_void, size: *mut size_t) -> *const c_char {
@@ -49,29 +55,41 @@ unsafe fn err_to_str(L: *mut lua_State) -> String {
     result
 }
 
-unsafe fn runstring(L: *mut lua_State, s: &str) -> bool {
+unsafe fn runstring(L: *mut lua_State, s: &str, filename: *const i8, env: SandboxMode) -> bool {
     let mut state: ReaderState = (s, false);
     let stateref: *mut c_void = mem::transmute(&mut state);
-    if 0 != lua_load(L, stringreader, stateref, cstr!("loadLuaScript() input")) {
+    if 0 != lua_load(L, stringreader, stateref, filename) {
         false
         //Err(format!("script failed to load: {}", err_to_str(L)))
-    } else if 0 != lua_pcall(L, 0, MULTRET, 0) {
-        false
-        //Err(format!("script failed to run: {}", err_to_str(L)));
     } else {
-        true
-        //Ok(())
+        if let Sandboxed(key) = env {
+            lua_pushlightuserdata(L, key);
+            lua_gettable(L, LUA_REGISTRYINDEX);
+            lua_setfenv(L, -2);
+        }
+        if 0 != lua_pcall(L, 0, MULTRET, 0) {
+            false
+            //Err(format!("script failed to run: {}", err_to_str(L)));
+        } else {
+            true
+            //Ok(())
+        }
     }
 }
 
 unsafe fn init_lua() -> GLResult<*mut lua_State> {
+    GLDRAW_LUA_SANDBOX = &mut GLDRAW_LUA_SANDBOX as *mut *mut c_void as *mut c_void;
+
     let L = luaL_newstate();
     luaL_openlibs(L);
 
     luaJIT_setmode(L, 0, LUAJIT_MODE_ENGINE as i32|LUAJIT_MODE_ON as i32);
 
-    if runstring(L, LUA_FFI_SCRIPT) {
+    if runstring(L, LUA_FFI_SCRIPT, cstr!("built-in ffi init script"), Unsandboxed) {
         logi!("ffi init script loaded");
+        lua_pushlightuserdata(L, GLDRAW_LUA_SANDBOX);
+        lua_getglobal(L, cstr!("sandboxed"));
+        lua_settable(L, LUA_REGISTRYINDEX);
         Ok(L)
     } else {
         let err = format!("ffi init script failed to load: {}\nThis should never happen!", err_to_str(L));
@@ -90,39 +108,52 @@ unsafe fn get_lua() -> GLResult<*mut lua_State> {
     }
 }
 
+unsafe fn push_sandbox(L: *mut lua_State) {
+    lua_pushlightuserdata(L, GLDRAW_LUA_SANDBOX);
+    lua_gettable(L, LUA_REGISTRYINDEX);
+}
+
 pub unsafe fn load_lua_script(script: Option<&str>) -> GLResult<i32> {
     let L = try!(get_lua());
     logi!("got lua");
 
+    push_sandbox(L);
+
     lua_pushnil(L);
-    lua_setglobal(L, cstr!("main"));
+    lua_setfield(L, -2, cstr!("main"));
     lua_pushnil(L);
-    lua_setglobal(L, cstr!("onframe"));
+    lua_setfield(L, -2, cstr!("onframe"));
     lua_pushnil(L);
-    lua_setglobal(L, cstr!("ondown"));
+    lua_setfield(L, -2, cstr!("ondown"));
     lua_pushnil(L);
-    lua_setglobal(L, cstr!("onup"));
+    lua_setfield(L, -2, cstr!("onup"));
+
+    lua_pop(L, 1);
 
     let key = (&gldraw_lua_key) as *const i32 as i32 + gldraw_lua_key;
     lua_pushlightuserdata(L, key as *mut c_void);
 
     let script = script.unwrap_or(DEFAULT_SCRIPT);
-    if !runstring(L, script) {
+    if !runstring(L, script, cstr!("interpolator script"), Sandboxed(GLDRAW_LUA_SANDBOX)) {
         let err = format!("script failed to load: {}", err_to_str(L));
         lua_pop(L, 1);
         return log_err(err);
     }
 
-    lua_getglobal(L, cstr!("main"));
+    push_sandbox(L);
+    lua_getfield(L, -1, cstr!("main"));
     if !lua_isfunction(L, -1) {
-        lua_pop(L, 2);
+        lua_pop(L, 3);
         return log_err("no main function defined :(".into_string());
     }
     luaJIT_setmode(L, 0, LUAJIT_MODE_ENGINE as i32|LUAJIT_MODE_ON as i32);
     lua_pop(L, 1);
 
+    // make values defined in script available to lua_runner
+    lua_setglobal(L, cstr!("callbacks"));
+
     // FIXME compile runner once
-    if !runstring(L, LUA_RUNNER) {
+    if !runstring(L, LUA_RUNNER, cstr!("built-in lua_runner script"), Unsandboxed) {
         let err = format!("lua runner failed to load: {}\n This should never happen!", err_to_str(L));
         lua_pop(L, 1);
         return log_err(err);

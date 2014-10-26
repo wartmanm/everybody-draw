@@ -30,3 +30,41 @@ clearlayer=ffi.C.lua_clearlayer
 savelayers=ffi.C.lua_savelayers
 
 ShaderPaintPoint=ffi.typeof("struct ShaderPaintPoint")
+
+local function copytable(t)
+  out = {}
+  for k,v in pairs(t) do
+    out[k] = v
+  end
+  return out
+end
+
+local stringbox = copytable(string)
+local mathbox = copytable(math)
+local tablebox = copytable(table)
+sandboxed = {
+  assert = assert,
+  error = error,
+  ipairs = ipairs,
+  next = next,
+  pairs = pairs,
+  pcall = pcall,
+  print = loglua,
+  select = select,
+  tonumber = tonumber,
+  tostring = tostring,
+  type = type,
+  unpack = unpack,
+  string = stringbox,
+  math = mathbox,
+  table = tablebox,
+  pushpoint = pushpoint,
+
+  pushline = pushline,
+  pushcatmullrom = pushcatmullrom,
+  pushcubicbezier = pushcubicbezier,
+  loglua = loglua,
+  clearlayer = clearlayer,
+  savelayers = savelayers,
+  ShaderPaintPoint = ShaderPaintPoint,
+}
