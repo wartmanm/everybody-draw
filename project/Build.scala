@@ -6,10 +6,10 @@ import sbtandroid.AndroidProjects.Standard
   
 
 object General {
-  //val optimized = Seq (
-    //scalacOptions ++= Seq("-Ybackend:o3", "-Ydelambdafy:method", "-Yinline", "-optimise"),
+  val optimized = Seq (
+    scalacOptions ++= Seq("-Ybackend:o3", "-Yclosure-elim", "-Yconst-opt", "-Ydead-code", /*"-Ydelambdafy:method",*/ "-Yinline", "-optimise")
     //scalaHome := Some(file("/opt/scala"))
-  //)
+  )
 
 
   lazy val compileRust = taskKey[sbt.inc.Analysis]("Compiles native sources.")
@@ -103,9 +103,9 @@ object General {
       keyalias := "change-me",
       useTypedResources := true,
       libraryDependencies ++= Seq(
-        apklib("com.github.iPaulPro" % "aFileChooser" % "0.1" changing() ),
+        aarlib("com.github.iPaulPro" % "aFileChooser" % "0.1"),
         "com.jsuereth" %% "scala-arm" % "1.5-SNAPSHOT",
-        "io.spray" %%  "spray-json" % "1.3.0" changing()
+        "io.spray" %%  "spray-json" % "1.3.0"
       ),
       proguardOptions ++= Seq(
         """
