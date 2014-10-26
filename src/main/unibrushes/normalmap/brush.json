@@ -1,0 +1,5 @@
+{
+  "basecopyshader": {
+    "fragmentshader": "normalmap.fsh"
+  }
+}
