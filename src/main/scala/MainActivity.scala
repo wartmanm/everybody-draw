@@ -7,6 +7,7 @@ import android.widget._
 import android.view._
 import android.graphics.{SurfaceTexture, Bitmap}
 import android.content.{Context, Intent}
+import android.content.res.Configuration
 import android.opengl.GLException
 
 import java.io.{BufferedInputStream}
@@ -28,6 +29,7 @@ import resource._
 import scala.concurrent.ExecutionContext
 import scala.concurrent.Future
 import java.util.concurrent.Executors
+
 
 
 class MainActivity extends Activity with TypedActivity with AndroidImplicits {
@@ -55,6 +57,8 @@ class MainActivity extends Activity with TypedActivity with AndroidImplicits {
     "Interpolator",
     "Unibrushes"
   )
+  lazy val drawerToggle = new android.support.v7.app.ActionBarDrawerToggle(
+      this, drawerParent, R.string.sidebar_open, R.string.sidebar_close)
 
   var textureThread: Option[TextureSurfaceThread] = None
 
@@ -113,8 +117,9 @@ class MainActivity extends Activity with TypedActivity with AndroidImplicits {
         controlflipper.setDisplayedChild(pos)
       })
 
-    drawerParent.setDrawerListener(new android.support.v7.app.ActionBarDrawerToggle(
-      this, drawerParent, R.string.sidebar_open, R.string.sidebar_close))
+    drawerParent.setDrawerListener(drawerToggle)
+    getActionBar().setDisplayHomeAsUpEnabled(true)
+    getActionBar().setHomeButtonEnabled(true)
 
     // TODO: deal with rotation better
     Option(bundle) match {
@@ -127,6 +132,28 @@ class MainActivity extends Activity with TypedActivity with AndroidImplicits {
         loadFromFile()
       }
     }
+  }
+
+  override protected def onPostCreate(bundle: Bundle) = {
+    super.onPostCreate(bundle)
+    drawerToggle.syncState()
+  }
+
+  override def onConfigurationChanged(config: Configuration) = {
+    super.onConfigurationChanged(config)
+    drawerToggle.onConfigurationChanged(config)
+  }
+
+  override def onOptionsItemSelected(item: MenuItem): Boolean = {
+    if (drawerToggle.onOptionsItemSelected(item)) true
+    else item.getItemId() match {
+      case R.id.menu_save => saveFile()
+      case R.id.menu_load => loadFile()
+      case R.id.menu_replay => startReplay()
+      case R.id.menu_clear => textureThread.foreach(_.clearScreen())
+      case _ => return super.onOptionsItemSelected(item)
+    }
+    true
   }
 
   override def onStart() = {
@@ -244,17 +271,6 @@ class MainActivity extends Activity with TypedActivity with AndroidImplicits {
         }(saveThread)
       })
     savePickersToFile()
-  }
-
-  override def onMenuItemSelected(featureId: Int, item: MenuItem): Boolean = {
-    item.getItemId() match {
-      case R.id.menu_save => saveFile()
-      case R.id.menu_load => loadFile()
-      case R.id.menu_replay => startReplay()
-      case R.id.menu_clear => textureThread.foreach(_.clearScreen())
-      case _ => return false
-    }
-    true
   }
 
   def populatePicker[U, T <: (String, (Unit)=>GLResult[U])](picker: NamedPicker[U], arr: Array[T], cb: (U)=>Unit, thread: TextureSurfaceThread) = {
