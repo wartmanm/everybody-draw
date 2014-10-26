@@ -51,7 +51,6 @@ class MainActivity extends Activity with TypedActivity with AndroidImplicits {
   lazy val replaybutton = findView(TR.replaybutton)
 
   var textureThread: Option[TextureSurfaceThread] = None
-  var outputShader: Option[CopyShader] = None
 
   private var savedBitmap: Option[Bitmap] = None
 
@@ -319,8 +318,9 @@ class MainActivity extends Activity with TypedActivity with AndroidImplicits {
       val brush = unibrush.brush.orElse(getSelectedValue(controls.brushpicker))
       val anim = unibrush.baseanimshader.orElse(getSelectedValue(controls.animpicker))
       val point = unibrush.basepointshader.orElse(getSelectedValue(controls.paintpicker))
+      val copy = unibrush.basecopyshader
       val interp = unibrush.interpolator.orElse(getSelectedValue(controls.interppicker))
-      thread.loadUniBrush(brush, anim, point, interp, unibrush.layers)
+      thread.loadUniBrush(brush, anim, point, copy, interp, unibrush.layers)
     }
   }
 

@@ -47,6 +47,7 @@ case class UniBrushSource (
   animshaders: Option[Array[ShaderSource]],
   basepointshader: Option[ShaderSource],
   baseanimshader: Option[ShaderSource],
+  basecopyshader: Option[ShaderSource],
   interpolator: Option[String],
   layers: Option[Array[LayerSource]]
 )
@@ -55,6 +56,7 @@ case class UniBrush(
   brush: Option[Texture],
   basepointshader: Option[PointShader],
   baseanimshader: Option[CopyShader],
+  basecopyshader: Option[CopyShader],
   interpolator: Option[LuaScript],
   layers: Array[Layer])
 
@@ -172,6 +174,10 @@ object UniBrush extends AutoProductFormat {
       case Left(x) => return Left(x)
       case Right(x) => x
     }
+    val basecopyshader = flipoption(s.basecopyshader, (x: ShaderSource) => x.compile(data, CopyShader, files)) match {
+      case Left(x) => return Left(x)
+      case Right(x) => x
+    }
     val basepointshader = flipoption(s.basepointshader, (x: ShaderSource) => x.compile(data, PointShader, files)) match {
       case Left(x) => return Left(x)
       case Right(x) => x
@@ -195,6 +201,6 @@ object UniBrush extends AutoProductFormat {
     Log.i("unibrush", s"have animshader: ${baseanimshader.nonEmpty}");
     Log.i("unibrush", s"have layers: ${layers.length}");
     Log.i("unibrush", s"have brush: ${brush.nonEmpty}");
-    Right(UniBrush(brush, basepointshader, baseanimshader, interpolator, layers))
+    Right(UniBrush(brush, basepointshader, baseanimshader, basecopyshader, interpolator, layers))
   }
 }

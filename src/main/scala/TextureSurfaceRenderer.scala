@@ -209,11 +209,12 @@ extends Thread with Handler.Callback with AndroidImplicits {
     }}
   }
 
-    def loadUniBrush(brushopt: Option[Texture], baseanimopt: Option[CopyShader], basepointopt: Option[PointShader], scriptopt: Option[LuaScript], layers: Array[Layer]) = {
+    def loadUniBrush(brushopt: Option[Texture], baseanimopt: Option[CopyShader], basepointopt: Option[PointShader], basecopyopt: Option[CopyShader], scriptopt: Option[LuaScript], layers: Array[Layer]) = {
       for (gl <- glinit) { runHere {
         val brush = brushopt.getOrElse(Texture(gl, null).right.get)
         val baseanim = baseanimopt.getOrElse(CopyShader(gl, null, null).right.get)
         val basepoint = basepointopt.getOrElse(PointShader(gl, null, null).right.get)
+        val basecopy = basecopyopt.getOrElse(CopyShader(gl, null, null).right.get)
         val script = scriptopt.getOrElse(LuaScript(gl, null).right.get)
 
         Log.i("tst", "loading unibrush!")
@@ -224,6 +225,7 @@ extends Thread with Handler.Callback with AndroidImplicits {
         Log.i("tst", "set up layers!")
         nativeSetAnimShader(gl, baseanim)
         nativeSetPointShader(gl, basepoint)
+        nativeSetCopyShader(gl, basecopy)
         nativeSetInterpolator(gl, script)
         Log.i("tst", "set interpolator!")
         nativeSetBrushTexture(gl, brush)
