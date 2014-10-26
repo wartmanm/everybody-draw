@@ -9,7 +9,6 @@ import scala.collection.mutable
 import scala.annotation.tailrec
 
 import spray.json._
-import org.parboiled.errors.ParsingException
 
 import com.github.wartman4404.gldraw._
 
@@ -110,7 +109,7 @@ object UniBrush extends AutoProductFormat {
       Log.i("unibrush", "got brush.json")
       compile(data, new String(brushjson).parseJson.convertTo[UniBrushSource], files)
     } catch {
-      case e @ (_: ParsingException | _: DeserializationException) => {
+      case e: DeserializationException => {
         logAbort(s"unable to parse brush.json: ${e}")
       }
       case e: IOException => logAbort(s"IOException ${e}")

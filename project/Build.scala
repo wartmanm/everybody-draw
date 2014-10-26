@@ -80,16 +80,24 @@ object General {
     name := "everybodydraw",
     version := "0.1",
     versionCode := 0,
-    scalaVersion := "2.11.0",
-    platformName := "android-19",
+    scalaVersion := "2.11.2",
+    platformName := "android-21",
     javacOptions ++= Seq("-encoding", "UTF-8", "-source", "1.6", "-target", "1.6"),
     scalacOptions ++= Seq("-feature", "-language:implicitConversions", "-deprecation", "-Xlint")
   ) ++ debugSettings
+
+  lazy val onlyLocalResolvers = Seq (
+    externalResolvers := Seq (
+      Resolver.defaultLocal,
+      Resolver.mavenLocal
+    )
+  )
 
   lazy val fullAndroidSettings =
     General.settings ++
     androidDefaults ++
     rustSettings ++
+    onlyLocalResolvers ++
     Seq (ndkJniSourcePath <<= Def.setting { baseDirectory.value / "jni" }) ++
     Seq (
       keyalias := "change-me",
@@ -97,7 +105,7 @@ object General {
       libraryDependencies ++= Seq(
         apklib("com.github.iPaulPro" % "aFileChooser" % "0.1" changing() ),
         "com.jsuereth" %% "scala-arm" % "1.5-SNAPSHOT",
-        "io.spray" %%  "spray-json" % "1.2.7-A" changing()
+        "io.spray" %%  "spray-json" % "1.3.0" changing()
       ),
       proguardOptions ++= Seq(
         """
