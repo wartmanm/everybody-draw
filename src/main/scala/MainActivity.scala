@@ -310,7 +310,7 @@ class MainActivity extends Activity with TypedActivity with AndroidImplicits {
     Log.i("main", "loading unibrush")
     def getSelectedValue[T](picker: NamedPicker[T]) = {
       picker.control.getAdapter.asInstanceOf[LazyPicker[T]]
-      .getItem(picker.control.getSelectedItemPosition())._2.cachedValue.get.right.toOption
+      .getItem(picker.control.getSelectedItemPosition())._2.cachedValue.flatMap(_.right.toOption)
     }
     for (thread <- textureThread) {
       // TODO: don't load when nothing changed; perform load from texturethread side
