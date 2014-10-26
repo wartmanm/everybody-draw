@@ -50,15 +50,9 @@ class MainActivity extends Activity with TypedActivity with AndroidImplicits {
   lazy val drawerParent = findView(TR.drawer_parent)
   lazy val controlflipper = findView(TR.controlflipper)
   lazy val controldrawer = findView(TR.control_drawer)
-  val controlTitles = Array( // must match order of controlflipper's children
-    "Brush Texture",
-    "Animation",
-    "Paint",
-    "Interpolator",
-    "Unibrushes"
-  )
   lazy val drawerToggle = new android.support.v7.app.ActionBarDrawerToggle(
       this, drawerParent, R.string.sidebar_open, R.string.sidebar_close)
+  lazy val sidebarAdapter = new SidebarAdapter()
 
   var textureThread: Option[TextureSurfaceThread] = None
 
@@ -112,9 +106,9 @@ class MainActivity extends Activity with TypedActivity with AndroidImplicits {
     super.onCreate(bundle)
     setContentView(R.layout.activity_main)
 
-    controldrawer.setAdapter(new ArrayAdapter(this, android.R.layout.simple_list_item_activated_1, controlTitles))
+    controldrawer.setAdapter(sidebarAdapter)
     controldrawer.setOnItemClickListener((v: View, pos: Int) => {
-        controlflipper.setDisplayedChild(pos)
+        sidebarAdapter.sidebarControls(pos).onClick(pos)
       })
 
     drawerParent.setDrawerListener(drawerToggle)
@@ -285,8 +279,10 @@ class MainActivity extends Activity with TypedActivity with AndroidImplicits {
               case Left(errmsg) => {
                 //adapter.getState(0, (result: GLResult[U]) => cb(result.right.get))
                 MainActivity.this.runOnUiThread(() => {
+                  //FIXME gridview items aren't being greyed out, why not?
                   Toast.makeText(MainActivity.this, "unable to load item!\n" + errmsg, Toast.LENGTH_LONG).show()
                   picker.control.performItemClick(null, 0, 0)
+                  adapter.notifyDataSetChanged()
                   ()
                 })
               }
@@ -325,10 +321,7 @@ class MainActivity extends Activity with TypedActivity with AndroidImplicits {
   // TODO: fewer callbacks
   def loadUniBrushControls(unibrush: UniBrush) = {
     runOnUiThread(() => {
-      controls.brushpicker.control.setEnabled(unibrush.brush.isEmpty)
-      controls.animpicker.control.setEnabled(unibrush.baseanimshader.isEmpty)
-      controls.paintpicker.control.setEnabled(unibrush.basepointshader.isEmpty)
-      controls.interppicker.control.setEnabled(unibrush.interpolator.isEmpty)
+      sidebarAdapter.updateUnibrush(unibrush)
     })
   }
 
@@ -416,6 +409,75 @@ class MainActivity extends Activity with TypedActivity with AndroidImplicits {
       thread.beginReplay()
     }
   }
+  
+  def showControl(pos: Int) = {
+    controlflipper.setVisibility(View.VISIBLE)
+    controlflipper.setDisplayedChild(pos)
+    drawerParent.closeDrawer(controldrawer)
+  }
+  def hideControls() = {
+    controlflipper.setVisibility(View.INVISIBLE)
+    drawerParent.closeDrawer(controldrawer)
+  }
+
+  class SidebarAdapter() extends BaseAdapter {
+    import SidebarAdapter._
+    val inflater = LayoutInflater.from(MainActivity.this)
+    // must match order of viewflipper children
+    val sidebarControls = Array (
+      new SidebarEntryPicker("Brush Texture", controls.brushpicker, (u: UniBrush) => u.brush),
+      new SidebarEntryPicker("Animation", controls.animpicker, (u: UniBrush) => u.baseanimshader),
+      new SidebarEntryPicker("Paint", controls.paintpicker, (u: UniBrush) => u.basepointshader),
+      new SidebarEntryPicker("Interpolator", controls.interppicker, (u: UniBrush) => u.interpolator),
+      new SidebarEntryPicker("Unibrushes", controls.unipicker, (u: UniBrush) => None),
+      new SidebarEntryHider("Hide Controls")
+    )
+    override def areAllItemsEnabled = false
+    override def isEnabled(pos: Int) = sidebarControls(pos).isEnabled
+    override def getCount = sidebarControls.length
+    override def getViewTypeCount() = 1
+    override def getItem(pos: Int) = sidebarControls(pos)
+    override def getItemId(pos: Int) = pos
+    override def getView(pos: Int, convertView: View, parent: ViewGroup): View = {
+      val view = if (convertView == null) {
+        inflater.inflate(android.R.layout.simple_list_item_activated_1, parent, false)
+      } else {
+        convertView
+      }
+      val name = view.findViewById(android.R.id.text1).asInstanceOf[TextView]
+      val control = sidebarControls(pos)
+      name.setText(control.name)
+      name.setEnabled(control.isEnabled)
+      view.setEnabled(control.isEnabled)
+      view
+    }
+
+    def updateUnibrush(unibrush: UniBrush) = {
+      for (control <- sidebarControls) {
+        control.updateForUnibrush(unibrush)
+        this.notifyDataSetChanged()
+      }
+    }
+  }
+  object SidebarAdapter {
+    trait SidebarEntry {
+      def onClick(pos: Int): Unit
+      def updateForUnibrush(u: UniBrush): Unit
+      def isEnabled: Boolean
+      def name: String
+    }
+    class SidebarEntryPicker[T](val name: String, val picker: NamedPicker[_], getUnibrushValue: (UniBrush) => Option[T]) extends SidebarEntry {
+      var enabled = true
+      override def isEnabled = enabled
+      override def updateForUnibrush(u: UniBrush) = enabled = getUnibrushValue(u).isEmpty
+      override def onClick(pos: Int) = showControl(pos)
+    }
+    class SidebarEntryHider(val name: String) extends SidebarEntry {
+      override def isEnabled = true
+      override def updateForUnibrush(u: UniBrush) = { }
+      override def onClick(pos: Int) = hideControls()
+    }
+  }
 }
 
 object MainActivity {
@@ -439,5 +501,10 @@ object MainActivity {
 
   class FrameListener extends SurfaceTexture.OnFrameAvailableListener {
     def onFrameAvailable(st: android.graphics.SurfaceTexture): Unit = { }
+  }
+
+  abstract class NamedSidebarControl(val name: String) {
+    override def toString() = name
+    def onClick(pos: Int)
   }
 }

@@ -9,6 +9,8 @@ class LazyPicker[T](context: Context, thread: TextureSurfaceThread, content: Seq
   val lazified: Seq[(String, LoadedState[T])] = content.map { case (k, v) => (k, new LoadedState(v)) }
   case class Holder(nameView: TextView)
 
+  override def areAllItemsEnabled = false
+  override def isEnabled(pos: Int) = lazified(pos)._2.isNotFailed
   override def getCount = lazified.size
   override def getViewTypeCount() = 1
   override def getItem(pos: Int) = lazified(pos)
@@ -31,6 +33,7 @@ class LazyPicker[T](context: Context, thread: TextureSurfaceThread, content: Seq
     val ok = item._2.isNotFailed
     nameview.setEnabled(ok)
     view.setEnabled(ok)
+    //view.setBackgroundColor(if ok 0xffff0000 else 0x00000000);
     view
   }
 

@@ -10,10 +10,16 @@
         android:layout_width="match_parent"
         android:layout_height="match_parent" >
 
+        <FrameLayout
+            android:id="@+id/textureviewframe"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent" />
+
         <ViewFlipper
             android:id="@+id/controlflipper"
             android:layout_width="match_parent"
             android:layout_height="160dp"
+            android:background="#fff"
             android:layout_alignParentBottom="true" >
 
             <GridView
@@ -56,13 +62,6 @@
                 android:columnWidth="120dp"
                 android:numColumns="auto_fit" />
         </ViewFlipper>
-
-        <FrameLayout
-            android:id="@+id/textureviewframe"
-            android:layout_width="match_parent"
-            android:layout_height="match_parent"
-            android:layout_above="@id/controlflipper" >
-        </FrameLayout>
     </RelativeLayout>
 
     <ListView
