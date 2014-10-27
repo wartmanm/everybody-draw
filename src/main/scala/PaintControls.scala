@@ -3,6 +3,7 @@ package com.github.wartman4404.gldraw
 import android.os.Bundle
 import android.content.Context
 import android.widget.{AdapterView, Adapter, GridView, ListAdapter}
+import android.util.Log
 
 import java.io.{InputStream, OutputStream, OutputStreamWriter, BufferedWriter}
 
@@ -75,7 +76,10 @@ object PaintControls {
   class UnnamedPicker[T](val control: AdapterView[ListAdapter]) extends SavedControl[T] with AutoProductFormat {
     type U = AdapterView[LazyPicker[T]]
     var selected = AdapterView.INVALID_POSITION
-    override def currentValue(gl: GLInit) = adapter.getState(selected, gl)
+    override def currentValue(gl: GLInit) = {
+      Log.i("picker", s"getting value at idx ${selected}: '${adapter.lazified(selected)._1}'")
+      adapter.getState(selected, gl)
+    }
     var selectedName = ""
     private var adapter: LazyPicker[T] = null
     def setAdapter(a: LazyPicker[T]) = {
@@ -104,9 +108,12 @@ object PaintControls {
   class UnnamedUnpicker[T](var value: Option[T] = None) extends SavedControl[T] with AutoProductFormat {
     override def save() = enabled.toJson
     override def load(j: JsValue) = enabled = j.convertTo[Boolean]
-    override def currentValue(gl: GLInit) = value match {
-      case None => Left("No value present?")
-      case Some(x) => Right(x)
+    override def currentValue(gl: GLInit) = {
+      Log.i("picker", "getting unpicker value")
+      value match {
+        case None => Left("No value present?")
+        case Some(x) => Right(x)
+      }
     }
   }
 

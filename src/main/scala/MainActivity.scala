@@ -340,24 +340,29 @@ class MainActivity extends Activity with TypedActivity with AndroidImplicits {
       }
     }
     //Log.i("main", s"copypicker is enabled: ${controls.copypicker.enabled}")
-    Log.i("tst", "loading unibrushes and old values...")
+    Log.i("unibrush", "loading unibrushes and old values...")
+    Log.i("unibrush", "loading brush")
     val brush = unibrush.brush.orElse(getSelectedValue(controls.brushpicker))
+    Log.i("unibrush", "loading anim")
     val anim = unibrush.baseanimshader.orElse(getSelectedValue(controls.animpicker))
+    Log.i("unibrush", "loading point")
     val point = unibrush.basepointshader.orElse(getSelectedValue(controls.paintpicker))
+    Log.i("unibrush", "loading copy")
     val copy = unibrush.basecopyshader.orElse(getSelectedValue(controls.copypicker))
+    Log.i("unibrush", "loading interp")
     val interp = unibrush.interpolator.orElse(getSelectedValue(controls.interppicker))
-    Log.i("tst", "loading unibrush!")
+    Log.i("unibrush", "loading unibrush!")
     thread.clearLayers(gl)
     for (layer <- unibrush.layers) {
       thread.addLayer(gl, layer.copyshader, layer.pointshader, layer.pointsrc)
     }
-    Log.i("tst", "set up layers!")
+    Log.i("unibrush", "set up layers!")
     brush.foreach(thread.setBrushTexture(gl, _))
     anim.foreach(thread.setAnimShader(gl, _))
     point.foreach(thread.setPointShader(gl, _))
     copy.foreach(thread.setCopyShader(gl, _))
     interp.foreach(thread.setInterpScript(gl, _))
-    Log.i("tst", "done loading unibrush!")
+    Log.i("unibrush", "done loading unibrush!")
     loadUniBrushControls(unibrush) // now that we're done, update which controls are enabled
     ()
   }
