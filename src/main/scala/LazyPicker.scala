@@ -37,31 +37,20 @@ class LazyPicker[T](context: Context, thread: TextureSurfaceThread, content: Seq
     view
   }
 
-  def getState(pos: Int, cb: (GLResult[T])=>Any) = {
-    lazified(pos)._2.get(cb)
-  }
-  //DANGER: runs callback on gl thread
-  //(does it need to always?)
+  def getState(pos: Int, gl: GLInit) = lazified(pos)._2.get(gl)
+
   class LoadedState[T](var loader: (GLInit)=>GLResult[T]) {
-    def get(cb: (GLResult[T])=>Any) = {
-      thread.withGL(gl => {
-        cachedValue match {
-          case None => {
-            val value = loader(gl)
-            cachedValue = Some(value)
-            cb(value)
-          }
-          case Some(value) => cb(value)
+    def get(gl: GLInit): GLResult[T] = {
+      cachedValue match {
+        case None => {
+          val value = loader(gl)
+          cachedValue = Some(value)
+          value
         }
-      })
+        case Some(value) => value
+      }
     }
-
     private var cachedValue: Option[GLResult[T]] = None
-
-    def getCached() = cachedValue match {
-      case Some(Right(x)) => Some(x)
-      case _ => None
-    }
 
     def isNotFailed = cachedValue match {
       case None => true

@@ -269,26 +269,26 @@ class MainActivity extends Activity with TypedActivity with AndroidImplicits {
     savePickersToFile()
   }
 
-  def populatePicker[U, T <: (String, (GLInit)=>GLResult[U])](picker: UnnamedPicker[U], arr: Array[T], cb: (U)=>Unit, thread: TextureSurfaceThread) = {
+  def populatePicker[U, T <: (String, (GLInit)=>GLResult[U])](picker: UnnamedPicker[U], arr: Array[T], cb: (GLInit, U)=>Unit, thread: TextureSurfaceThread) = {
     val adapter = new LazyPicker(this, thread, arr)
     picker.setAdapter(adapter)
     picker.control.setOnItemClickListener(new AdapterView.OnItemClickListener() {
-        override def onItemClick(parent: AdapterView[_], view: View, pos: Int, id: Long) = {
-          picker.selected = pos
-          //Log.i("main", s"Item selected for {picker.name}! {pos}")
-          adapter.getState(pos, (result: GLResult[U]) => result match {
-              case Right(value) => cb(value)
-              case Left(errmsg) => {
-                MainActivity.this.runOnUiThread(() => {
-                  Toast.makeText(MainActivity.this, "unable to load item!\n" + errmsg, Toast.LENGTH_LONG).show()
-                  picker.control.performItemClick(null, 0, 0)
-                  adapter.notifyDataSetChanged()
-                  ()
-                })
-              }
+      override def onItemClick(parent: AdapterView[_], view: View, pos: Int, id: Long) = {
+        picker.selected = pos
+        //Log.i("main", s"Item selected for {picker.name}! {pos}")
+        thread.withGL(gl => adapter.getState(pos, gl) match {
+          case Right(value) => cb(gl, value)
+          case Left(errmsg) => {
+            MainActivity.this.runOnUiThread(() => {
+              Toast.makeText(MainActivity.this, "unable to load item!\n" + errmsg, Toast.LENGTH_LONG).show()
+              picker.control.performItemClick(null, 0, 0)
+              adapter.notifyDataSetChanged()
+              ()
             })
-        }
-      })
+          }
+        })
+      }
+    })
     picker.restoreState()
   }
 
@@ -309,8 +309,8 @@ class MainActivity extends Activity with TypedActivity with AndroidImplicits {
         populatePicker(controls.animpicker, anims,  thread.setAnimShader _, thread)
         populatePicker(controls.paintpicker, paints,  thread.setPointShader _, thread)
         populatePicker(controls.interppicker, interpscripts,  thread.setInterpScript _, thread)
-        populatePicker(controls.unipicker, unibrushes, loadUniBrush _, thread)
-        controls.copypicker.currentValue = thread.outputShader
+        populatePicker(controls.unipicker, unibrushes, loadUniBrush(thread), thread)
+        controls.copypicker.value = thread.outputShader
       })
     }
   }
@@ -322,23 +322,35 @@ class MainActivity extends Activity with TypedActivity with AndroidImplicits {
     })
   }
 
-  def loadUniBrush(unibrush: UniBrush) = {
+  def loadUniBrush(thread: TextureSurfaceThread) = (gl: GLInit, unibrush: UniBrush) => {
     Log.i("main", "loading unibrush")
     def getSelectedValue[T](picker: SavedControl[T]) = {
       // return None if the control is already active, or we're trying to restore a missing value
       // TODO: the missing-value part is probably busted
       if (picker.enabled) None
-      else picker.currentValue
+      else picker.currentValue(gl).right.toOption
     }
-    for (thread <- textureThread) {
-      loadUniBrushControls(unibrush)
-      val brush = unibrush.brush.orElse(getSelectedValue(controls.brushpicker))
-      val anim = unibrush.baseanimshader.orElse(getSelectedValue(controls.animpicker))
-      val point = unibrush.basepointshader.orElse(getSelectedValue(controls.paintpicker))
-      val copy = unibrush.basecopyshader.orElse(getSelectedValue(controls.copypicker))
-      val interp = unibrush.interpolator.orElse(getSelectedValue(controls.interppicker))
-      thread.loadUniBrush(brush, anim, point, copy, interp, unibrush.layers)
+    //Log.i("main", s"copypicker is enabled: ${controls.copypicker.enabled}")
+    loadUniBrushControls(unibrush)
+    Log.i("tst", "loading unibrushes and old values...")
+    val brush = unibrush.brush.orElse(getSelectedValue(controls.brushpicker))
+    val anim = unibrush.baseanimshader.orElse(getSelectedValue(controls.animpicker))
+    val point = unibrush.basepointshader.orElse(getSelectedValue(controls.paintpicker))
+    val copy = unibrush.basecopyshader.orElse(getSelectedValue(controls.copypicker))
+    val interp = unibrush.interpolator.orElse(getSelectedValue(controls.interppicker))
+    Log.i("tst", "loading unibrush!")
+    thread.clearLayers(gl)
+    for (layer <- unibrush.layers) {
+      thread.addLayer(gl, layer.copyshader, layer.pointshader, layer.pointsrc)
     }
+    Log.i("tst", "set up layers!")
+    brush.foreach(thread.setBrushTexture(gl, _))
+    anim.foreach(thread.setAnimShader(gl, _))
+    point.foreach(thread.setPointShader(gl, _))
+    copy.foreach(thread.setCopyShader(gl, _))
+    interp.foreach(thread.setInterpScript(gl, _))
+    Log.i("tst", "done loading unibrush!")
+    ()
   }
 
   override def onCreateOptionsMenu(menu: Menu): Boolean = {
@@ -429,6 +441,7 @@ class MainActivity extends Activity with TypedActivity with AndroidImplicits {
       new SidebarEntryPicker("Unibrushes", controls.unipicker, (u: UniBrush) => None),
       new SidebarEntryHider("Hide Controls")
     )
+    val copyShaderControl = new SidebarEntryPicker("Overlay", controls.copypicker, (u: UniBrush) => u.basecopyshader)
     override def areAllItemsEnabled = false
     override def isEnabled(pos: Int) = sidebarControls(pos).enabled
     override def getCount = sidebarControls.length
@@ -454,6 +467,8 @@ class MainActivity extends Activity with TypedActivity with AndroidImplicits {
       for (control <- sidebarControls) {
         control.updateForUnibrush(unibrush)
       }
+      copyShaderControl.updateForUnibrush(unibrush)
+
       this.notifyDataSetChanged()
     }
   }
@@ -464,9 +479,13 @@ class MainActivity extends Activity with TypedActivity with AndroidImplicits {
       def enabled: Boolean
       def name: String
     }
-    class SidebarEntryPicker[T](val name: String, picker: UnnamedPicker[_], getUnibrushValue: (UniBrush) => Option[T]) extends SidebarEntry {
+    class SidebarEntryPicker[T](val name: String, picker: SavedControl[_], getUnibrushValue: (UniBrush) => Option[T]) extends SidebarEntry {
       override def enabled = picker.enabled
-      override def updateForUnibrush(u: UniBrush) = picker.enabled = getUnibrushValue(u).isEmpty
+      override def updateForUnibrush(u: UniBrush) = {
+        val oldstate = enabled
+        picker.enabled = getUnibrushValue(u).isEmpty
+        Log.i("main", s"${if (enabled) "enabling" else "disabling"} control ${name} for unibrush (was: ${if (oldstate) "enabled" else "disabled"})")
+      }
       override def onClick(pos: Int) = showControl(pos)
     }
     class SidebarEntryHider(val name: String) extends SidebarEntry {

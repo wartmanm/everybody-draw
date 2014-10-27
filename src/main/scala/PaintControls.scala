@@ -10,6 +10,7 @@ import unibrush.UniBrush
 
 import spray.json._
 import PaintControls._
+import GLResultTypeDef._
 
 class PaintControls
   (val animpicker: UP[CopyShader], val brushpicker: UP[Texture], val paintpicker: UP[PointShader], val interppicker: UP[LuaScript], val unipicker: UP[UniBrush], val copypicker: UUP[CopyShader]) 
@@ -68,13 +69,13 @@ object PaintControls {
     def restoreState() { }
     def updateState() { }
     var enabled: Boolean = true
-    def currentValue: Option[T]
+    def currentValue(gl: GLInit): GLResult[T]
   }
 
   class UnnamedPicker[T](val control: AdapterView[ListAdapter]) extends SavedControl[T] with AutoProductFormat {
     type U = AdapterView[LazyPicker[T]]
     var selected = AdapterView.INVALID_POSITION
-    def currentValue = adapter.lazified(selected)._2.getCached()
+    override def currentValue(gl: GLInit) = adapter.getState(selected, gl)
     var selectedName = ""
     private var adapter: LazyPicker[T] = null
     def setAdapter(a: LazyPicker[T]) = {
@@ -100,9 +101,13 @@ object PaintControls {
     }
   }
 
-  class UnnamedUnpicker[T](var currentValue: Option[T] = None) extends SavedControl[T] with AutoProductFormat {
+  class UnnamedUnpicker[T](var value: Option[T] = None) extends SavedControl[T] with AutoProductFormat {
     override def save() = enabled.toJson
     override def load(j: JsValue) = enabled = j.convertTo[Boolean]
+    override def currentValue(gl: GLInit) = value match {
+      case None => Left("No value present?")
+      case Some(x) => Right(x)
+    }
   }
 
   case class SavedState(enabled: Boolean, selectedName: String)

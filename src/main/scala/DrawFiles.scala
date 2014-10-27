@@ -55,8 +55,6 @@ object DrawFiles {
   def withFilename[T](reader: (GLInit, InputStream)=>GLResult[T]): ((String, ()=>ManagedResource[InputStream]))=>(String, (GLInit)=>GLResult[T]) = {
     val a = (kv: (String, ()=>ManagedResource[InputStream])) => {
       val (k, v) = kv
-      //val withgl = (is: InputStream) => (g: GLInit) => reader(g, is)
-      //val withgl = (is: InputStream) => (g: GLInit) => reader(g, is)
       k -> ((g: GLInit) => {
         val is = v()
         val useinput: (ManagedResource[InputStream]) => GLResult[T] = useInputStream(reader(g, _: InputStream))
