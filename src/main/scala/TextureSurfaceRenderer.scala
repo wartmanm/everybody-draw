@@ -209,29 +209,29 @@ extends Thread with Handler.Callback with AndroidImplicits {
     }}
   }
 
-    def loadUniBrush(brushopt: Option[Texture], baseanimopt: Option[CopyShader], basepointopt: Option[PointShader], basecopyopt: Option[CopyShader], scriptopt: Option[LuaScript], layers: Array[Layer]) = {
-      for (gl <- glinit) { runHere {
-        val brush = brushopt.getOrElse(Texture(gl, null).right.get)
-        val baseanim = baseanimopt.getOrElse(CopyShader(gl, null, null).right.get)
-        val basepoint = basepointopt.getOrElse(PointShader(gl, null, null).right.get)
-        val basecopy = basecopyopt.getOrElse(CopyShader(gl, null, null).right.get)
-        val script = scriptopt.getOrElse(LuaScript(gl, null).right.get)
 
-        Log.i("tst", "loading unibrush!")
-        nativeClearLayers(gl)
-        for (layer <- layers) {
-          nativeAddLayer(gl, layer.copyshader, layer.pointshader, layer.pointsrc)
-        }
-        Log.i("tst", "set up layers!")
-        nativeSetAnimShader(gl, baseanim)
-        nativeSetPointShader(gl, basepoint)
-        nativeSetCopyShader(gl, basecopy)
-        nativeSetInterpolator(gl, script)
-        Log.i("tst", "set interpolator!")
-        nativeSetBrushTexture(gl, brush)
-        Log.i("tst", "done loading unibrush!")
-      }}
-    }
+  // all but basecopyopt are options to indicate whether a new value should be set, because
+  // there's no way to track the old value except through an UnnamedPicker control
+  // FIXME: ...which really blows
+  def loadUniBrush(brushopt: Option[Texture], baseanimopt: Option[CopyShader], basepointopt: Option[PointShader], basecopyopt: Option[CopyShader], scriptopt: Option[LuaScript], layers: Array[Layer]) = {
+    for (gl <- glinit) { runHere {
+      val basecopy = basecopyopt.getOrElse(CopyShader(gl, null, null).right.get)
+
+      Log.i("tst", "loading unibrush!")
+      nativeClearLayers(gl)
+      for (layer <- layers) {
+        nativeAddLayer(gl, layer.copyshader, layer.pointshader, layer.pointsrc)
+      }
+      Log.i("tst", "set up layers!")
+      baseanimopt.map(nativeSetAnimShader(gl, _))
+      basepointopt.map(nativeSetPointShader(gl, _))
+      nativeSetCopyShader(gl, basecopy)
+      scriptopt.map(nativeSetInterpolator(gl, _))
+      Log.i("tst", "set interpolator!")
+      brushopt.map(nativeSetBrushTexture(gl, _))
+      Log.i("tst", "done loading unibrush!")
+    }}
+  }
 
   // only set values, could maybe run on main thread
   def setAnimShader(shader: CopyShader) = for (gl <- glinit) { runHere { nativeSetAnimShader(gl, shader) } }

@@ -41,7 +41,7 @@ class MainActivity extends Activity with TypedActivity with AndroidImplicits {
   lazy val content = new TextureView(this)
   lazy val contentframe = findView(TR.textureviewframe)
 
-  lazy val controls = PaintControls[GridView, GridView, GridView, GridView, GridView, Adapter, Adapter, Adapter, Adapter, Adapter](
+  lazy val controls = PaintControls(
     brushpicker = findView(TR.brushpicker),
     animpicker = findView(TR.animpicker),
     paintpicker = findView(TR.paintpicker),
@@ -268,7 +268,7 @@ class MainActivity extends Activity with TypedActivity with AndroidImplicits {
     savePickersToFile()
   }
 
-  def populatePicker[U, T <: (String, (Unit)=>GLResult[U]), V <: AdapterView[_ <: Adapter]](picker: UnnamedPicker[U, V], arr: Array[T], cb: (U)=>Unit, thread: TextureSurfaceThread) = {
+  def populatePicker[U, T <: (String, (Unit)=>GLResult[U])](picker: UnnamedPicker[U], arr: Array[T], cb: (U)=>Unit, thread: TextureSurfaceThread) = {
     val adapter = new LazyPicker(this, thread, arr)
     picker.setAdapter(adapter)
     picker.control.setOnItemClickListener(new AdapterView.OnItemClickListener() {
@@ -278,9 +278,7 @@ class MainActivity extends Activity with TypedActivity with AndroidImplicits {
           adapter.getState(pos, (result: GLResult[U]) => result match {
               case Right(value) => cb(value)
               case Left(errmsg) => {
-                //adapter.getState(0, (result: GLResult[U]) => cb(result.right.get))
                 MainActivity.this.runOnUiThread(() => {
-                  //FIXME gridview items aren't being greyed out, why not?
                   Toast.makeText(MainActivity.this, "unable to load item!\n" + errmsg, Toast.LENGTH_LONG).show()
                   picker.control.performItemClick(null, 0, 0)
                   adapter.notifyDataSetChanged()
@@ -328,14 +326,14 @@ class MainActivity extends Activity with TypedActivity with AndroidImplicits {
 
   def loadUniBrush(unibrush: UniBrush) = {
     Log.i("main", "loading unibrush")
-    def getSelectedValue[T, U <: AdapterView[V], V <: Adapter](picker: UnnamedPicker[T, U, V]) = {
-      picker.control.getAdapter.asInstanceOf[LazyPicker[T]]
-      .getItem(picker.selected)._2.cachedValue.flatMap(_.right.toOption)
+    def getSelectedValue[T](picker: UnnamedPicker[T]) = {
+      // return None if the control is already active, or we're trying to restore a missing value
+      // TODO: the missing-value part is probably busted
+      if (picker.enabled) None
+      else picker.currentValue._2.getCached()
     }
     for (thread <- textureThread) {
-      // TODO: don't load when nothing changed; perform load from texturethread side
       loadUniBrushControls(unibrush)
-
       val brush = unibrush.brush.orElse(getSelectedValue(controls.brushpicker))
       val anim = unibrush.baseanimshader.orElse(getSelectedValue(controls.animpicker))
       val point = unibrush.basepointshader.orElse(getSelectedValue(controls.paintpicker))
@@ -468,7 +466,7 @@ class MainActivity extends Activity with TypedActivity with AndroidImplicits {
       def enabled: Boolean
       def name: String
     }
-    class SidebarEntryPicker[T](val name: String, picker: UnnamedPicker[_,_,_], getUnibrushValue: (UniBrush) => Option[T]) extends SidebarEntry {
+    class SidebarEntryPicker[T](val name: String, picker: UnnamedPicker[_], getUnibrushValue: (UniBrush) => Option[T]) extends SidebarEntry {
       override def enabled = picker.enabled
       override def updateForUnibrush(u: UniBrush) = picker.enabled = getUnibrushValue(u).isEmpty
       override def onClick(pos: Int) = showControl(pos)

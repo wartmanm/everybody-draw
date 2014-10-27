@@ -2,7 +2,7 @@ package com.github.wartman4404.gldraw
 
 import android.os.Bundle
 import android.content.Context
-import android.widget.{AdapterView, Adapter, GridView}
+import android.widget.{AdapterView, Adapter, GridView, ListAdapter}
 
 import java.io.{InputStream, OutputStream, OutputStreamWriter, BufferedWriter}
 
@@ -11,8 +11,8 @@ import unibrush.UniBrush
 import spray.json._
 import PaintControls._
 
-class PaintControls[A <: UP[CopyShader, AV, _ <: AA], B <: UP[Texture, AV, _ <: AA], C <: UP[PointShader, AV, _ <: AA], D <: UP[LuaScript, AV, _ <: AA], E <: UP[UniBrush, AV, _ <: AA]]
-  (val animpicker: A, val brushpicker: B, val paintpicker: C, val interppicker: D, val unipicker: E) 
+class PaintControls
+  (val animpicker: UP[CopyShader], val brushpicker: UP[Texture], val paintpicker: UP[PointShader], val interppicker: UP[LuaScript], val unipicker: UP[UniBrush]) 
 extends AutoProductFormat {
 
   val namedPickers = Map(
@@ -47,34 +47,26 @@ extends AutoProductFormat {
   }
 }
 object PaintControls {
-  type AV = AdapterView[_ <: Adapter]
-  type AAV[AA] = AdapterView[AA]
-  type UP[T, U <: AAV[V], V <: AA] = UnnamedPicker[T, U, V]
-  type AA = Adapter
-  //def apply[A <: AV[CopyShader], B <: AV[Texture], C <: AV[PointShader], D <: AV[LuaScript], E <: AV[UniBrush]]
-  def apply[A <: AAV[A_A], B <: AAV[B_A], C <: AAV[C_A], D <: AAV[D_A], E <: AAV[E_A], A_A <: AA, B_A <: AA, C_A <: AA, D_A <: AA, E_A <: AA]
-  (animpicker: A, brushpicker: B, paintpicker: C, interppicker: D, unipicker: E) = {
-    val a: UP[CopyShader, A, A_A] = new UnnamedPicker[CopyShader, A, A_A](animpicker)
-    val b: UP[Texture, B, B_A] = new UnnamedPicker[Texture, B, B_A](brushpicker)
-    val c: UP[PointShader, C, C_A] = new UnnamedPicker[PointShader, C, C_A](paintpicker)
-    val d: UP[LuaScript, D, D_A] = new UnnamedPicker[LuaScript, D, D_A](interppicker)
-    val e: UP[UniBrush, E, E_A] = new UnnamedPicker[UniBrush, E, E_A](unipicker)
-    
-    new PaintControls (a, b, c, d, e)
-    //new UnnamedPicker[CopyShader, A](animpicker),
-    //new UnnamedPicker[Texture, B](brushpicker),
-    //new UnnamedPicker[PointShader, C](paintpicker),
-    //new UnnamedPicker[LuaScript, D](interppicker),
-    //new UnnamedPicker[UniBrush, E](unipicker)
-  //)
+  type LAV = AdapterView[ListAdapter]
+  type UP[T] = UnnamedPicker[T]
+  def apply
+  (animpicker: LAV, brushpicker: LAV, paintpicker: LAV, interppicker: LAV, unipicker: LAV) = {
+    new PaintControls (
+      new UnnamedPicker[CopyShader](animpicker),
+      new UnnamedPicker[Texture](brushpicker),
+      new UnnamedPicker[PointShader](paintpicker),
+      new UnnamedPicker[LuaScript](interppicker),
+      new UnnamedPicker[UniBrush](unipicker))
   }
 
-  class UnnamedPicker[T, +U <: AdapterView[V], V <: Adapter](val control: U)  {
+  class UnnamedPicker[T](val control: AdapterView[ListAdapter])  {
+    type U = AdapterView[LazyPicker[T]]
     var selected = AdapterView.INVALID_POSITION
+    def currentValue = adapter.lazified(selected)
     var selectedName = ""
     var enabled = true
     private var adapter: LazyPicker[T] = null
-    def setAdapter[V](a: LazyPicker[T]) = {
+    def setAdapter(a: LazyPicker[T]) = {
       adapter = a
       control.setAdapter(a)
     }
@@ -87,7 +79,7 @@ object PaintControls {
     }
     def updateState() = selectedName = selected match {
       case AdapterView.INVALID_POSITION => ""
-      case x => this.adapter.lazified(x)._1
+      case x => currentValue._1
     }
     def save() = SavedState(enabled, selectedName)
     def load(state: SavedState) = {
