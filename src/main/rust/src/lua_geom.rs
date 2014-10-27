@@ -108,6 +108,11 @@ unsafe fn get_lua() -> GLResult<*mut lua_State> {
     }
 }
 
+#[inline(always)]
+pub unsafe fn get_existing_lua() -> Option<*mut lua_State> {
+    STATIC_LUA
+}
+
 unsafe fn push_sandbox(L: *mut lua_State) {
     lua_pushlightuserdata(L, GLDRAW_LUA_SANDBOX);
     lua_gettable(L, LUA_REGISTRYINDEX);
@@ -192,20 +197,16 @@ pub unsafe fn push_lua_script(key: i32) {
 }
 
 pub unsafe fn do_interpolate_lua(script: &::luascript::LuaScript, dimensions: (i32, i32), output: &mut LuaCallbackType) -> GLResult<()> {
-    if let Some(L) = STATIC_LUA {
-        script.push_self();
-        
-        let (x, y) = dimensions;
-        lua_pushnumber(L, x as f64);
-        lua_pushnumber(L, y as f64);
-        lua_pushlightuserdata(L, output as *mut LuaCallbackType as *mut c_void);
+    let L = output.lua;
+    script.push_self();
 
-        match lua_pcall(L, 3, 0, 0) {
-            0 => Ok(()),
-            _ => log_err(format!("script failed to run: {}", err_to_str(L))),
-        }
-    } else {
-        logi!("lua state doesn't exist!");
-        Ok(())
+    let (x, y) = dimensions;
+    lua_pushnumber(L, x as f64);
+    lua_pushnumber(L, y as f64);
+    lua_pushlightuserdata(L, output as *mut LuaCallbackType as *mut c_void);
+
+    match lua_pcall(L, 3, 0, 0) {
+        0 => Ok(()),
+        _ => log_err(format!("script failed to run: {}", err_to_str(L))),
     }
 }
