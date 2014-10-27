@@ -21,7 +21,6 @@ import scala.collection.mutable
 
 import com.ipaulpro.afilechooser.utils.FileUtils
 
-import PaintControls.NamedPicker
 import unibrush.{UniBrush, Layer}
 
 import resource._
@@ -29,6 +28,8 @@ import resource._
 import scala.concurrent.ExecutionContext
 import scala.concurrent.Future
 import java.util.concurrent.Executors
+
+import PaintControls.UnnamedPicker
 
 
 
@@ -40,12 +41,12 @@ class MainActivity extends Activity with TypedActivity with AndroidImplicits {
   lazy val content = new TextureView(this)
   lazy val contentframe = findView(TR.textureviewframe)
 
-  lazy val controls = new PaintControls(
-    inbrushpicker = findView(TR.brushpicker).asInstanceOf[AdapterView[Adapter]],
-    inanimpicker = findView(TR.animpicker).asInstanceOf[AdapterView[Adapter]],
-    inpaintpicker = findView(TR.paintpicker).asInstanceOf[AdapterView[Adapter]],
-    ininterppicker = findView(TR.interppicker).asInstanceOf[AdapterView[Adapter]],
-    inunipicker = findView(TR.unipicker).asInstanceOf[AdapterView[Adapter]])
+  lazy val controls = PaintControls[GridView, GridView, GridView, GridView, GridView, Adapter, Adapter, Adapter, Adapter, Adapter](
+    brushpicker = findView(TR.brushpicker),
+    animpicker = findView(TR.animpicker),
+    paintpicker = findView(TR.paintpicker),
+    interppicker = findView(TR.interppicker),
+    unipicker = findView(TR.unipicker))
 
   lazy val drawerParent = findView(TR.drawer_parent)
   lazy val controlflipper = findView(TR.controlflipper)
@@ -267,13 +268,13 @@ class MainActivity extends Activity with TypedActivity with AndroidImplicits {
     savePickersToFile()
   }
 
-  def populatePicker[U, T <: (String, (Unit)=>GLResult[U]), V <: AdapterView[Adapter]](picker: NamedPicker[V, U], arr: Array[T], cb: (U)=>Unit, thread: TextureSurfaceThread) = {
+  def populatePicker[U, T <: (String, (Unit)=>GLResult[U]), V <: AdapterView[_ <: Adapter]](picker: UnnamedPicker[U, V], arr: Array[T], cb: (U)=>Unit, thread: TextureSurfaceThread) = {
     val adapter = new LazyPicker(this, thread, arr)
-    picker.control.setAdapter(adapter)
+    picker.setAdapter(adapter)
     picker.control.setOnItemClickListener(new AdapterView.OnItemClickListener() {
         override def onItemClick(parent: AdapterView[_], view: View, pos: Int, id: Long) = {
           picker.selected = pos
-          Log.i("main", s"Item selected for {picker.name}! {pos}")
+          //Log.i("main", s"Item selected for {picker.name}! {pos}")
           adapter.getState(pos, (result: GLResult[U]) => result match {
               case Right(value) => cb(value)
               case Left(errmsg) => {
@@ -327,7 +328,7 @@ class MainActivity extends Activity with TypedActivity with AndroidImplicits {
 
   def loadUniBrush(unibrush: UniBrush) = {
     Log.i("main", "loading unibrush")
-    def getSelectedValue[T, U <: AdapterView[Adapter]](picker: NamedPicker[U, T]) = {
+    def getSelectedValue[T, U <: AdapterView[V], V <: Adapter](picker: UnnamedPicker[T, U, V]) = {
       picker.control.getAdapter.asInstanceOf[LazyPicker[T]]
       .getItem(picker.selected)._2.cachedValue.flatMap(_.right.toOption)
     }
@@ -433,7 +434,7 @@ class MainActivity extends Activity with TypedActivity with AndroidImplicits {
       new SidebarEntryHider("Hide Controls")
     )
     override def areAllItemsEnabled = false
-    override def isEnabled(pos: Int) = sidebarControls(pos).isEnabled
+    override def isEnabled(pos: Int) = sidebarControls(pos).enabled
     override def getCount = sidebarControls.length
     override def getViewTypeCount() = 1
     override def getItem(pos: Int) = sidebarControls(pos)
@@ -446,34 +447,34 @@ class MainActivity extends Activity with TypedActivity with AndroidImplicits {
       }
       val name = view.findViewById(android.R.id.text1).asInstanceOf[TextView]
       val control = sidebarControls(pos)
+      val enabled = control.enabled
       name.setText(control.name)
-      name.setEnabled(control.isEnabled)
-      view.setEnabled(control.isEnabled)
+      name.setEnabled(enabled)
+      view.setEnabled(enabled)
       view
     }
 
     def updateUnibrush(unibrush: UniBrush) = {
       for (control <- sidebarControls) {
         control.updateForUnibrush(unibrush)
-        this.notifyDataSetChanged()
       }
+      this.notifyDataSetChanged()
     }
   }
   object SidebarAdapter {
     trait SidebarEntry {
       def onClick(pos: Int): Unit
       def updateForUnibrush(u: UniBrush): Unit
-      def isEnabled: Boolean
+      def enabled: Boolean
       def name: String
     }
-    class SidebarEntryPicker[T](val name: String, val picker: NamedPicker[_,_], getUnibrushValue: (UniBrush) => Option[T]) extends SidebarEntry {
-      var enabled = true
-      override def isEnabled = enabled
-      override def updateForUnibrush(u: UniBrush) = enabled = getUnibrushValue(u).isEmpty
+    class SidebarEntryPicker[T](val name: String, picker: UnnamedPicker[_,_,_], getUnibrushValue: (UniBrush) => Option[T]) extends SidebarEntry {
+      override def enabled = picker.enabled
+      override def updateForUnibrush(u: UniBrush) = picker.enabled = getUnibrushValue(u).isEmpty
       override def onClick(pos: Int) = showControl(pos)
     }
     class SidebarEntryHider(val name: String) extends SidebarEntry {
-      override def isEnabled = true
+      override def enabled = true
       override def updateForUnibrush(u: UniBrush) = { }
       override def onClick(pos: Int) = hideControls()
     }
