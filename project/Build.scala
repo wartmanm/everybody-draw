@@ -75,8 +75,6 @@ object General {
   )
 
   val settings = Defaults.defaultSettings ++ Seq (
-    resolvers += "Local Maven Repository" at "file://"+Path.userHome.absolutePath+"/.m2/repository",
-    resolvers += "spray" at "http://repo.spray.io/",
     name := "everybodydraw",
     version := "0.1",
     versionCode := 0,
