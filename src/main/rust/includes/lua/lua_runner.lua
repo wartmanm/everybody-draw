@@ -2,12 +2,13 @@ local _main = callbacks.main
 local _onframe = callbacks.onframe
 local _ondown = callbacks.ondown
 local _onup = callbacks.onup
+local _ondone = callbacks.ondone
 if type(_main) ~= "function" then
   loglua("main not defined for runmain()!!")
   return
 end
 
-if _onup == nil and _ondown == nil and _onframe == nil then
+if _onup == nil and _ondown == nil and _onframe == nil and _ondone == nil then
   local queue_layer_save = false
   loglua("setting default pointer callbacks")
   local downcount = 0
@@ -26,10 +27,17 @@ if _onup == nil and _ondown == nil and _onframe == nil then
       queue_layer_save = false
     end
   end
+  function default_ondone(output)
+    savelayers(output)
+  end
   _ondown = default_ondown
   _onup = default_onup
   _onframe = default_onframe
+  _ondone = default_ondone
+elseif _ondone == nil then
+  _ondone = function(output) end
 end
+callback.ondone = _ondone
 
 function runmain(x, y, output)
   if type(_onframe) == "function" then

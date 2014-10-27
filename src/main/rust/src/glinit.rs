@@ -22,7 +22,7 @@ use eglinit;
 use luascript::LuaScript;
 use paintlayer::PaintLayer;
 use lua_callbacks::LuaCallbackType;
-use lua_geom::do_interpolate_lua;
+use lua_geom::{do_interpolate_lua, finish_lua_script};
 use drawevent::Events;
 
 
@@ -248,6 +248,17 @@ impl<'a> GLInit<'a> {
         gl2::blend_func(gl2::ONE, gl2::ONE_MINUS_SRC_ALPHA);
 
         data
+    }
+
+    pub fn clear_pending(&mut self, handler: &mut MotionEventConsumer, events: &'a mut Events<'a>) -> GLResult<()> {
+        if let Some(interpolator) = self.paintstate.interpolator {
+            unsafe {
+                let mut callback = try!(LuaCallbackType::new(self, events, handler));
+                finish_lua_script(&mut callback, interpolator)
+            }
+        } else {
+            Ok(())
+        }
     }
 
     pub fn draw_queued_points(&mut self, handler: &mut MotionEventConsumer, events: &'a mut Events<'a>, matrix: &matrix::Matrix) -> GLResult<()> {

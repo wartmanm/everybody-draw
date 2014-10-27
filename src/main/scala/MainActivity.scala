@@ -65,6 +65,7 @@ class MainActivity extends Activity with TypedActivity with AndroidImplicits {
   lazy val saveThread = ExecutionContext.fromExecutor(Executors.newSingleThreadExecutor())
 
   @native protected def nativeAppendMotionEvent(handler: MotionEventProducer, m: MotionEvent): Unit
+  @native protected def nativePauseMotionEvent(handler: MotionEventProducer): Unit
 
   // TODO: actually clean up
   var handlers: Option[MotionEventHandlerPair] = None
@@ -90,7 +91,7 @@ class MainActivity extends Activity with TypedActivity with AndroidImplicits {
     thread.initScreen(savedBitmap)
     savedBitmap = None
     thread.startFrames()
-    populatePickers()
+    populatePickers(producer)
     content.setOnTouchListener(createViewTouchListener(producer))
     Log.i("main", "set ontouch listener")
   }
@@ -293,7 +294,25 @@ class MainActivity extends Activity with TypedActivity with AndroidImplicits {
     })
   }
 
-  def populatePickers() = {
+  def loadInterpolatorSynchronized(thread: TextureSurfaceThread, producer: MotionEventProducer) = (gl: GLInit, interpolator: LuaScript) => {
+    val notify = new Object()
+    notify.synchronized {
+      runOnUiThread(() => {
+        nativePauseMotionEvent(producer)
+        notify.synchronized {
+          notify.notify()
+          notify.wait()
+        }
+      })
+      notify.wait()
+      thread.finishLuaScript(gl)
+      thread.setInterpScript(gl, interpolator)
+      notify.notify()
+    }
+  }
+
+
+  def populatePickers(producer: MotionEventProducer) = {
     for (thread <- textureThread) {
       // TODO: maybe make the save thread load from disk and then hand off to the gl thread?
       // also, have it opportunistically load at least up to that point
@@ -309,7 +328,7 @@ class MainActivity extends Activity with TypedActivity with AndroidImplicits {
         populatePicker(controls.brushpicker, brushes,  thread.setBrushTexture _, thread)
         populatePicker(controls.animpicker, anims,  thread.setAnimShader _, thread)
         populatePicker(controls.paintpicker, paints,  thread.setPointShader _, thread)
-        populatePicker(controls.interppicker, interpscripts,  thread.setInterpScript _, thread)
+        populatePicker(controls.interppicker, interpscripts,  loadInterpolatorSynchronized(thread, producer), thread)
         populatePicker(controls.unipicker, unibrushes, loadUniBrush(thread), thread)
         controls.copypicker.value = thread.outputShader
         controls.restoreState()

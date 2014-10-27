@@ -28,6 +28,7 @@ use drawevent::Events;
 use drawevent::event_stream::EventStream;
 use gltexture::ToPixelFormat;
 use gltexture::Texture;
+use lua_geom;
 
 macro_rules! native_method(
     ($name:expr, $sig:expr, $fn_ptr:expr) => (
@@ -124,6 +125,11 @@ unsafe extern "C" fn native_draw_queued_points(env: *mut JNIEnv, thiz: jobject, 
     }
 }
 
+unsafe extern "C" fn native_finish_lua_script(env: *mut JNIEnv, thiz: jobject, data: i32, handler: i32) {
+    let data = get_safe_data(data);
+    data.glinit.clear_pending(mem::transmute(handler), &mut data.events);
+}
+
 unsafe extern "C" fn native_update_gl(env: *mut JNIEnv, thiz: jobject, data: i32) {
     let data = get_safe_data(data);
     data.glinit.render_frame();
@@ -151,6 +157,10 @@ unsafe extern "C" fn destroy_motion_event_handler(env: *mut JNIEnv, thiz: jobjec
 unsafe extern "C" fn native_append_motion_event(env: *mut JNIEnv, thiz: jobject, handler: jint, evtobj: jobject) {
     let evtptr = ((**env).GetIntField)(env, evtobj, MOTIONEVENT_NATIVE_PTR_FIELD);
     glpoint::jni_append_motion_event(mem::transmute(handler), evtptr as *const AInputEvent);
+}
+
+unsafe extern "C" fn native_pause_motion_event(env: *mut JNIEnv, thiz: jobject, handler: jint) {
+    glpoint::jni_pause_motion_event(mem::transmute(handler));
 }
 
 unsafe extern "C" fn set_anim_shader(env: *mut JNIEnv, thiz: jobject, data: jint, shader: jint) {
@@ -375,12 +385,14 @@ pub unsafe extern "C" fn JNI_OnLoad(vm: *mut JavaVM, reserved: *mut c_void) -> j
 
     let mainmethods = [
         native_method!("nativeAppendMotionEvent", "(ILandroid/view/MotionEvent;)V", native_append_motion_event),
+        native_method!("nativePauseMotionEvent", "(I)V", native_pause_motion_event),
     ];
     register_classmethods(env, cstr!("com/github/wartman4404/gldraw/MainActivity"), mainmethods);
 
     let texturemethods = [
         native_method!("nativeUpdateGL", "(I)V", native_update_gl),
         native_method!("nativeDrawQueuedPoints", "(II[F)V", native_draw_queued_points),
+        native_method!("nativeFinishLuaScript", "(II)V", native_finish_lua_script),
         native_method!("nativeClearFramebuffer", "(I)V", clear_framebuffer),
         native_method!("drawImage", "(ILandroid/graphics/Bitmap;)V", draw_image),
         native_method!("nativeSetAnimShader", "(II)Z", set_anim_shader),

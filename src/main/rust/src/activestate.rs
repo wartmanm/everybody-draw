@@ -16,5 +16,9 @@ impl ActiveState {
         let ActiveState(state) = self;
         ActiveState(((state << 1) & OLDMASK) | newstate as u8)
     }
+    //#[inline]
+    //pub fn is_active(self) -> bool {
+        //(self & NEWMASK) != 0
+    //}
 }
 

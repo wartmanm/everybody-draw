@@ -3,7 +3,7 @@ use core::fmt;
 use core::fmt::Show;
 use log::logi;
 use glcommon::GLResult;
-use lua_geom::{load_lua_script, unload_lua_script, push_lua_script};
+use lua_geom::{load_lua_script, destroy_lua_script, push_lua_script};
 
 pub struct LuaScript {
     registry_id: i32,
@@ -30,7 +30,7 @@ impl Drop for LuaScript {
     fn drop(&mut self) {
         logi!("dropping {}", self);
         unsafe {
-            unload_lua_script(self.registry_id);
+            destroy_lua_script(self.registry_id);
         }
     }
 }

@@ -23,6 +23,7 @@ extends Thread with Handler.Callback with AndroidImplicits {
 
   @native protected def nativeUpdateGL(data: GLInit): Unit
   @native protected def nativeDrawQueuedPoints(data: GLInit, handler: MotionEventHandler, transformMatrix: Array[Float]): Unit
+  @native protected def nativeFinishLuaScript(data: GLInit, handler: MotionEventHandler): Unit
   @native protected def nativeClearFramebuffer(data: GLInit): Unit
   @native protected def drawImage(data: GLInit, bitmap: Bitmap): Unit
   @native protected def nativeSetAnimShader(data: GLInit, shader: CopyShader): Boolean
@@ -165,6 +166,11 @@ extends Thread with Handler.Callback with AndroidImplicits {
 
   private def drawQueuedPoints(g: GLInit) = {
     nativeDrawQueuedPoints(g, motionHandler, matrix)
+  }
+
+  def finishLuaScript(gl: GLInit) = {
+    nativeDrawQueuedPoints(gl, motionHandler, matrix)
+    nativeFinishLuaScript(gl, motionHandler)
   }
 
   private def drawReplayFrame(gl: GLInit, r: Replay) = {

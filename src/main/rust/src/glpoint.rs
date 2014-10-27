@@ -63,6 +63,10 @@ pub fn jni_append_motion_event(s: &mut MotionEventProducer, evt: *const AInputEv
     append_motion_event(&mut s.pointer_data, evt, &mut s.producer);
 }
 
+pub fn jni_pause_motion_event(s: &mut MotionEventProducer) {
+    motionevent::pause(&mut s.pointer_data, &mut s.producer);
+}
+
 fn manhattan_distance(a: Coordinate, b: Coordinate) -> f32 {
     let x = if a.x > b.x { a.x - b.x } else { b.x - a.x };
     let y = if a.y > b.y { a.y - b.y } else { b.y - a.y };
@@ -101,6 +105,9 @@ pub fn next_point(s: &mut MotionEventConsumer, e: &mut Events) -> (point::Shader
                     };
                     oldpoint.info = Some(npdata);
                     point::Move(op, npdata)
+                },
+                (_, point::FrameStop) => {
+                    point::NoEvent
                 },
                 (_, point::Stop) => {
                     oldpoint.info = None;

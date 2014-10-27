@@ -23,6 +23,15 @@ impl Data {
     }
 }
 
+pub fn pause(data: &mut Data, queue: &mut PointProducer) {
+    let active = &mut data.pointer_states;
+    for (_, state) in active.iter_mut() {
+        *state = state.push(false);
+    }
+    push_stops(queue, active);
+    queue.push(PointEntry { index: -1, entry: point::FrameStop })
+}
+
 pub fn append_motion_event(data: &mut Data, evt: *const AInputEvent, queue: &mut PointProducer) -> () {
     let active = &mut data.pointer_states;
     for (_, state) in active.iter_mut() {
