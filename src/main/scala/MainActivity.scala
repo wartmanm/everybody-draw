@@ -293,10 +293,8 @@ class MainActivity extends Activity with TypedActivity with AndroidImplicits {
   }
 
   def populatePickers() = {
-    for (
-      thread <- textureThread;
-      gl <- thread.glinit) {
-      thread.runHere {
+    for (thread <- textureThread) {
+      thread.withGL(gl => {
         // TODO: maybe make the save thread load from disk and then hand off to the gl thread?
         // also, have it opportunistically load at least up to that point
         val brushes = DrawFiles.loadBrushes(this, gl).toArray
@@ -315,7 +313,7 @@ class MainActivity extends Activity with TypedActivity with AndroidImplicits {
             populatePicker(controls.unipicker, unibrushes, loadUniBrush _, thread)
             controls.copypicker.currentValue = thread.outputShader
           })
-      }
+      })
     }
   }
 

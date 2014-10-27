@@ -18,7 +18,7 @@ extends Thread with Handler.Callback with AndroidImplicits {
   private var eglHelper: EGLHelper = null
   private var pOutputShader: Option[CopyShader] = None
   def outputShader = pOutputShader
-  var glinit: Option[GLInit] = None
+  private var glinit: Option[GLInit] = None
   private var replay = Replay.nullReplay
 
   @native protected def nativeUpdateGL(data: GLInit): Unit
@@ -118,7 +118,7 @@ extends Thread with Handler.Callback with AndroidImplicits {
   }
 
   // TODO: check if we're already on the gl thread
-  def runHere(fn: => Unit) = {
+  private def runHere(fn: => Unit) = {
     handler.post(() => { fn; () })
   }
 
@@ -242,6 +242,12 @@ extends Thread with Handler.Callback with AndroidImplicits {
   }
   //unused
   def setCopyShader(shader: CopyShader) = for (gl <- glinit) { runHere { nativeSetCopyShader(gl, shader) } }
+
+  def withGL(cb: (GLInit) => Unit) = {
+    for (gl <- glinit) { runHere {
+      cb(gl)
+    }}
+  }
 }
 
 object TextureSurfaceThread {
