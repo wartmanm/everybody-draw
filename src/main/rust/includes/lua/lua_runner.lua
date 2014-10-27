@@ -7,7 +7,8 @@ if type(_main) ~= "function" then
   return
 end
 
-if _onup == nil and _ondown == nil then
+if _onup == nil and _ondown == nil and _onframe == nil then
+  local queue_layer_save = false
   loglua("setting default pointer callbacks")
   local downcount = 0
   function default_ondown(pointer, output)
@@ -16,11 +17,18 @@ if _onup == nil and _ondown == nil then
   function default_onup(pointer, output)
     downcount = downcount - 1
     if downcount == 0 then
+      queue_layer_save = true
+    end
+  end
+  function default_onframe(x, y, output)
+    if queue_layer_save == true then
       savelayers(output)
+      queue_layer_save = false
     end
   end
   _ondown = default_ondown
   _onup = default_onup
+  _onframe = default_onframe
 end
 
 function runmain(x, y, output)
