@@ -2,6 +2,7 @@ package com.github.wartman4404.gldraw
 
 import android.os.Bundle
 import android.content.Context
+import android.view.View
 import android.widget.{AdapterView, Adapter, GridView, ListAdapter}
 import android.util.Log
 
@@ -14,7 +15,7 @@ import PaintControls._
 import GLResultTypeDef._
 
 class PaintControls
-  (val animpicker: UP[CopyShader], val brushpicker: UP[Texture], val paintpicker: UP[PointShader], val interppicker: UP[LuaScript], val unipicker: UP[UniBrush], val copypicker: UUP[CopyShader]) 
+  (val animpicker: UP[CopyShader], val brushpicker: UP[Texture], val paintpicker: UP[PointShader], val interppicker: UP[LuaScript], val unipicker: UP[UniBrush], val copypicker: UUP[CopyShader], val sidebar: FIP) 
 extends AutoProductFormat {
 
   val namedPickers = Map(
@@ -23,11 +24,12 @@ extends AutoProductFormat {
     "paint" -> paintpicker,
     "interp" -> interppicker,
     "unibrush" -> unipicker,
-    "copy" -> copypicker
+    "copy" -> copypicker,
+    "sidebar" -> sidebar
   )
 
-  def restoreState() = namedPickers.values.map(_.restoreState())
-  def updateState() = namedPickers.values.map(_.updateState())
+  def restoreState() = namedPickers.values.foreach(_.restoreState())
+  def updateState() = namedPickers.values.foreach(_.updateState())
   def saveToString(): String = {
     namedPickers.map({case (k,v) => (k, v.save())}).toJson.toString
   }
@@ -49,33 +51,48 @@ extends AutoProductFormat {
     loadFromString(state)
   }
 }
-object PaintControls {
+object PaintControls extends AndroidImplicits {
   type LAV = AdapterView[ListAdapter]
   type UP[T] = UnnamedPicker[T]
   type UUP[T] = UnnamedUnpicker[T]
+  type FIP = FixedIndexPicker
   def apply
-  (animpicker: LAV, brushpicker: LAV, paintpicker: LAV, interppicker: LAV, unipicker: LAV) = {
+  (animpicker: LAV, brushpicker: LAV, paintpicker: LAV, interppicker: LAV, unipicker: LAV, sidebar: LAV) = {
     new PaintControls (
       new UnnamedPicker[CopyShader](animpicker),
       new UnnamedPicker[Texture](brushpicker),
       new UnnamedPicker[PointShader](paintpicker),
       new UnnamedPicker[LuaScript](interppicker),
       new UnnamedPicker[UniBrush](unipicker),
-      new UnnamedUnpicker[CopyShader](None))
+      new UnnamedUnpicker[CopyShader](None),
+      new FixedIndexPicker(sidebar))
   }
 
-  trait SavedControl[T] {
+  trait SavedControl {
     def save(): JsValue
     def load(j: JsValue): Unit
     def restoreState() { }
     def updateState() { }
+  }
+
+  trait SelectedListener {
+    val control: AdapterView[ListAdapter]
+    var selected = AdapterView.INVALID_POSITION
+    def setListener(cb: (View, Int) => Unit) = {
+      control.setOnItemClickListener((v: View, pos: Int) => {
+        selected = pos
+        cb(v, pos)
+      })
+    }
+  }
+
+  trait GLControl[T] {
     var enabled: Boolean = true
     def currentValue(gl: GLInit): GLResult[T]
   }
 
-  class UnnamedPicker[T](val control: AdapterView[ListAdapter]) extends SavedControl[T] with AutoProductFormat {
+  class UnnamedPicker[T](override val control: AdapterView[ListAdapter]) extends SavedControl with GLControl[T] with SelectedListener with AutoProductFormat {
     type U = AdapterView[LazyPicker[T]]
-    var selected = AdapterView.INVALID_POSITION
     override def currentValue(gl: GLInit) = {
       Log.i("picker", s"getting value at idx ${selected}: '${adapter.lazified(selected)._1}'")
       adapter.getState(selected, gl)
@@ -87,6 +104,7 @@ object PaintControls {
       control.setAdapter(a)
     }
     override def restoreState(): Unit = {
+      Log.i("picker", "restoring unnamedpicker state")
       selected = this.adapter.lazified.indexWhere(_._1 == selectedName) match {
         case -1 => 0
         case  x => x
@@ -105,7 +123,17 @@ object PaintControls {
     }
   }
 
-  class UnnamedUnpicker[T](var value: Option[T] = None) extends SavedControl[T] with AutoProductFormat {
+  class FixedIndexPicker(override val control: AdapterView[ListAdapter]) extends SavedControl with SelectedListener with AutoProductFormat {
+    override def restoreState(): Unit = {
+      Log.i("picker", s"clicking ${selected} in sidebar")
+      this.control.performItemClick(null, selected, selected)
+    }
+    override def updateState() = { }
+    override def save() = selected.toJson
+    override def load(j: JsValue) = { selected = j.convertTo[Int] }
+  }
+
+  class UnnamedUnpicker[T](var value: Option[T] = None) extends SavedControl with GLControl[T] with AutoProductFormat {
     override def save() = enabled.toJson
     override def load(j: JsValue) = enabled = j.convertTo[Boolean]
     override def currentValue(gl: GLInit) = {
