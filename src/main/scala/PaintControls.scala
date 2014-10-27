@@ -7,60 +7,68 @@ import java.io.{InputStream, OutputStream, OutputStreamWriter, BufferedWriter}
 
 import unibrush.UniBrush
 
-class PaintControls(inbrushpicker: AdapterView[Adapter], inanimpicker: AdapterView[Adapter], inpaintpicker: AdapterView[Adapter], ininterppicker: AdapterView[Adapter], inunipicker: AdapterView[Adapter]) {
-  import PaintControls._
+import spray.json._
+import PaintControls._
 
-  val animpicker = NamedPicker[CopyShader]("anim", inanimpicker)
-  val brushpicker = NamedPicker[Texture]("brush", inbrushpicker)
-  val paintpicker = NamedPicker[PointShader]("paint", inpaintpicker)
-  val interppicker = NamedPicker[LuaScript]("interp", ininterppicker)
-  val unipicker = NamedPicker[UniBrush]("unib", inunipicker)
+class PaintControls[A <: AV, B <: AV, C <: AV, D <: AV, E <: AV]
+    (inanimpicker: A, inbrushpicker: B, inpaintpicker: C, ininterppicker: D, inunipicker: E) extends AutoProductFormat {
+
+  val animpicker = NamedPicker[A, CopyShader]("anim", inanimpicker)
+  val brushpicker = NamedPicker[B, Texture]("brush", inbrushpicker)
+  val paintpicker = NamedPicker[C, PointShader]("paint", inpaintpicker)
+  val interppicker = NamedPicker[D, LuaScript]("interp", ininterppicker)
+  val unipicker = NamedPicker[E, UniBrush]("unib", inunipicker)
 
   val namedPickers = Array(animpicker, brushpicker, paintpicker, interppicker, unipicker)
 
   def restoreState() = namedPickers.map(_.restoreState())
   def updateState() = namedPickers.map(_.updateState())
-  def save(b: Bundle): Unit = namedPickers.foreach(_.save(b))
-  def load(b: Bundle): Unit = namedPickers.foreach(_.load(b))
-  def save(m: Map[String, String]): Map[String, String] = namedPickers.foldLeft(m)((m, p) => p.save(m))
-  def load(m: Map[String, String]): Unit = namedPickers.map(_.load(m))
+  def saveToString(): String = {
+    namedPickers.map(_.save()).toJson.toString
+  }
+  def loadFromString(s: String) = {
+    val saved = s.parseJson.convertTo[Array[SavedState]]
+    for ((picker, state) <- namedPickers.zip(saved)) {
+      picker.load(state)
+    }
+  }
+  def save(b: Bundle): Unit = b.putString("paintcontrols", saveToString())
+  def load(b: Bundle): Unit = loadFromString(b.getString("paintcontrols"))
   def save(os: OutputStream): Unit = {
     val writer = new BufferedWriter(new OutputStreamWriter(os))
-    writer.write(save(Map[String,String]()).map { case (k, v) => s"$k=$v" }.mkString("\n"))
+    writer.write(saveToString())
     writer.close()
   }
   def load(is: InputStream): Unit = {
-    val reader = scala.io.Source.fromInputStream(is)
-    val map = reader.getLines.foldLeft(Map[String, String]())((m, line) => {
-        val Array(k, v): Array[String] = line.split("=", 2)
-        m + (k -> v)
-      })
-    load(map)
-    reader.close()
+    val state = DrawFiles.readStream(is)
+    loadFromString(state)
   }
-
 }
 object PaintControls {
-
-  case class NamedPicker[T](name: String, control: AdapterView[Adapter]) {
+  type AV = AdapterView[Adapter]
+  case class NamedPicker[A <: AdapterView[Adapter], T](name: String, control: A) {
     var selected = AdapterView.INVALID_POSITION
-    private var state: Option[String] = None
+    var selectedName = ""
+    var enabled = true
     def restoreState(): Unit = {
-      val index = state.map(s => control.getAdapter().asInstanceOf[LazyPicker[T]].lazified.indexWhere(_._1 == s) match {
-          case -1 => 0
-          case  x => x
-        }).getOrElse(0)
-      control.performItemClick(null, index, index)
+      selected = control.getAdapter().asInstanceOf[LazyPicker[T]].lazified.indexWhere(_._1 == selectedName) match {
+        case -1 => 0
+        case  x => x
+      }
+      if (enabled) control.performItemClick(null, selected, selected)
     }
-    def updateState() = state = selected match {
-      case AdapterView.INVALID_POSITION => None
-      case x => Some(control.getAdapter().asInstanceOf[LazyPicker[T]].lazified(x)._1)
+    def updateState() = selectedName = selected match {
+      case AdapterView.INVALID_POSITION => ""
+      case x => control.getAdapter().asInstanceOf[LazyPicker[T]].lazified(x)._1
     }
-    def save(b: Bundle): Unit = for (value <- state) b.putString(name, value)
-    def load(b: Bundle): Unit = state = Option(b.getString(name))
-    def save(m: Map[String, String]): Map[String, String] = state.map(value => m + (name -> value)).getOrElse(m)
-    def load(m: Map[String, String]): Unit = state = m.get(name)
+    def save() = SavedState(enabled, selectedName)
+    def load(state: SavedState) = {
+      enabled = state.enabled
+      selectedName = state.selectedName
+    }
   }
+
+  case class SavedState(enabled: Boolean, selectedName: String)
 
   implicit class AdapterSeq(a: Adapter) extends IndexedSeq[Object] {
     def length = a.getCount()

@@ -267,7 +267,7 @@ class MainActivity extends Activity with TypedActivity with AndroidImplicits {
     savePickersToFile()
   }
 
-  def populatePicker[U, T <: (String, (Unit)=>GLResult[U])](picker: NamedPicker[U], arr: Array[T], cb: (U)=>Unit, thread: TextureSurfaceThread) = {
+  def populatePicker[U, T <: (String, (Unit)=>GLResult[U]), V <: AdapterView[Adapter]](picker: NamedPicker[V, U], arr: Array[T], cb: (U)=>Unit, thread: TextureSurfaceThread) = {
     val adapter = new LazyPicker(this, thread, arr)
     picker.control.setAdapter(adapter)
     picker.control.setOnItemClickListener(new AdapterView.OnItemClickListener() {
@@ -327,7 +327,7 @@ class MainActivity extends Activity with TypedActivity with AndroidImplicits {
 
   def loadUniBrush(unibrush: UniBrush) = {
     Log.i("main", "loading unibrush")
-    def getSelectedValue[T](picker: NamedPicker[T]) = {
+    def getSelectedValue[T, U <: AdapterView[Adapter]](picker: NamedPicker[U, T]) = {
       picker.control.getAdapter.asInstanceOf[LazyPicker[T]]
       .getItem(picker.selected)._2.cachedValue.flatMap(_.right.toOption)
     }
@@ -466,7 +466,7 @@ class MainActivity extends Activity with TypedActivity with AndroidImplicits {
       def isEnabled: Boolean
       def name: String
     }
-    class SidebarEntryPicker[T](val name: String, val picker: NamedPicker[_], getUnibrushValue: (UniBrush) => Option[T]) extends SidebarEntry {
+    class SidebarEntryPicker[T](val name: String, val picker: NamedPicker[_,_], getUnibrushValue: (UniBrush) => Option[T]) extends SidebarEntry {
       var enabled = true
       override def isEnabled = enabled
       override def updateForUnibrush(u: UniBrush) = enabled = getUnibrushValue(u).isEmpty
