@@ -99,7 +99,7 @@ object UniBrush extends AutoProductFormat {
     }
   }
 
-  def compile(data: GLInit, sourceZip: InputStream): GLResult[UniBrush] = {
+  def compileFromStream(data: GLInit, sourceZip: InputStream): GLResult[UniBrush] = {
     Log.i("unibrush", "loading unibrush")
     try {
       val files = new ZipInputStream(sourceZip)

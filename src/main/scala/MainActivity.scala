@@ -75,13 +75,13 @@ class MainActivity extends Activity with TypedActivity with AndroidImplicits {
   }
 
   val onTextureThreadStarted = (x: Int, y: Int, producer: MotionEventProducer) => (thread: TextureSurfaceThread) => this.runOnUiThread(() => {
-      Log.i("main", "got handler")
-      textureThread = Some(thread)
-      thread.beginGL(x, y, onTextureCreated(thread, producer) _)
-      thread.startFrames()
-      Log.i("main", "sent begin_gl message")
-      ()
-    })
+    Log.i("main", "got handler")
+    textureThread = Some(thread)
+    thread.beginGL(x, y, onTextureCreated(thread, producer) _)
+    thread.startFrames()
+    Log.i("main", "sent begin_gl message")
+    ()
+  })
 
   // runs on gl thread
   def onTextureCreated(thread: TextureSurfaceThread, producer: MotionEventProducer)() = {
@@ -193,7 +193,7 @@ class MainActivity extends Activity with TypedActivity with AndroidImplicits {
     super.onStop()
     Log.i("main", "onStop");
     content.setOnTouchListener(null)
-    // (textureview does its own cleanup, see SurfaceTextureListener.onSurfaceTextureDestroyed()
+    // (textureview does its own cleanup, see SurfaceTextureListener.onSurfaceTextureDestroyed())
     // TODO: is this the right order? probably not
     contentframe.removeAllViews()
     saveLocalState()
@@ -269,7 +269,7 @@ class MainActivity extends Activity with TypedActivity with AndroidImplicits {
     savePickersToFile()
   }
 
-  def populatePicker[U, T <: (String, (Unit)=>GLResult[U])](picker: UnnamedPicker[U], arr: Array[T], cb: (U)=>Unit, thread: TextureSurfaceThread) = {
+  def populatePicker[U, T <: (String, (GLInit)=>GLResult[U])](picker: UnnamedPicker[U], arr: Array[T], cb: (U)=>Unit, thread: TextureSurfaceThread) = {
     val adapter = new LazyPicker(this, thread, arr)
     picker.setAdapter(adapter)
     picker.control.setOnItemClickListener(new AdapterView.OnItemClickListener() {
@@ -294,25 +294,23 @@ class MainActivity extends Activity with TypedActivity with AndroidImplicits {
 
   def populatePickers() = {
     for (thread <- textureThread) {
-      thread.withGL(gl => {
-        // TODO: maybe make the save thread load from disk and then hand off to the gl thread?
-        // also, have it opportunistically load at least up to that point
-        val brushes = DrawFiles.loadBrushes(this, gl).toArray
-        val anims = DrawFiles.loadAnimShaders(this, gl).toArray
-        val paints = DrawFiles.loadPointShaders(this, gl).toArray
-        val interpscripts = DrawFiles.loadScripts(this, gl).toArray
-        val unibrushes = DrawFiles.loadUniBrushes(this, gl).toArray
-        Log.i("main", s"got ${brushes.length} brushes, ${anims.length} anims, ${paints.length} paints, ${interpscripts.length} interpolation scripts")
+      // TODO: maybe make the save thread load from disk and then hand off to the gl thread?
+      // also, have it opportunistically load at least up to that point
+      val brushes = DrawFiles.loadBrushes(this).toArray
+      val anims = DrawFiles.loadAnimShaders(this).toArray
+      val paints = DrawFiles.loadPointShaders(this).toArray
+      val interpscripts = DrawFiles.loadScripts(this).toArray
+      val unibrushes = DrawFiles.loadUniBrushes(this).toArray
+      Log.i("main", s"got ${brushes.length} brushes, ${anims.length} anims, ${paints.length} paints, ${interpscripts.length} interpolation scripts")
 
-        MainActivity.this.runOnUiThread(() => {
-            // TODO: make hardcoded shaders accessible a better way
-            populatePicker(controls.brushpicker, brushes,  thread.setBrushTexture _, thread)
-            populatePicker(controls.animpicker, anims,  thread.setAnimShader _, thread)
-            populatePicker(controls.paintpicker, paints,  thread.setPointShader _, thread)
-            populatePicker(controls.interppicker, interpscripts,  thread.setInterpScript _, thread)
-            populatePicker(controls.unipicker, unibrushes, loadUniBrush _, thread)
-            controls.copypicker.currentValue = thread.outputShader
-          })
+      MainActivity.this.runOnUiThread(() => {
+        // TODO: make hardcoded shaders accessible a better way
+        populatePicker(controls.brushpicker, brushes,  thread.setBrushTexture _, thread)
+        populatePicker(controls.animpicker, anims,  thread.setAnimShader _, thread)
+        populatePicker(controls.paintpicker, paints,  thread.setPointShader _, thread)
+        populatePicker(controls.interppicker, interpscripts,  thread.setInterpScript _, thread)
+        populatePicker(controls.unipicker, unibrushes, loadUniBrush _, thread)
+        controls.copypicker.currentValue = thread.outputShader
       })
     }
   }
