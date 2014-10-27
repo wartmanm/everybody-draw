@@ -12,7 +12,7 @@ import spray.json._
 import PaintControls._
 
 class PaintControls
-  (val animpicker: UP[CopyShader], val brushpicker: UP[Texture], val paintpicker: UP[PointShader], val interppicker: UP[LuaScript], val unipicker: UP[UniBrush]) 
+  (val animpicker: UP[CopyShader], val brushpicker: UP[Texture], val paintpicker: UP[PointShader], val interppicker: UP[LuaScript], val unipicker: UP[UniBrush], val copypicker: UUP[CopyShader]) 
 extends AutoProductFormat {
 
   val namedPickers = Map(
@@ -20,7 +20,8 @@ extends AutoProductFormat {
     "brush" -> brushpicker,
     "paint" -> paintpicker,
     "interp" -> interppicker,
-    "unibrush" -> unipicker
+    "unibrush" -> unipicker,
+    "copy" -> copypicker
   )
 
   def restoreState() = namedPickers.values.map(_.restoreState())
@@ -29,7 +30,7 @@ extends AutoProductFormat {
     namedPickers.map({case (k,v) => (k, v.save())}).toJson.toString
   }
   def loadFromString(s: String) = {
-    val saved = s.parseJson.convertTo[Map[String, SavedState]]
+    val saved = s.parseJson.convertTo[Map[String, JsValue]]
     for ((name, state) <- saved) {
       namedPickers(name).load(state)
     }
@@ -49,6 +50,7 @@ extends AutoProductFormat {
 object PaintControls {
   type LAV = AdapterView[ListAdapter]
   type UP[T] = UnnamedPicker[T]
+  type UUP[T] = UnnamedUnpicker[T]
   def apply
   (animpicker: LAV, brushpicker: LAV, paintpicker: LAV, interppicker: LAV, unipicker: LAV) = {
     new PaintControls (
@@ -56,36 +58,51 @@ object PaintControls {
       new UnnamedPicker[Texture](brushpicker),
       new UnnamedPicker[PointShader](paintpicker),
       new UnnamedPicker[LuaScript](interppicker),
-      new UnnamedPicker[UniBrush](unipicker))
+      new UnnamedPicker[UniBrush](unipicker),
+      new UnnamedUnpicker[CopyShader](None))
   }
 
-  class UnnamedPicker[T](val control: AdapterView[ListAdapter])  {
+  trait SavedControl[T] {
+    def save(): JsValue
+    def load(j: JsValue): Unit
+    def restoreState() { }
+    def updateState() { }
+    var enabled: Boolean = true
+    def currentValue: Option[T]
+  }
+
+  class UnnamedPicker[T](val control: AdapterView[ListAdapter]) extends SavedControl[T] with AutoProductFormat {
     type U = AdapterView[LazyPicker[T]]
     var selected = AdapterView.INVALID_POSITION
-    def currentValue = adapter.lazified(selected)
+    def currentValue = adapter.lazified(selected)._2.getCached()
     var selectedName = ""
-    var enabled = true
     private var adapter: LazyPicker[T] = null
     def setAdapter(a: LazyPicker[T]) = {
       adapter = a
       control.setAdapter(a)
     }
-    def restoreState(): Unit = {
+    override def restoreState(): Unit = {
       selected = this.adapter.lazified.indexWhere(_._1 == selectedName) match {
         case -1 => 0
         case  x => x
       }
       if (enabled) this.control.performItemClick(null, selected, selected)
     }
-    def updateState() = selectedName = selected match {
+    override def updateState() = selectedName = selected match {
       case AdapterView.INVALID_POSITION => ""
-      case x => currentValue._1
+      case x => adapter.lazified(x)._1
     }
-    def save() = SavedState(enabled, selectedName)
-    def load(state: SavedState) = {
+    override def save() = SavedState(enabled, selectedName).toJson
+    override def load(j: JsValue) = {
+      val state = j.convertTo[SavedState]
       enabled = state.enabled
       selectedName = state.selectedName
     }
+  }
+
+  class UnnamedUnpicker[T](var currentValue: Option[T] = None) extends SavedControl[T] with AutoProductFormat {
+    override def save() = enabled.toJson
+    override def load(j: JsValue) = enabled = j.convertTo[Boolean]
   }
 
   case class SavedState(enabled: Boolean, selectedName: String)

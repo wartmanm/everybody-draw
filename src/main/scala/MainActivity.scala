@@ -30,6 +30,7 @@ import scala.concurrent.Future
 import java.util.concurrent.Executors
 
 import PaintControls.UnnamedPicker
+import PaintControls.SavedControl
 
 
 
@@ -312,6 +313,7 @@ class MainActivity extends Activity with TypedActivity with AndroidImplicits {
             populatePicker(controls.paintpicker, paints,  thread.setPointShader _, thread)
             populatePicker(controls.interppicker, interpscripts,  thread.setInterpScript _, thread)
             populatePicker(controls.unipicker, unibrushes, loadUniBrush _, thread)
+            controls.copypicker.currentValue = thread.outputShader
           })
       }
     }
@@ -326,18 +328,18 @@ class MainActivity extends Activity with TypedActivity with AndroidImplicits {
 
   def loadUniBrush(unibrush: UniBrush) = {
     Log.i("main", "loading unibrush")
-    def getSelectedValue[T](picker: UnnamedPicker[T]) = {
+    def getSelectedValue[T](picker: SavedControl[T]) = {
       // return None if the control is already active, or we're trying to restore a missing value
       // TODO: the missing-value part is probably busted
       if (picker.enabled) None
-      else picker.currentValue._2.getCached()
+      else picker.currentValue
     }
     for (thread <- textureThread) {
       loadUniBrushControls(unibrush)
       val brush = unibrush.brush.orElse(getSelectedValue(controls.brushpicker))
       val anim = unibrush.baseanimshader.orElse(getSelectedValue(controls.animpicker))
       val point = unibrush.basepointshader.orElse(getSelectedValue(controls.paintpicker))
-      val copy = unibrush.basecopyshader
+      val copy = unibrush.basecopyshader.orElse(getSelectedValue(controls.copypicker))
       val interp = unibrush.interpolator.orElse(getSelectedValue(controls.interppicker))
       thread.loadUniBrush(brush, anim, point, copy, interp, unibrush.layers)
     }
