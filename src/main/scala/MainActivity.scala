@@ -328,10 +328,18 @@ class MainActivity extends Activity with TypedActivity with AndroidImplicits {
       // return None if the control is already active, or we're trying to restore a missing value
       // TODO: the missing-value part is probably busted
       if (picker.enabled) None
-      else picker.currentValue(gl).right.toOption
+      else picker.currentValue(gl) match {
+        case Left(msg) => {
+          runOnUiThread(() => {
+            Toast.makeText(MainActivity.this, "unable to load old control!" + msg, Toast.LENGTH_LONG).show()
+          })
+          Log.i("main", s"unable to load old control: ${msg}")
+          None
+        }
+        case Right(value) => Some(value)
+      }
     }
     //Log.i("main", s"copypicker is enabled: ${controls.copypicker.enabled}")
-    loadUniBrushControls(unibrush)
     Log.i("tst", "loading unibrushes and old values...")
     val brush = unibrush.brush.orElse(getSelectedValue(controls.brushpicker))
     val anim = unibrush.baseanimshader.orElse(getSelectedValue(controls.animpicker))
@@ -350,6 +358,7 @@ class MainActivity extends Activity with TypedActivity with AndroidImplicits {
     copy.foreach(thread.setCopyShader(gl, _))
     interp.foreach(thread.setInterpScript(gl, _))
     Log.i("tst", "done loading unibrush!")
+    loadUniBrushControls(unibrush) // now that we're done, update which controls are enabled
     ()
   }
 
