@@ -238,6 +238,7 @@ pub unsafe fn push_lua_script(key: i32) {
 }
 
 pub unsafe fn do_interpolate_lua(script: &::luascript::LuaScript, dimensions: (i32, i32), output: &mut LuaCallbackType) -> GLResult<()> {
+    logi!("prepping {}", script);
     let L = output.lua;
     script.push_self();
 

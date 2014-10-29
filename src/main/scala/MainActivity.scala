@@ -299,12 +299,15 @@ class MainActivity extends Activity with TypedActivity with AndroidImplicits {
     notify.synchronized {
       runOnUiThread(() => {
         nativePauseMotionEvent(producer)
+        Log.i("main", "loading interpolator - paused motion events")
         notify.synchronized {
           notify.notify()
         }
       })
+      Log.i("main", "loading interpolator - waiting for pause")
       notify.wait()
     }
+    Log.i("main", "loading interpolator - finishing lua script")
     try {
       thread.finishLuaScript(gl)
     }
