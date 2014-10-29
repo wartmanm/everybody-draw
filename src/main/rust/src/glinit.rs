@@ -252,6 +252,7 @@ impl<'a> GLInit<'a> {
 
     pub fn clear_pending(&mut self, handler: &mut MotionEventConsumer, events: &'a mut Events<'a>) -> GLResult<()> {
         if let Some(interpolator) = self.paintstate.interpolator {
+            logi!("finishing luascript {}", interpolator);
             unsafe {
                 let mut callback = try!(LuaCallbackType::new(self, events, handler));
                 finish_lua_script(&mut callback, interpolator)

@@ -305,7 +305,10 @@ class MainActivity extends Activity with TypedActivity with AndroidImplicits {
         }
       })
       notify.wait()
-      thread.finishLuaScript(gl)
+      try {
+        thread.finishLuaScript(gl)
+      }
+      catch { case _ => { } }
       thread.setInterpScript(gl, interpolator)
       notify.notify()
     }
@@ -325,11 +328,12 @@ class MainActivity extends Activity with TypedActivity with AndroidImplicits {
 
       MainActivity.this.runOnUiThread(() => {
         // TODO: make hardcoded shaders accessible a better way
+        val interpLoader = loadInterpolatorSynchronized(thread, producer)
         populatePicker(controls.brushpicker, brushes,  thread.setBrushTexture _, thread)
         populatePicker(controls.animpicker, anims,  thread.setAnimShader _, thread)
         populatePicker(controls.paintpicker, paints,  thread.setPointShader _, thread)
-        populatePicker(controls.interppicker, interpscripts,  loadInterpolatorSynchronized(thread, producer), thread)
-        populatePicker(controls.unipicker, unibrushes, loadUniBrush(thread), thread)
+        populatePicker(controls.interppicker, interpscripts,  interpLoader, thread)
+        populatePicker(controls.unipicker, unibrushes, loadUniBrush(thread, interpLoader), thread)
         controls.copypicker.value = thread.outputShader
         controls.restoreState()
       })
@@ -343,7 +347,8 @@ class MainActivity extends Activity with TypedActivity with AndroidImplicits {
     })
   }
 
-  def loadUniBrush(thread: TextureSurfaceThread) = (gl: GLInit, unibrush: UniBrush) => {
+  def loadUniBrush(thread: TextureSurfaceThread, interpolatorLoader: (GLInit, LuaScript) => Unit) =
+    (gl: GLInit, unibrush: UniBrush) => {
     Log.i("main", "loading unibrush")
     def getSelectedValue[T](picker: GLControl[T]) = {
       // return None if the control is already active, or we're trying to restore a missing value
@@ -378,11 +383,11 @@ class MainActivity extends Activity with TypedActivity with AndroidImplicits {
       thread.addLayer(gl, layer.copyshader, layer.pointshader, layer.pointsrc)
     }
     Log.i("unibrush", "set up layers!")
+    interp.foreach(interpolatorLoader(gl, _)) // this runs the old interpolator and so must run under the old state
     brush.foreach(thread.setBrushTexture(gl, _))
     anim.foreach(thread.setAnimShader(gl, _))
     point.foreach(thread.setPointShader(gl, _))
     copy.foreach(thread.setCopyShader(gl, _))
-    interp.foreach(thread.setInterpScript(gl, _))
     Log.i("unibrush", "done loading unibrush!")
     loadUniBrushControls(unibrush) // now that we're done, update which controls are enabled
     ()

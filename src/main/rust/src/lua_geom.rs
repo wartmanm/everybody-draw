@@ -212,7 +212,7 @@ pub unsafe fn finish_lua_script(output: &mut LuaCallbackType, script: &::luascri
     lua_pushlightuserdata(L, output as *mut LuaCallbackType as *mut c_void);
     let result = match lua_pcall(L, 1, 0, 0) {
         0 => Ok(()),
-        _ => log_err(format!("script failed to run: {}", err_to_str(L))),
+        _ => log_err(format!("ondone() script failed to run: {}", err_to_str(L))),
     };
     lua_pop(L, 1); // remove stopfns
     result

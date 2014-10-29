@@ -29,7 +29,12 @@ pub fn pause(data: &mut Data, queue: &mut PointProducer) {
         *state = state.push(false);
     }
     push_stops(queue, active);
-    queue.push(PointEntry { index: -1, entry: point::FrameStop })
+    // index must be a valid index.  Consider making FrameStop a part of PointEntry instead --
+    // is this tradeoff worth it?
+    // pro: straightforward, con: extra 4 bytes on every pointentry
+    // could fold index into pointinfo, or have a magic index like -1 to indicate framestop
+    // maybe this entire approach isn't such a good one after all?
+    queue.push(PointEntry { index: 0, entry: point::FrameStop })
 }
 
 pub fn append_motion_event(data: &mut Data, evt: *const AInputEvent, queue: &mut PointProducer) -> () {

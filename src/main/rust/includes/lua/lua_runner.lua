@@ -37,7 +37,7 @@ if _onup == nil and _ondown == nil and _onframe == nil and _ondone == nil then
 elseif _ondone == nil then
   _ondone = function(output) end
 end
-callback.ondone = _ondone
+callbacks.ondone = _ondone
 
 function runmain(x, y, output)
   if type(_onframe) == "function" then
