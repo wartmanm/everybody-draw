@@ -127,7 +127,7 @@ unsafe extern "C" fn native_draw_queued_points(env: *mut JNIEnv, thiz: jobject, 
 
 unsafe extern "C" fn native_finish_lua_script(env: *mut JNIEnv, thiz: jobject, data: i32, handler: i32) {
     let data = get_safe_data(data);
-    data.glinit.clear_pending(mem::transmute(handler), &mut data.events);
+    data.glinit.unload_interpolator(mem::transmute(handler), &mut data.events);
 }
 
 unsafe extern "C" fn native_update_gl(env: *mut JNIEnv, thiz: jobject, data: i32) {

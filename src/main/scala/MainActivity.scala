@@ -294,26 +294,28 @@ class MainActivity extends Activity with TypedActivity with AndroidImplicits {
     })
   }
 
-  def loadInterpolatorSynchronized(thread: TextureSurfaceThread, producer: MotionEventProducer) = (gl: GLInit, interpolator: LuaScript) => {
+  def unloadInterpolatorSynchronized(thread: TextureSurfaceThread, producer: MotionEventProducer, gl: GLInit) = {
     val notify = new Object()
     notify.synchronized {
       runOnUiThread(() => {
         nativePauseMotionEvent(producer)
         notify.synchronized {
           notify.notify()
-          notify.wait()
         }
       })
       notify.wait()
-      try {
-        thread.finishLuaScript(gl)
-      }
-      catch { case _ => { } }
-      thread.setInterpScript(gl, interpolator)
-      notify.notify()
     }
+    try {
+      thread.finishLuaScript(gl)
+    }
+    catch { case _: LuaException => { } }
   }
 
+  def loadInterpolatorSynchronized(thread: TextureSurfaceThread, producer: MotionEventProducer) =
+  (gl: GLInit, script: LuaScript) => {
+    unloadInterpolatorSynchronized(thread, producer, gl)
+    thread.setInterpScript(gl, script)
+  }
 
   def populatePickers(producer: MotionEventProducer) = {
     for (thread <- textureThread) {
@@ -333,7 +335,7 @@ class MainActivity extends Activity with TypedActivity with AndroidImplicits {
         populatePicker(controls.animpicker, anims,  thread.setAnimShader _, thread)
         populatePicker(controls.paintpicker, paints,  thread.setPointShader _, thread)
         populatePicker(controls.interppicker, interpscripts,  interpLoader, thread)
-        populatePicker(controls.unipicker, unibrushes, loadUniBrush(thread, interpLoader), thread)
+        populatePicker(controls.unipicker, unibrushes, loadUniBrush(thread, producer), thread)
         controls.copypicker.value = thread.outputShader
         controls.restoreState()
       })
@@ -347,8 +349,8 @@ class MainActivity extends Activity with TypedActivity with AndroidImplicits {
     })
   }
 
-  def loadUniBrush(thread: TextureSurfaceThread, interpolatorLoader: (GLInit, LuaScript) => Unit) =
-    (gl: GLInit, unibrush: UniBrush) => {
+  def loadUniBrush(thread: TextureSurfaceThread, producer: MotionEventProducer) =
+  (gl: GLInit, unibrush: UniBrush) => {
     Log.i("main", "loading unibrush")
     def getSelectedValue[T](picker: GLControl[T]) = {
       // return None if the control is already active, or we're trying to restore a missing value
@@ -378,16 +380,18 @@ class MainActivity extends Activity with TypedActivity with AndroidImplicits {
     Log.i("unibrush", "loading interp")
     val interp = unibrush.interpolator.orElse(getSelectedValue(controls.interppicker))
     Log.i("unibrush", "loading unibrush!")
+
+    if (interp.nonEmpty) unloadInterpolatorSynchronized(thread, producer, gl) // this runs the old interpolator and so must run under the old state
     thread.clearLayers(gl)
     for (layer <- unibrush.layers) {
       thread.addLayer(gl, layer.copyshader, layer.pointshader, layer.pointsrc)
     }
     Log.i("unibrush", "set up layers!")
-    interp.foreach(interpolatorLoader(gl, _)) // this runs the old interpolator and so must run under the old state
     brush.foreach(thread.setBrushTexture(gl, _))
     anim.foreach(thread.setAnimShader(gl, _))
     point.foreach(thread.setPointShader(gl, _))
     copy.foreach(thread.setCopyShader(gl, _))
+    if (interp.nonEmpty) thread.setInterpScript(gl, interp.get)
     Log.i("unibrush", "done loading unibrush!")
     loadUniBrushControls(unibrush) // now that we're done, update which controls are enabled
     ()

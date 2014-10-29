@@ -14,6 +14,7 @@ use glcommon::GLResult;
 use glinit::GLInit;
 use drawevent::Events;
 use lua::raw::lua_State;
+use log::loge;
 
 static MOVE: u8 = 0u8;
 static DONE: u8 = 1u8;
@@ -73,6 +74,7 @@ fn get_queue_or_raise_err<'a, 'b, 'c, 'd>(data: &'d mut LuaCallbackType, queue: 
     let points = &mut data.glinit.points;
     if (queue as uint) >= points.len() {
         unsafe {
+            loge!("tried to push point to queue {} of {}", queue + 1, points.len());
             rust_raise_lua_err!(data.lua, "tried to push point to queue {} of {}", queue + 1, points.len());
         }
     }
@@ -99,6 +101,7 @@ pub unsafe extern "C" fn lua_log(message: *const c_char) {
 #[no_mangle]
 pub unsafe extern "C" fn lua_clearlayer(data: &mut LuaCallbackType, layer: i32) {
     if let Err(mut msg) = data.glinit.erase_layer(layer) {
+        loge!(msg.as_slice());
         msg.push('\0');
         rust_raise_lua_err(data.lua, msg.as_slice().as_ptr() as *const i8);
     }
