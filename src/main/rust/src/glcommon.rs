@@ -107,7 +107,7 @@ macro_rules! glattrib_f32 (
     // struct elements
     ($handle:expr, $count:expr, $item:ident, $elem:ident) => ({
         // XXX probably also unsafe
-        let firstref = unsafe { $item.unsafe_ref(0) };
+        let firstref = unsafe { $item.unsafe_get(0) };
         gl2::vertex_attrib_pointer_f32($handle, $count, false,
             mem::size_of_val(firstref) as i32,
             // XXX this actually derefences firstref and is completely unsafe
@@ -119,7 +119,7 @@ macro_rules! glattrib_f32 (
     });
     // densely-packed array
     ($handle:expr, $count:expr, $item:ident) => ({
-        let firstref = unsafe { $item.unsafe_ref(0) };
+        let firstref = unsafe { $item.unsafe_get(0) };
         gl2::vertex_attrib_pointer_f32($handle, $count, false, 0, unsafe { mem::transmute(firstref) });
         check_gl_error(stringify!(vertex_attrib_pointer($handle)));
         gl2::enable_vertex_attrib_array($handle);
