@@ -131,7 +131,7 @@ fn init_context(surface_texture: *mut c_void) -> Option<EGLStatus> {
 pub fn egl_swap() -> () {
     unsafe {
         match data {
-            Some(EGLStatus { display: display, context: _, surface: surface }) => {
+            Some(EGLStatus { display, context: _, surface }) => {
                 if SwapBuffers(display, surface) != EGL_TRUE {
                     loge!("failed to swap buffers??");
                 }
@@ -146,7 +146,7 @@ pub fn egl_swap() -> () {
 pub fn egl_finish() -> () {
     unsafe {
         match data {
-            Some(EGLStatus { display: display, context: context, surface: surface }) => {
+            Some(EGLStatus { display, context, surface }) => {
                 logi!("running finish_egl");
                 MakeCurrent(display, EGL_NO_SURFACE, EGL_NO_SURFACE, EGL_NO_CONTEXT);
                 logi!("detached from egl");

@@ -6,7 +6,7 @@ use glcommon::GLResult;
 use lua_geom::{load_lua_script, destroy_lua_script, push_lua_script};
 
 pub struct LuaScript {
-    registry_id: i32,
+    pub registry_id: i32,
 }
 
 impl LuaScript {

@@ -28,7 +28,6 @@ use drawevent::Events;
 use drawevent::event_stream::EventStream;
 use gltexture::ToPixelFormat;
 use gltexture::Texture;
-use lua_geom;
 
 macro_rules! native_method(
     ($name:expr, $sig:expr, $fn_ptr:expr) => (
@@ -113,11 +112,8 @@ unsafe extern "C" fn finish_gl(env: *mut JNIEnv, thiz: jobject, data: jint) {
     logi!("finished deinit");
 }
 
-unsafe extern "C" fn native_draw_queued_points(env: *mut JNIEnv, thiz: jobject, data: i32, handler: i32, java_matrix: jfloatArray) {
-    let data = get_safe_data(data);
-    let mut matrix: Matrix = mem::uninitialized();
-    ((**env).GetFloatArrayRegion)(env, java_matrix, 0, 16, matrix.as_mut_ptr());
-    if let Err(msg) = data.glinit.draw_queued_points(mem::transmute(handler), &mut data.events, &matrix) {
+unsafe fn rethrow_lua_result(env: *mut JNIEnv, result: GLResult<()>) {
+    if let Err(msg) = result {
         let luaerr_class = ((**env).FindClass)(env, cstr!("com/github/wartman4404/gldraw/LuaException"));
         let luaerr_init = ((**env).GetMethodID)(env, luaerr_class, cstr!("<init>"), cstr!("(Ljava/lang/String;)V"));
         let err = ((**env).NewObject)(env, luaerr_class, luaerr_init, str_to_jstring(env, msg.as_slice()));
@@ -125,9 +121,18 @@ unsafe extern "C" fn native_draw_queued_points(env: *mut JNIEnv, thiz: jobject, 
     }
 }
 
+unsafe extern "C" fn native_draw_queued_points(env: *mut JNIEnv, thiz: jobject, data: i32, handler: i32, java_matrix: jfloatArray) {
+    let data = get_safe_data(data);
+    let mut matrix: Matrix = mem::uninitialized();
+    ((**env).GetFloatArrayRegion)(env, java_matrix, 0, 16, matrix.as_mut_ptr());
+    let luaerr = data.glinit.draw_queued_points(mem::transmute(handler), &mut data.events, &matrix);
+    rethrow_lua_result(env, luaerr);
+}
+
 unsafe extern "C" fn native_finish_lua_script(env: *mut JNIEnv, thiz: jobject, data: i32, handler: i32) {
     let data = get_safe_data(data);
-    data.glinit.unload_interpolator(mem::transmute(handler), &mut data.events);
+    let luaerr = data.glinit.unload_interpolator(mem::transmute(handler), &mut data.events);
+    rethrow_lua_result(env, luaerr);
 }
 
 unsafe extern "C" fn native_update_gl(env: *mut JNIEnv, thiz: jobject, data: i32) {
