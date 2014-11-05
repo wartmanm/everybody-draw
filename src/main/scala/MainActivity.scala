@@ -383,8 +383,11 @@ class MainActivity extends Activity with TypedActivity with AndroidImplicits {
     Log.i("unibrush", "loading interp")
     val interp = unibrush.interpolator.orElse(getSelectedValue(controls.interppicker))
     Log.i("unibrush", "loading unibrush!")
-
-    if (interp.nonEmpty) unloadInterpolatorSynchronized(thread, producer, gl) // this runs the old interpolator and so must run under the old state
+    
+    // Unconditionally call ondone() in the interpolator to write layers, etc
+    // This runs the old interpolator and so must run under the old state.
+    unloadInterpolatorSynchronized(thread, producer, gl)
+    Log.i("unibrush", s"should have unloaded interpolator, which is ${interp} (unibrush interp is ${unibrush.interpolator})")
     thread.clearLayers(gl)
     for (layer <- unibrush.layers) {
       thread.addLayer(gl, layer.copyshader, layer.pointshader, layer.pointsrc)
@@ -394,7 +397,7 @@ class MainActivity extends Activity with TypedActivity with AndroidImplicits {
     anim.foreach(thread.setAnimShader(gl, _))
     point.foreach(thread.setPointShader(gl, _))
     copy.foreach(thread.setCopyShader(gl, _))
-    if (interp.nonEmpty) thread.setInterpScript(gl, interp.get)
+    interp.foreach(thread.setInterpScript(gl, _))
     Log.i("unibrush", "done loading unibrush!")
     loadUniBrushControls(unibrush) // now that we're done, update which controls are enabled
     ()
