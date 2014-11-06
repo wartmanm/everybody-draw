@@ -112,7 +112,6 @@ impl<'a, T: MaybeInitFromCache<Init>, Init: Hash+Eq> DrawObjectList<'a, T, Init>
         }
     }
 
-    // TODO: avoid allocations just to see if the key is in the map
     pub fn push_object(&mut self, init: Init) -> GLResult<DrawObjectIndex<T>> {
         // Can't use map.entry() here as it consumes the key
         if self.map.contains_key(&init) {
