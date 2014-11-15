@@ -25,6 +25,7 @@ use paintlayer::PaintLayer;
 use lua_callbacks::{LuaCallbackType};
 use lua_geom::{do_interpolate_lua, finish_lua_script};
 use drawevent::Events;
+use rustjni::JNICallbackClosure;
 
 
 static DRAW_INDEXES: [GLubyte, ..6] = [
@@ -322,7 +323,7 @@ impl<'a> GLInit<'a> {
         data
     }
 
-    pub fn unload_interpolator<T: Fn<(i32,),()>>(&mut self, handler: &mut MotionEventConsumer, events: &'a mut Events<'a>, undo_callback: &T) -> GLResult<()> {
+    pub fn unload_interpolator(&mut self, handler: &mut MotionEventConsumer, events: &'a mut Events<'a>, undo_callback: &JNICallbackClosure) -> GLResult<()> {
         if let Some(interpolator) = self.paintstate.interpolator {
             logi!("finishing luascript {}", interpolator);
             unsafe {
@@ -350,7 +351,7 @@ impl<'a> GLInit<'a> {
         }
     }
 
-    pub fn draw_queued_points<T: Fn<(i32,),()>>(&mut self, handler: &mut MotionEventConsumer, events: &'a mut Events<'a>, matrix: &matrix::Matrix, undo_callback: &T) -> GLResult<()> {
+    pub fn draw_queued_points(&mut self, handler: &mut MotionEventConsumer, events: &'a mut Events<'a>, matrix: &matrix::Matrix, undo_callback: &JNICallbackClosure) -> GLResult<()> {
         match (self.paintstate.pointshader, self.paintstate.copyshader, self.paintstate.brush) {
             (Some(point_shader), Some(copy_shader), Some(brush)) => {
                 gl2::enable(gl2::BLEND);
