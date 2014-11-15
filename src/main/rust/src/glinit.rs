@@ -335,7 +335,7 @@ impl<'a> GLInit<'a> {
     }
 
     pub fn push_undo_frame(&mut self) -> i32 {
-        let source = self.targetdata.get_current_texturesource();
+        let source = self.targetdata.get_current_texturesource(); // FIXME is this correct?
         if let Some(copy_shader) = self.paintstate.copyshader {
             self.paintstate.undo_targets.push_new_buffer(source, copy_shader);
         }
@@ -343,6 +343,7 @@ impl<'a> GLInit<'a> {
     }
 
     pub fn load_undo_frame(&mut self, idx: i32) {
+        // FIXME why does this work, shouldn't it get overwritten?
         let source = self.targetdata.get_current_texturetarget();
         if let Some(copy_shader) = self.paintstate.copyshader {
             self.paintstate.undo_targets.load_buffer_at(idx, source, copy_shader);
