@@ -93,6 +93,8 @@ impl UndoTargets {
             *target = TextureTarget::new(x, y, gltexture::RGBA);
             self.max += 1;
         }
+        gl2::bind_framebuffer(gl2::FRAMEBUFFER, target.framebuffer);
+        gl2::blend_func(gl2::ONE, gl2::ZERO);
         perform_copy(target.framebuffer, &buf.texture, copyshader, matrix::IDENTITY.as_slice());
         if self.pos < UNDO_BUFFERS {
             self.pos += 1;
@@ -111,6 +113,8 @@ impl UndoTargets {
         logi!("loading undo buffer {}/{}", idx, self.len);
         self.pos = idx + 1;
         let src = &mut self.targets[self.get_pos(idx) as uint];
+        gl2::bind_framebuffer(gl2::FRAMEBUFFER, buf.framebuffer);
+        gl2::blend_func(gl2::ONE, gl2::ZERO);
         perform_copy(buf.framebuffer, &src.texture, copyshader, matrix::IDENTITY.as_slice());
     }
 }
@@ -339,7 +343,7 @@ impl<'a> GLInit<'a> {
     }
 
     pub fn load_undo_frame(&mut self, idx: i32) {
-        let source = self.targetdata.get_current_texturesource();
+        let source = self.targetdata.get_current_texturetarget();
         if let Some(copy_shader) = self.paintstate.copyshader {
             self.paintstate.undo_targets.load_buffer_at(idx, source, copy_shader);
         }
