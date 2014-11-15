@@ -95,26 +95,26 @@ extends Thread with Handler.Callback with AndroidImplicits {
           matrix(12), matrix(13), matrix(14), matrix(15)))
         Log.i("tst", "gl inited");
         updateGL(gl)
-        beginGLCallback()
+        beginGLCallback(gl)
       }
     }
     true
   }
 
-  def beginGL(x: Int, y: Int, initCallback: ()=>Unit, undoCallback: UndoCallback): Unit = {
+  def beginGL(x: Int, y: Int, initCallback: (GLInit)=>Unit, undoCallback: UndoCallback): Unit = {
     handler.obtainMessage(MSG_BEGIN_GL, x, y, BeginGLArgs(undoCallback, initCallback)).sendToTarget()
   }
-  
-  def startFrames() = {
+
+  def startFrames(): Unit = {
     glinit match {
-      case Some(gl) => {
-        this.running.set(true)
-        gl.toMessage(handler.obtainMessage(MSG_NEW_FRAME)).sendToTarget()
-      }
-      case None => {
-        Log.e("tst", "unable to start frames, no gl inited!")
-      }
+      case Some(gl) => startFrames(gl)
+      case None => Log.e("tst", "unable to start frames, no gl inited!")
     }
+  }
+  
+  def startFrames(gl: GLInit): Unit = {
+    this.running.set(true)
+    gl.toMessage(handler.obtainMessage(MSG_NEW_FRAME)).sendToTarget()
   }
 
   def stopFrames() = {
@@ -126,14 +126,14 @@ extends Thread with Handler.Callback with AndroidImplicits {
     handler.post(() => { fn; () })
   }
 
-  def initScreen(bitmap: Option[Bitmap]) = withGL(gl => {
+  def initScreen(gl: GLInit, bitmap: Option[Bitmap]) = {
     Log.i("tst", "initing output shader")
     Log.i("tst", s"drawing bitmap: ${bitmap}")
     for (b <- bitmap) {
       drawImage(gl, b)
       b.recycle()
     }
-  })
+  }
 
   def clearScreen() = withGL(nativeClearFramebuffer _)
 
@@ -230,5 +230,5 @@ object TextureSurfaceThread {
     val MSG_BEGIN_FRAMES = 4
   }
 
-  case class BeginGLArgs(undoCallback: UndoCallback, initCallback: () => Unit)
+  case class BeginGLArgs(undoCallback: UndoCallback, initCallback: (GLInit) => Unit)
 }

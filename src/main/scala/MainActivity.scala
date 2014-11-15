@@ -117,17 +117,17 @@ class MainActivity extends Activity with TypedActivity with AndroidImplicits {
     textureThread = Some(thread)
     val undoCallback = new MainUndoListener()
     thread.beginGL(x, y, onTextureCreated(thread, producer) _, undoCallback)
-    thread.startFrames()
+    //thread.startFrames() // FIXME is this needed?
     Log.i("main", "sent begin_gl message")
     ()
   })
 
   // runs on gl thread
-  def onTextureCreated(thread: TextureSurfaceThread, producer: MotionEventProducer)() = {
-    thread.initScreen(savedBitmap)
+  def onTextureCreated(thread: TextureSurfaceThread, producer: MotionEventProducer)(gl: GLInit) = {
+    thread.initScreen(gl, savedBitmap)
     savedBitmap = None
-    thread.startFrames()
-    populatePickers(producer)
+    thread.startFrames(gl)
+    populatePickers(producer, thread, gl)
     content.setOnTouchListener(createViewTouchListener(producer))
     Log.i("main", "set ontouch listener")
   }
@@ -361,29 +361,27 @@ class MainActivity extends Activity with TypedActivity with AndroidImplicits {
     thread.setInterpScript(gl, script)
   }
 
-  def populatePickers(producer: MotionEventProducer) = {
-    for (thread <- textureThread) {
-      // TODO: maybe make the save thread load from disk and then hand off to the gl thread?
-      // also, have it opportunistically load at least up to that point
-      val brushes = DrawFiles.loadBrushes(this).toArray
-      val anims = DrawFiles.loadAnimShaders(this).toArray
-      val paints = DrawFiles.loadPointShaders(this).toArray
-      val interpscripts = DrawFiles.loadScripts(this).toArray
-      val unibrushes = DrawFiles.loadUniBrushes(this).toArray
-      Log.i("main", s"got ${brushes.length} brushes, ${anims.length} anims, ${paints.length} paints, ${interpscripts.length} interpolation scripts")
+  def populatePickers(producer: MotionEventProducer, thread: TextureSurfaceThread, gl: GLInit) = {
+    // TODO: maybe make the save thread load from disk and then hand off to the gl thread?
+    // also, have it opportunistically load at least up to that point
+    val brushes = DrawFiles.loadBrushes(this).toArray
+    val anims = DrawFiles.loadAnimShaders(this).toArray
+    val paints = DrawFiles.loadPointShaders(this).toArray
+    val interpscripts = DrawFiles.loadScripts(this).toArray
+    val unibrushes = DrawFiles.loadUniBrushes(this).toArray
+    Log.i("main", s"got ${brushes.length} brushes, ${anims.length} anims, ${paints.length} paints, ${interpscripts.length} interpolation scripts")
 
-      MainActivity.this.runOnUiThread(() => {
-        // TODO: make hardcoded shaders accessible a better way
-        val interpLoader = loadInterpolatorSynchronized(thread, producer)
-        populatePicker(controls.brushpicker, brushes,  thread.setBrushTexture _, thread)
-        populatePicker(controls.animpicker, anims,  thread.setAnimShader _, thread)
-        populatePicker(controls.paintpicker, paints,  thread.setPointShader _, thread)
-        populatePicker(controls.interppicker, interpscripts,  interpLoader, thread)
-        populatePicker(controls.unipicker, unibrushes, loadUniBrush(thread, producer), thread)
-        controls.copypicker.value = thread.outputShader
-        controls.restoreState()
-      })
-    }
+    MainActivity.this.runOnUiThread(() => {
+      // TODO: make hardcoded shaders accessible a better way
+      val interpLoader = loadInterpolatorSynchronized(thread, producer)
+      populatePicker(controls.brushpicker, brushes,  thread.setBrushTexture _, thread)
+      populatePicker(controls.animpicker, anims,  thread.setAnimShader _, thread)
+      populatePicker(controls.paintpicker, paints,  thread.setPointShader _, thread)
+      populatePicker(controls.interppicker, interpscripts,  interpLoader, thread)
+      populatePicker(controls.unipicker, unibrushes, loadUniBrush(thread, producer), thread)
+      controls.copypicker.value = thread.outputShader
+      controls.restoreState()
+    })
   }
 
   // TODO: fewer callbacks
