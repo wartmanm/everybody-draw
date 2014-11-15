@@ -22,7 +22,7 @@ use matrix;
 use eglinit;
 use luascript::LuaScript;
 use paintlayer::PaintLayer;
-use lua_callbacks::{LuaCallback, LuaCallbackType};
+use lua_callbacks::{LuaCallbackType};
 use lua_geom::{do_interpolate_lua, finish_lua_script};
 use drawevent::Events;
 

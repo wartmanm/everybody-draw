@@ -2,7 +2,6 @@ use core::prelude::*;
 use core::mem;
 use collections::MutableSeq;
 use collections::vec::Vec;
-use collections::str::StrAllocating;
 
 use android::log::{ANDROID_LOG_INFO, __android_log_write};
 use libc::{c_char, c_int};
@@ -10,10 +9,8 @@ use point::ShaderPaintPoint;
 use point::{Move, Down, Up, NoEvent};
 use glpoint;
 use glpoint::MotionEventConsumer;
-use glcommon::GLResult;
 use glinit::GLInit;
 use drawevent::Events;
-use lua::raw::lua_State;
 use log::loge;
 use lua_geom::rust_raise_lua_err;
 
@@ -31,11 +28,11 @@ pub struct LuaCallbackType<'a, 'b, 'c: 'b, 'd, F: Fn<(i32,),()>+'d> {
     undo_callback: &'d F,
 }
 
-trait LuaCallback { }
+pub trait LuaCallback { }
 impl<'a,'b,'c,'d,F: Fn<(i32,),()>> LuaCallback for LuaCallbackType<'a,'b,'c,'d,F> { }
 
 impl<'a, 'b, 'c, 'd, F: Fn<(i32,),()>> LuaCallbackType<'a, 'b, 'c, 'd, F> {
-    pub fn new<F: Fn<(i32,),()>>(glinit: &'b mut GLInit<'c>, events: &'c mut Events<'c>, s: &'a mut MotionEventConsumer, undo_callback: &'d F) -> LuaCallbackType<'a, 'b, 'c, 'd, F> {
+    pub fn new(glinit: &'b mut GLInit<'c>, events: &'c mut Events<'c>, s: &'a mut MotionEventConsumer, undo_callback: &'d F) -> LuaCallbackType<'a, 'b, 'c, 'd, F> {
         LuaCallbackType {
             consumer: s,
             events: events,
