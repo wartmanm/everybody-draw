@@ -12,7 +12,6 @@ use core::prelude::*;
 use core::mem;
 use collections::vec::Vec;
 use collections::string::String;
-use collections::{Map, MutableMap, MutableSeq};
 use collections::hash::Hash;
 use collections::hash::sip::SipHasher;
 use std::collections::HashMap;
@@ -115,7 +114,7 @@ impl<'a, T: MaybeInitFromCache<Init>, Init: Hash+Eq> DrawObjectList<'a, T, Init>
     pub fn push_object(&mut self, init: Init) -> GLResult<DrawObjectIndex<T>> {
         // Can't use map.entry() here as it consumes the key
         if self.map.contains_key(&init) {
-            Ok(*self.map.find(&init).unwrap())
+            Ok(*self.map.get(&init).unwrap())
         } else {
             let inited = try!(MaybeInitFromCache::maybe_init(&init));
             // ptr's lifetime is limited to &self's, which is fair but not very useful.

@@ -9,9 +9,8 @@
 // TODO: remove all this duplication
 
 use core::prelude::*;
+use collections::slice::CloneSliceAllocPrelude;
 use collections::vec::Vec;
-use collections::{Mutable, MutableSeq};
-use collections::slice::CloneableVector;
 use collections::string::String;
 use point::PointEntry;
 use glstore::{DrawObjectIndex, DrawObjectList};

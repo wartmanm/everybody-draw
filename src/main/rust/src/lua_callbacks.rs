@@ -1,6 +1,5 @@
 use core::prelude::*;
 use core::mem;
-use collections::MutableSeq;
 use collections::vec::Vec;
 
 use android::log::{ANDROID_LOG_INFO, __android_log_write};
@@ -119,6 +118,7 @@ pub unsafe extern "C" fn lua_pushcubicbezier(data: &mut LuaCallbackType, queue: 
 #[no_mangle]
 pub unsafe extern "C" fn lua_saveundobuffer(data: &mut LuaCallbackType) -> () {
     let result = data.glinit.push_undo_frame();
-    (data.undo_callback)(result);
+    (*data.undo_callback)(result);
 }
+
 

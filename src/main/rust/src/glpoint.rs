@@ -1,7 +1,8 @@
 use core::prelude::*;
 use core::mem;
+use core::num::Float;
 use collections::vec::Vec;
-use collections::{SmallIntMap, MutableMap, MutableSeq, Mutable, Map};
+use collections::vec_map::VecMap;
 use alloc::boxed::Box;
 
 use std::sync::spsc_queue;
@@ -24,10 +25,9 @@ struct PointStorage {
     speedavg: RollingAverage16<Coordinate>,
 }
 
-#[allow(ctypes)]
 pub struct MotionEventConsumer {
     consumer: PointConsumer,
-    current_points: SmallIntMap<PointStorage>,
+    current_points: VecMap<PointStorage>,
     point_counter: i32,
     point_count: i32,
 }
@@ -41,7 +41,7 @@ pub fn create_motion_event_handler() -> (MotionEventConsumer, MotionEventProduce
     let (consumer, producer) = spsc_queue::queue::<PointEntry>(0);
     let handler = MotionEventConsumer {
         consumer: consumer,
-        current_points: SmallIntMap::new(),
+        current_points: VecMap::new(),
         point_counter: 0, // unique value for each new pointer
         point_count: 0, // # of currently active pointers
     };
@@ -89,7 +89,7 @@ pub fn next_point(s: &mut MotionEventConsumer, e: &mut Events) -> (point::Shader
                     speedavg: RollingAverage16::new(),
                 });
             }
-            let oldpoint = current_points.find_mut(&(idx as uint)).unwrap();
+            let oldpoint = current_points.get_mut(&(idx as uint)).unwrap();
             let pointevent = match (oldpoint.info, newpoint) {
                 (Some(op), point::Point(np)) => {
                     let dist = manhattan_distance(op.pos, np.pos);

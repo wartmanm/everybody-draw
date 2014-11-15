@@ -3,7 +3,6 @@ use core::prelude::*;
 use core::mem;
 use collections::vec::Vec;
 use collections::str::StrAllocating;
-use collections::{Mutable, MutableSeq};
 
 use log::{logi,loge};
 

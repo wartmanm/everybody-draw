@@ -1,4 +1,4 @@
-#![allow(unused_variable)]
+#![allow(unused_variables)]
 use core::prelude::*;
 use core::{ptr, mem};
 use core::ptr::RawMutPtr;

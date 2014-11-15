@@ -1,4 +1,4 @@
-#![allow(unused_variable, dead_code)]
+#![allow(unused_variables, dead_code)]
 
 const NEWMASK: u8 = 0x01;
 const OLDMASK: u8 = 0x02;

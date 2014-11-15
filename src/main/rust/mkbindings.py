@@ -18,11 +18,11 @@ includes = set([
 ])
 
 prelude_lints = [
-    'unused_attribute',
+    'unused_attributes',
     'unused_imports',
     'non_camel_case_types',
     'non_snake_case',
-    'non_uppercase_statics',
+    'non_upper_case_globals',
 ]
 
 builtins_name = 'bindgen_builtins'
