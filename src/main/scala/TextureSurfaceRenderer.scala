@@ -35,6 +35,7 @@ extends Thread with Handler.Callback with AndroidImplicits {
   @native protected def nativeSetInterpolator(data: GLInit, script: LuaScript): Unit
   @native protected def nativeAddLayer(data: GLInit, copyshader: CopyShader, pointshader: PointShader, pointidx: Int): Unit
   @native protected def nativeClearLayers(data: GLInit): Unit
+  @native protected def nativeLoadUndo(data: GLInit, pos: Int): Unit
 
   override def run() = {
     Looper.prepare()
@@ -205,6 +206,8 @@ extends Thread with Handler.Callback with AndroidImplicits {
   def addLayer(gl: GLInit, copyshader: CopyShader, pointshader: PointShader, pointidx: Int) = {
     nativeAddLayer(gl, copyshader, pointshader, pointidx)
   }
+
+  def loadUndo(gl: GLInit, pos: Int) = nativeLoadUndo(gl, pos)
 
   // only set values, could maybe run on main thread
   def setAnimShader(gl: GLInit, shader: CopyShader) = nativeSetAnimShader(gl, shader)

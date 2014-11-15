@@ -54,9 +54,12 @@ class MainActivity extends Activity with TypedActivity with AndroidImplicits {
   lazy val drawerParent = findView(TR.drawer_parent)
   lazy val controlflipper = findView(TR.controlflipper)
   lazy val controldrawer = findView(TR.control_drawer)
+  lazy val sidebar = findView(TR.sidebar_parent)
   lazy val drawerToggle = new android.support.v7.app.ActionBarDrawerToggle(
       this, drawerParent, R.string.sidebar_open, R.string.sidebar_close)
   lazy val sidebarAdapter = new SidebarAdapter()
+  lazy val undoButton = findView(TR.undo_button)
+  lazy val redoButton = findView(TR.redo_button)
 
   var textureThread: Option[TextureSurfaceThread] = None
 
@@ -77,10 +80,36 @@ class MainActivity extends Activity with TypedActivity with AndroidImplicits {
     Log.i("main", "started thread");
   }
 
+  var undoCount: Int = 0
+  var undoPos: Int = 0
+
   class MainUndoListener() extends UndoCallback() {
     override def undoBufferChanged(newSize: Int): Unit = {
       Log.i("main", s"new undo buffer size: ${newSize}")
+      undoCount = newSize
+      undoPos = newSize - 1
+      runOnUiThread(() => {
+        updateUndoButtons()
+      })
     }
+  }
+
+  def moveUndo(offset: Int) = {
+    val newPos = undoPos + offset
+    if (newPos >= 0 && newPos < undoCount) {
+      for (thread <- textureThread) {
+        undoPos = newPos
+        updateUndoButtons()
+        thread.withGL(gl => {
+          thread.loadUndo(gl, newPos)
+        })
+      }
+    }
+  }
+
+  def updateUndoButtons() = {
+    redoButton.setEnabled(undoCount - undoPos > 1)
+    undoButton.setEnabled(undoPos > 0)
   }
 
   val onTextureThreadStarted = (x: Int, y: Int, producer: MotionEventProducer) => (thread: TextureSurfaceThread) => this.runOnUiThread(() => {
@@ -125,6 +154,11 @@ class MainActivity extends Activity with TypedActivity with AndroidImplicits {
         sidebarAdapter.sidebarControls(pos).onClick(pos)
       }
     })
+    
+    updateUndoButtons()
+    undoButton.setOnClickListener(() => moveUndo(-1))
+    redoButton.setOnClickListener(() => moveUndo(1))
+
 
     drawerParent.setDrawerListener(drawerToggle)
     getActionBar().setDisplayHomeAsUpEnabled(true)
@@ -479,11 +513,11 @@ class MainActivity extends Activity with TypedActivity with AndroidImplicits {
   def showControl(pos: Int) = {
     controlflipper.setVisibility(View.VISIBLE)
     controlflipper.setDisplayedChild(pos)
-    drawerParent.closeDrawer(controldrawer)
+    drawerParent.closeDrawer(sidebar)
   }
   def hideControls() = {
     controlflipper.setVisibility(View.INVISIBLE)
-    drawerParent.closeDrawer(controldrawer)
+    drawerParent.closeDrawer(sidebar)
   }
 
   class SidebarAdapter() extends BaseAdapter {

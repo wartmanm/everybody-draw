@@ -5,7 +5,7 @@ use collections::vec::Vec;
 use collections::str::StrAllocating;
 use collections::{Mutable, MutableSeq};
 
-use log::logi;
+use log::{logi,loge};
 
 use opengles::gl2;
 use opengles::gl2::{GLuint, GLenum, GLubyte};
@@ -66,6 +66,7 @@ pub struct UndoTargets {
     start: i32,
     len: i32,
     max: i32,
+    pos: i32,
 }
 
 impl UndoTargets {
@@ -75,36 +76,40 @@ impl UndoTargets {
             start: 0,
             max: 0,
             len: 0,
+            pos: 0,
         }
     }
     #[inline(always)] #[allow(dead_code)]
-    fn len(&self) -> i32 { self.len }
+    pub fn len(&self) -> i32 { self.len }
 
     #[inline(always)]
     fn get_pos(&self, pos: i32) -> i32 { (self.start + pos) % UNDO_BUFFERS }
 
     pub fn push_new_buffer(&mut self, buf: &TextureTarget, copyshader: &CopyShader) {
-        let end = self.get_pos(self.len);
+        let end = self.get_pos(self.pos);
         let target = &mut self.targets[end as uint];
-        if self.len >= self.max {
+        if self.pos >= self.max {
             let (x, y) = buf.texture.dimensions;
             *target = TextureTarget::new(x, y, gltexture::RGBA);
             self.max += 1;
         }
-        if self.len < UNDO_BUFFERS {
-            self.len += 1;
+        perform_copy(target.framebuffer, &buf.texture, copyshader, matrix::IDENTITY.as_slice());
+        if self.pos < UNDO_BUFFERS {
+            self.pos += 1;
         } else {
             let next = self.start + 1;
             self.start = if next == UNDO_BUFFERS { 0 } else { next };
         }
-        perform_copy(target.framebuffer, &buf.texture, copyshader, matrix::IDENTITY.as_slice());
+        self.len = self.pos;
     }
 
-    pub fn load_buffer_at(&mut self, idx: i32, buf: TextureTarget, copyshader: &CopyShader) {
+    pub fn load_buffer_at(&mut self, idx: i32, buf: &TextureTarget, copyshader: &CopyShader) {
         if idx >= self.len {
-            panic!("undo index exceeds current buffer size!");
+            loge!("undo index {} exceeds current buffer size {}!", idx, self.len);
+            return;
         }
-        self.len = idx + 1;
+        logi!("loading undo buffer {}/{}", idx, self.len);
+        self.pos = idx + 1;
         let src = &mut self.targets[self.get_pos(idx) as uint];
         perform_copy(buf.framebuffer, &src.texture, copyshader, matrix::IDENTITY.as_slice());
     }
@@ -331,6 +336,13 @@ impl<'a> GLInit<'a> {
             self.paintstate.undo_targets.push_new_buffer(source, copy_shader);
         }
         self.paintstate.undo_targets.len
+    }
+
+    pub fn load_undo_frame(&mut self, idx: i32) {
+        let source = self.targetdata.get_current_texturesource();
+        if let Some(copy_shader) = self.paintstate.copyshader {
+            self.paintstate.undo_targets.load_buffer_at(idx, source, copy_shader);
+        }
     }
 
     pub fn draw_queued_points(&mut self, handler: &mut MotionEventConsumer, events: &'a mut Events<'a>, matrix: &matrix::Matrix, undo_callback: &::lua_callbacks::UndoCallback) -> GLResult<()> {

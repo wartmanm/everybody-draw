@@ -414,6 +414,11 @@ unsafe extern "C" fn jni_replay_destroy(env: *mut JNIEnv, thiz: jobject, replay:
     mem::drop(replay);
 }
 
+unsafe extern "C" fn jni_load_undo(env: *mut JNIEnv, thiz: jobject, data: jint, idx: jint) {
+    let data = get_safe_data(data);
+    data.glinit.load_undo_frame(idx);
+}
+
 unsafe fn register_classmethods(env: *mut JNIEnv, classname: *const i8, methods: &[JNINativeMethod]) {
     let class = ((**env).FindClass)(env, classname);
     ((**env).RegisterNatives)(env, class, methods.as_ptr(), methods.len() as i32);
@@ -458,6 +463,7 @@ pub unsafe extern "C" fn JNI_OnLoad(vm: *mut JavaVM, reserved: *mut c_void) -> j
         native_method!("nativeSetInterpolator", "(II)V", jni_lua_set_interpolator),
         native_method!("nativeAddLayer", "(IIII)V", jni_add_layer),
         native_method!("nativeClearLayers", "(I)V", jni_clear_layers),
+        native_method!("nativeLoadUndo", "(II)V", jni_load_undo),
     ];
     register_classmethods(env, cstr!("com/github/wartman4404/gldraw/TextureSurfaceThread"), texturemethods);
     logi!("registered texture thread methods!");

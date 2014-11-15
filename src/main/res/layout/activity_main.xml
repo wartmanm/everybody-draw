@@ -64,14 +64,40 @@
         </ViewFlipper>
     </RelativeLayout>
 
-    <ListView
-        android:id="@+id/control_drawer"
-        android:layout_width="240dp"
-        android:layout_height="match_parent"
-        android:layout_gravity="start"
-        android:choiceMode="singleChoice"
-        android:background="#eee"
-        android:divider="@android:color/transparent"
-        android:dividerHeight="0dp" />
+    <RelativeLayout
+      android:layout_width="240dp"
+      android:layout_height="match_parent"
+      android:layout_gravity="start"
+      android:background="#eee"
+      android:id="@+id/sidebar_parent">
+      <ListView
+          android:id="@+id/control_drawer"
+          android:layout_width="match_parent"
+          android:layout_height="wrap_content"
+          android:choiceMode="singleChoice"
+          android:background="#eee"
+          android:divider="@android:color/transparent"
+          android:layout_alignParentTop="true"
+          android:dividerHeight="0dp" />
+          <LinearLayout
+              android:id="@+id/undo_redo_layout"
+              android:layout_width="match_parent"
+              android:layout_height="wrap_content"
+              android:layout_below="@id/control_drawer">
+              <Button
+                  android:id="@+id/undo_button"
+                  android:layout_width="0dp"
+                  android:layout_height="wrap_content"
+                  android:text="&lt;"
+                  android:layout_weight="1"/>
+              <Button
+                  android:id="@+id/redo_button"
+                  android:layout_width="0dp"
+                  android:layout_height="wrap_content"
+                  android:text="&gt;"
+                  android:layout_weight="1"/>
+          </LinearLayout>
+
+  </RelativeLayout>
 
 </android.support.v4.widget.DrawerLayout>
