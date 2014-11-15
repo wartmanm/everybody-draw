@@ -27,6 +27,7 @@ if _onup == nil and _ondown == nil and _onframe == nil and _ondone == nil then
     if queue_layer_save == true then
       loglua("saving layers")
       savelayers(output)
+      saveundo(output)
       queue_layer_save = false
     end
   end

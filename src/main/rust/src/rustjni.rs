@@ -94,7 +94,7 @@ impl<'a> ::core::ops::Fn<(i32,), ()> for JNICallbackClosure<'a> {
 
 impl JNIUndoCallback {
     pub unsafe fn new(env: *mut JNIEnv, obj: jobject) -> JNIUndoCallback {
-        ((**env).NewGlobalRef)(env, obj);
+        let obj = ((**env).NewGlobalRef)(env, obj);
         let objclass = ((**env).GetObjectClass)(env, obj);
         let method = ((**env).GetMethodID)(env, objclass, cstr!("undoBufferChanged"), cstr!("(I)V"));
         JNIUndoCallback { callback_obj: obj, callback_method: method }

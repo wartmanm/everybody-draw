@@ -127,7 +127,7 @@ pub unsafe extern "C" fn lua_pushcubicbezier(data: &mut LuaCallbackType, queue: 
 }
 
 #[no_mangle]
-pub unsafe extern "C" fn lua_saveundobuffer(data: &mut LuaCallbackType) {
+pub unsafe extern "C" fn lua_saveundobuffer(data: &mut LuaCallbackType) -> () {
     let result = data.glinit.push_undo_frame();
     (data.undo_callback)(result);
 }
