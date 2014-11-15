@@ -75,6 +75,7 @@ static mut BOXED_JINT: CaseClass = CaseClass { constructor: 0 as jmethodID, clas
 
 struct JNIUndoCallback {
     callback_obj: jobject,
+    callback_method: jmethodID,
 }
 
 pub struct JNICallbackClosure<'a> {
@@ -91,17 +92,16 @@ impl<'a> ::core::ops::Fn<(i32,), ()> for JNICallbackClosure<'a> {
     }
 }
 
-static mut JNI_UNDO_CALLBACK_METHOD: jmethodID = 0 as jmethodID;
-static mut JNI_UNDO_CALLBACK_CLASS: jclass = 0 as jclass;
-
 impl JNIUndoCallback {
     pub unsafe fn new(env: *mut JNIEnv, obj: jobject) -> JNIUndoCallback {
         ((**env).NewGlobalRef)(env, obj);
-        JNIUndoCallback { callback_obj: obj }
+        let objclass = ((**env).GetObjectClass)(env, obj);
+        let method = ((**env).GetMethodID)(env, objclass, cstr!("undoBufferChanged"), cstr!("(I)V"));
+        JNIUndoCallback { callback_obj: obj, callback_method: method }
     }
 
     pub unsafe fn call(&self, env: *mut JNIEnv, new_undo_size: i32) {
-        ((**env).CallVoidMethod)(env, self.callback_obj, JNI_UNDO_CALLBACK_METHOD, new_undo_size as jint);
+        ((**env).CallVoidMethod)(env, self.callback_obj, self.callback_method, new_undo_size as jint);
     }
 
     pub unsafe fn destroy(self, env: *mut JNIEnv) {
@@ -437,8 +437,6 @@ pub unsafe extern "C" fn JNI_OnLoad(vm: *mut JavaVM, reserved: *mut c_void) -> j
     BOXED_JINT = CaseClass::new(env, cstr!("java/lang/Integer"), cstr!("(I)V"));
 
     let undo_callback_class = ((**env).FindClass)(env, cstr!("com/github/wartman4404/gldraw/UndoCallback"));
-    JNI_UNDO_CALLBACK_METHOD = ((**env).GetMethodID)(env, undo_callback_class, cstr!("undoBufferChanged"), cstr!("(I)V"));
-    JNI_UNDO_CALLBACK_CLASS = ((**env).NewGlobalRef)(env, undo_callback_class);
 
     let mainmethods = [
         native_method!("nativeAppendMotionEvent", "(ILandroid/view/MotionEvent;)V", native_append_motion_event),
@@ -527,5 +525,4 @@ pub unsafe extern "C" fn JNI_OnUnload(vm: *mut JavaVM, reserved: *mut c_void) {
     SCALA_LEFT.destroy(env);
     SCALA_RIGHT.destroy(env);
     BOXED_JINT.destroy(env);
-    ((**env).DeleteGlobalRef)(env, JNI_UNDO_CALLBACK_CLASS);
 }

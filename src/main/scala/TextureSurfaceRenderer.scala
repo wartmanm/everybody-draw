@@ -10,6 +10,7 @@ import unibrush.Layer
 class TextureSurfaceThread(surface: SurfaceTexture, private var motionHandler: MotionEventHandler, handlerCallback: (TextureSurfaceThread)=>Unit, errorCallback: (Exception)=>Unit)
 extends Thread with Handler.Callback with AndroidImplicits {
   import TextureSurfaceThread.Constants._
+  import TextureSurfaceThread._
 
   private var handler: Handler = null
   private val running = new AtomicBoolean(true)
@@ -77,7 +78,7 @@ extends Thread with Handler.Callback with AndroidImplicits {
         eglHelper = new EGLHelper()
         eglHelper.init(surface)
         Log.i("tst", "egl inited");
-        val (undoCallback, beginGLCallback) = msg.obj.asInstanceOf[(UndoCallback, ()=>Unit)]
+        val BeginGLArgs(undoCallback, beginGLCallback) = msg.obj.asInstanceOf[BeginGLArgs]
         val gl = GLInit(msg.arg1, msg.arg2, undoCallback)
         glinit = Some(gl)
         initOutputShader(gl)
@@ -99,8 +100,8 @@ extends Thread with Handler.Callback with AndroidImplicits {
     true
   }
 
-  def beginGL(x: Int, y: Int, callback: ()=>Unit, undoCallback: UndoCallback): Unit = {
-    handler.obtainMessage(MSG_BEGIN_GL, x, y, (callback, undoCallback)).sendToTarget()
+  def beginGL(x: Int, y: Int, initCallback: ()=>Unit, undoCallback: UndoCallback): Unit = {
+    handler.obtainMessage(MSG_BEGIN_GL, x, y, BeginGLArgs(undoCallback, initCallback)).sendToTarget()
   }
   
   def startFrames() = {
@@ -225,4 +226,6 @@ object TextureSurfaceThread {
     val MSG_BEGIN_GL = 3
     val MSG_BEGIN_FRAMES = 4
   }
+
+  case class BeginGLArgs(undoCallback: UndoCallback, initCallback: () => Unit)
 }

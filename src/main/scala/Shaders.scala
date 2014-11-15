@@ -17,7 +17,7 @@ class GLInit private (private val nativePtr: Int) extends AnyVal {
   }
 }
 trait UndoCallback {
-  def undoBufferChanged(newSize: Int)
+  def undoBufferChanged(newSize: Int): Unit
 }
 object GLResultTypeDef {
   type GLResult[T] = Either[String, T]
