@@ -15,39 +15,38 @@ use glinit::GLInit;
 use drawevent::Events;
 use lua::raw::lua_State;
 use log::loge;
+use lua_geom::rust_raise_lua_err;
 
 static MOVE: u8 = 0u8;
 static DONE: u8 = 1u8;
 static DOWN: u8 = 2u8;
 static UP:   u8 = 3u8;
 
-pub type UndoCallback<'a> = ::rustjni::JNICallbackClosure<'a>;
+//pub type UndoCallback<'a> = ::rustjni::JNICallbackClosure<'a>;
 
-pub struct LuaCallbackType<'a, 'b, 'c: 'b, 'd> {
+pub struct LuaCallbackType<'a, 'b, 'c: 'b, 'd, F: Fn<(i32,),()>+'d> {
     consumer: &'a mut MotionEventConsumer,
     events: &'c mut Events<'c>,
     glinit: &'b mut GLInit<'c>,
-    pub lua: *mut lua_State,
-    undo_callback: &'d UndoCallback<'d>,
+    undo_callback: &'d F,
 }
 
-impl<'a, 'b, 'c, 'd> LuaCallbackType<'a, 'b, 'c, 'd> {
-    pub fn new(glinit: &'b mut GLInit<'c>, events: &'c mut Events<'c>, s: &'a mut MotionEventConsumer, undo_callback: &'d UndoCallback) -> GLResult<LuaCallbackType<'a, 'b, 'c, 'd>> {
-        match unsafe { ::lua_geom::get_existing_lua() } {
-            Some(lua) => Ok(LuaCallbackType {
-                consumer: s,
-                events: events,
-                glinit: glinit,
-                lua: lua,
-                undo_callback: undo_callback,
-            }),
-            None => Err("couldn't get lua state!".into_string()),
+trait LuaCallback { }
+impl<'a,'b,'c,'d,F: Fn<(i32,),()>> LuaCallback for LuaCallbackType<'a,'b,'c,'d,F> { }
+
+impl<'a, 'b, 'c, 'd, F: Fn<(i32,),()>> LuaCallbackType<'a, 'b, 'c, 'd, F> {
+    pub fn new<F: Fn<(i32,),()>>(glinit: &'b mut GLInit<'c>, events: &'c mut Events<'c>, s: &'a mut MotionEventConsumer, undo_callback: &'d F) -> LuaCallbackType<'a, 'b, 'c, 'd, F> {
+        LuaCallbackType {
+            consumer: s,
+            events: events,
+            glinit: glinit,
+            undo_callback: undo_callback,
         }
     }
 }
 
 #[no_mangle]
-pub extern "C" fn lua_nextpoint(data: &mut LuaCallbackType, points: &mut (ShaderPaintPoint, ShaderPaintPoint)) -> u16 {
+pub extern "C" fn lua_nextpoint<F: Fn<(i32,),()>>(data: &mut LuaCallbackType<F>, points: &mut (ShaderPaintPoint, ShaderPaintPoint)) -> u16 {
     let events: &mut Events = data.events;
     let (state, pointer) = glpoint::next_point(data.consumer, events);
     let (newpoints, luastate) = match state {
@@ -60,13 +59,6 @@ pub extern "C" fn lua_nextpoint(data: &mut LuaCallbackType, points: &mut (Shader
     ((luastate as u16) << 8) | (pointer as u16)
 }
 
-#[no_mangle]
-#[allow(non_snake_case)]
-pub unsafe fn rust_raise_lua_err(L: *mut lua_State, msg: *const i8) -> ! {
-    ::lua::aux::raw::luaL_error(L, msg);
-    panic!("luaL_error() returned, this should never happen!");
-}
-
 macro_rules! rust_raise_lua_err(
     ($L:expr, $fmt:expr, $($arg:tt)*) => ({
         let formatted = format!(concat!($fmt, "\0"), $($arg)*);
@@ -74,25 +66,25 @@ macro_rules! rust_raise_lua_err(
     })
 )
 
-fn get_queue_or_raise_err<'a, 'b, 'c, 'd>(data: &'d mut LuaCallbackType, queue: i32) -> &'d mut Vec<ShaderPaintPoint> {
+fn get_queue_or_raise_err<'a, 'b, 'c, 'd, F: Fn<(i32,),()>>(data: &'d mut LuaCallbackType<F>, queue: i32) -> &'d mut Vec<ShaderPaintPoint> {
     let points = &mut data.glinit.points;
     if (queue as uint) >= points.len() {
         unsafe {
             loge!("tried to push point to queue {} of {}", queue + 1, points.len());
-            rust_raise_lua_err!(data.lua, "tried to push point to queue {} of {}", queue + 1, points.len());
+            rust_raise_lua_err!(None, "tried to push point to queue {} of {}", queue + 1, points.len());
         }
     }
     unsafe { points.as_mut_slice().unsafe_mut(queue as uint) }
 }
 
 #[no_mangle]
-pub unsafe extern "C" fn lua_pushpoint(data: &mut LuaCallbackType, queue: i32, point: *const ShaderPaintPoint) {
+pub unsafe extern "C" fn lua_pushpoint<F: Fn<(i32,),()>>(data: &mut LuaCallbackType<F>, queue: i32, point: *const ShaderPaintPoint) {
     let points = get_queue_or_raise_err(data, queue);
     glpoint::push_point(points, &*point);
 }
 
 #[no_mangle]
-pub unsafe extern "C" fn lua_pushline(data: &mut LuaCallbackType, queue: i32, a: *const ShaderPaintPoint, b: *const ShaderPaintPoint) {
+pub unsafe extern "C" fn lua_pushline<F: Fn<(i32,),()>>(data: &mut LuaCallbackType<F>, queue: i32, a: *const ShaderPaintPoint, b: *const ShaderPaintPoint) {
     let points = get_queue_or_raise_err(data, queue);
     glpoint::push_line(points, &*a, &*b);
 }
@@ -103,31 +95,31 @@ pub unsafe extern "C" fn lua_log(message: *const c_char) {
 }
 
 #[no_mangle]
-pub unsafe extern "C" fn lua_clearlayer(data: &mut LuaCallbackType, layer: i32) {
+pub unsafe extern "C" fn lua_clearlayer<F: Fn<(i32,),()>>(data: &mut LuaCallbackType<F>, layer: i32) {
     if let Err(mut msg) = data.glinit.erase_layer(layer) {
         loge!(msg.as_slice());
         msg.push('\0');
-        rust_raise_lua_err(data.lua, msg.as_slice().as_ptr() as *const i8);
+        rust_raise_lua_err(None, msg.as_slice().as_ptr() as *const i8);
     }
 }
 
 #[no_mangle]
-pub unsafe extern "C" fn lua_savelayers(data: &mut LuaCallbackType) {
+pub unsafe extern "C" fn lua_savelayers<F: Fn<(i32,),()>>(data: &mut LuaCallbackType<F>) {
     data.glinit.copy_layers_down();
 }
 
 #[no_mangle]
-pub unsafe extern "C" fn lua_pushcatmullrom(data: &mut LuaCallbackType, queue: i32, points: &[ShaderPaintPoint, ..4]) {
+pub unsafe extern "C" fn lua_pushcatmullrom<F: Fn<(i32,),()>>(data: &mut LuaCallbackType<F>, queue: i32, points: &[ShaderPaintPoint, ..4]) {
     glpoint::push_catmullrom(&mut data.glinit.points.as_mut_slice()[queue as uint], points);
 }
 
 #[no_mangle]
-pub unsafe extern "C" fn lua_pushcubicbezier(data: &mut LuaCallbackType, queue: i32, points: &[ShaderPaintPoint, ..4]) {
+pub unsafe extern "C" fn lua_pushcubicbezier<F: Fn<(i32,),()>>(data: &mut LuaCallbackType<F>, queue: i32, points: &[ShaderPaintPoint, ..4]) {
     glpoint::push_cubicbezier(&mut data.glinit.points.as_mut_slice()[queue as uint], points);
 }
 
 #[no_mangle]
-pub unsafe extern "C" fn lua_saveundobuffer(data: &mut LuaCallbackType) -> () {
+pub unsafe extern "C" fn lua_saveundobuffer<F: Fn<(i32,),()>>(data: &mut LuaCallbackType<F>) -> () {
     let result = data.glinit.push_undo_frame();
     (data.undo_callback)(result);
 }

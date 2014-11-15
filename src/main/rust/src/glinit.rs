@@ -22,7 +22,7 @@ use matrix;
 use eglinit;
 use luascript::LuaScript;
 use paintlayer::PaintLayer;
-use lua_callbacks::LuaCallbackType;
+use lua_callbacks::{LuaCallback, LuaCallbackType};
 use lua_geom::{do_interpolate_lua, finish_lua_script};
 use drawevent::Events;
 
@@ -322,11 +322,11 @@ impl<'a> GLInit<'a> {
         data
     }
 
-    pub fn unload_interpolator(&mut self, handler: &mut MotionEventConsumer, events: &'a mut Events<'a>, undo_callback: &::lua_callbacks::UndoCallback) -> GLResult<()> {
+    pub fn unload_interpolator<T: Fn<(i32,),()>>(&mut self, handler: &mut MotionEventConsumer, events: &'a mut Events<'a>, undo_callback: &T) -> GLResult<()> {
         if let Some(interpolator) = self.paintstate.interpolator {
             logi!("finishing luascript {}", interpolator);
             unsafe {
-                let mut callback = try!(LuaCallbackType::new(self, events, handler, undo_callback));
+                let mut callback = LuaCallbackType::new(self, events, handler, undo_callback);
                 finish_lua_script(&mut callback, interpolator)
             }
         } else {
@@ -350,7 +350,7 @@ impl<'a> GLInit<'a> {
         }
     }
 
-    pub fn draw_queued_points(&mut self, handler: &mut MotionEventConsumer, events: &'a mut Events<'a>, matrix: &matrix::Matrix, undo_callback: &::lua_callbacks::UndoCallback) -> GLResult<()> {
+    pub fn draw_queued_points<T: Fn<(i32,),()>>(&mut self, handler: &mut MotionEventConsumer, events: &'a mut Events<'a>, matrix: &matrix::Matrix, undo_callback: &T) -> GLResult<()> {
         match (self.paintstate.pointshader, self.paintstate.copyshader, self.paintstate.brush) {
             (Some(point_shader), Some(copy_shader), Some(brush)) => {
                 gl2::enable(gl2::BLEND);
@@ -358,7 +358,7 @@ impl<'a> GLInit<'a> {
                 let interp_error = match self.paintstate.interpolator {
                     Some(interpolator) => unsafe {
                         let dimensions = self.dimensions;
-                        let mut callback = try!(LuaCallbackType::new(self, events, handler, undo_callback));
+                        let mut callback = LuaCallbackType::new(self, events, handler, undo_callback);
                         do_interpolate_lua(interpolator, dimensions, &mut callback)
                     },
                     None => Ok(())

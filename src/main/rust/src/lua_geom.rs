@@ -15,7 +15,7 @@ use luajit_constants::*;
 use glcommon::GLResult;
 use log::{logi, loge};
 
-use lua_callbacks::LuaCallbackType;
+use lua_callbacks::LuaCallback;
 
 static mut GLDRAW_LUA_SANDBOX: *mut c_void = 0 as *mut c_void;
 static mut GLDRAW_LUA_STOPFNS: *mut c_void = 0 as *mut c_void;
@@ -115,9 +115,23 @@ unsafe fn get_lua() -> GLResult<*mut lua_State> {
     }
 }
 
+#[no_mangle]
+pub unsafe fn rust_raise_lua_err(L: Option<*mut lua_State>, msg: *const i8) -> ! {
+    let L = L.unwrap_or(get_existing_lua().unwrap());
+    ::lua::aux::raw::luaL_error(L, msg);
+    panic!("luaL_error() returned, this should never happen!");
+}
+
 #[inline(always)]
 pub unsafe fn get_existing_lua() -> Option<*mut lua_State> {
     STATIC_LUA
+}
+
+pub unsafe fn get_existing_lua_or_err() -> GLResult<*mut lua_State> {
+    match get_existing_lua() {
+        Some(lua) => Ok(lua),
+        None => Err("couldn't get lua state!".into_string()),
+    }
 }
 
 unsafe fn push_sandbox(L: *mut lua_State) {
@@ -224,7 +238,7 @@ pub unsafe fn load_lua_script(script: Option<&str>) -> GLResult<i32> {
     Ok(key)
 }
 
-pub unsafe fn finish_lua_script(output: &mut LuaCallbackType, script: &::luascript::LuaScript) -> GLResult<()> {
+pub unsafe fn finish_lua_script<T: LuaCallback>(output: &mut T, script: &::luascript::LuaScript) -> GLResult<()> {
     let L = get_lua().unwrap();
     lua_pushlightuserdata(L, GLDRAW_LUA_STOPFNS);
     lua_gettable(L, LUA_REGISTRYINDEX);
@@ -235,7 +249,7 @@ pub unsafe fn finish_lua_script(output: &mut LuaCallbackType, script: &::luascri
     lua_gettable(L, -2);
     logi!("type of stopfn for {} is {}", script, c_str_to_static_slice(lua_typename(L, lua_type(L, -1))));
     // stack is stopfns -- stopfn
-    lua_pushlightuserdata(L, output as *mut LuaCallbackType as *mut c_void);
+    lua_pushlightuserdata(L, output as *mut T as *mut c_void);
     let result = match lua_pcall(L, 1, 0, 0) {
         0 => Ok(()),
         _ => log_err(format!("ondone() script failed to run: {}", err_to_str(L))),
@@ -262,15 +276,15 @@ pub unsafe fn push_lua_script(key: i32) {
     lua_pushlightuserdata(L, key as *mut c_void);
 }
 
-pub unsafe fn do_interpolate_lua(script: &::luascript::LuaScript, dimensions: (i32, i32), output: &mut LuaCallbackType) -> GLResult<()> {
-    let L = output.lua;
+pub unsafe fn do_interpolate_lua<T: LuaCallback>(script: &::luascript::LuaScript, dimensions: (i32, i32), output: &mut T) -> GLResult<()> {
+    let L = try!(get_existing_lua_or_err());
     script.push_self();
     lua_gettable(L, LUA_REGISTRYINDEX);
 
     let (x, y) = dimensions;
     lua_pushnumber(L, x as f64);
     lua_pushnumber(L, y as f64);
-    lua_pushlightuserdata(L, output as *mut LuaCallbackType as *mut c_void);
+    lua_pushlightuserdata(L, output as *mut T as *mut c_void);
 
     match lua_pcall(L, 3, 0, 0) {
         0 => Ok(()),
