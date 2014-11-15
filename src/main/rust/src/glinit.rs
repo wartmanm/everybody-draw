@@ -1,5 +1,6 @@
 extern crate opengles;
 use core::prelude::*;
+use core::mem;
 use collections::vec::Vec;
 use collections::str::StrAllocating;
 use collections::{Mutable, MutableSeq};
@@ -31,6 +32,8 @@ static DRAW_INDEXES: [GLubyte, ..6] = [
     0, 2, 3
 ];
 
+const UNDO_BUFFERS: i32 = 5;
+
 //#[deriving(FromPrimitive)]
 #[repr(i32)]
 #[allow(non_camel_case_types, dead_code)]
@@ -58,6 +61,64 @@ pub struct TargetData {
     current_target: u8,
 }
 
+pub struct UndoTargets {
+    targets: [TextureTarget, ..UNDO_BUFFERS as uint],
+    start: i32,
+    len: i32,
+    max: i32,
+}
+
+impl UndoTargets {
+    pub fn new() -> UndoTargets {
+        UndoTargets {
+            targets: unsafe { mem::uninitialized() },
+            start: 0,
+            max: 0,
+            len: 0,
+        }
+    }
+    #[inline(always)] #[allow(dead_code)]
+    fn len(&self) -> i32 { self.len }
+
+    #[inline(always)]
+    fn get_pos(&self, pos: i32) -> i32 { (self.start + pos) % UNDO_BUFFERS }
+
+    pub fn push_new_buffer(&mut self, buf: &TextureTarget, copyshader: &CopyShader) {
+        let end = self.get_pos(self.len);
+        let target = &mut self.targets[end as uint];
+        if self.len >= self.max {
+            let (x, y) = buf.texture.dimensions;
+            *target = TextureTarget::new(x, y, gltexture::RGBA);
+            self.max += 1;
+        }
+        if self.len < UNDO_BUFFERS {
+            self.len += 1;
+        } else {
+            let next = self.start + 1;
+            self.start = if next == UNDO_BUFFERS { 0 } else { next };
+        }
+        perform_copy(target.framebuffer, &buf.texture, copyshader, matrix::IDENTITY.as_slice());
+    }
+
+    pub fn load_buffer_at(&mut self, idx: i32, buf: TextureTarget, copyshader: &CopyShader) {
+        if idx >= self.len {
+            panic!("undo index exceeds current buffer size!");
+        }
+        self.len = idx + 1;
+        let src = &mut self.targets[self.get_pos(idx) as uint];
+        perform_copy(buf.framebuffer, &src.texture, copyshader, matrix::IDENTITY.as_slice());
+    }
+}
+
+#[unsafe_destructor]
+impl Drop for UndoTargets {
+    fn drop(&mut self) -> () {
+        for pos in range(0, self.max) {
+            mem::drop(&mut self.targets[self.get_pos(pos) as uint]);
+        }
+    }
+}
+
 pub struct PaintState<'a> {
     pub pointshader: Option<&'a PointShader>,
     pub animshader: Option<&'a CopyShader>,
@@ -65,6 +126,7 @@ pub struct PaintState<'a> {
     pub brush: Option<&'a Texture>,
     pub interpolator: Option<&'a LuaScript>,
     pub layers: Vec<PaintLayer<'a>>,
+    pub undo_targets: UndoTargets,
 }
 
 impl<'a> PaintState<'a> {
@@ -76,6 +138,7 @@ impl<'a> PaintState<'a> {
             brush: None,
             interpolator: None,
             layers: Vec::new(),
+            undo_targets: UndoTargets::new(),
         }
     }
 }
@@ -250,11 +313,11 @@ impl<'a> GLInit<'a> {
         data
     }
 
-    pub fn unload_interpolator(&mut self, handler: &mut MotionEventConsumer, events: &'a mut Events<'a>) -> GLResult<()> {
+    pub fn unload_interpolator(&mut self, handler: &mut MotionEventConsumer, events: &'a mut Events<'a>, undo_callback: &::lua_callbacks::UndoCallback) -> GLResult<()> {
         if let Some(interpolator) = self.paintstate.interpolator {
             logi!("finishing luascript {}", interpolator);
             unsafe {
-                let mut callback = try!(LuaCallbackType::new(self, events, handler));
+                let mut callback = try!(LuaCallbackType::new(self, events, handler, undo_callback));
                 finish_lua_script(&mut callback, interpolator)
             }
         } else {
@@ -262,22 +325,30 @@ impl<'a> GLInit<'a> {
         }
     }
 
-    pub fn draw_queued_points(&mut self, handler: &mut MotionEventConsumer, events: &'a mut Events<'a>, matrix: &matrix::Matrix) -> GLResult<()> {
+    pub fn push_undo_frame(&mut self) -> i32 {
+        let source = self.targetdata.get_current_texturesource();
+        if let Some(copy_shader) = self.paintstate.copyshader {
+            self.paintstate.undo_targets.push_new_buffer(source, copy_shader);
+        }
+        self.paintstate.undo_targets.len
+    }
+
+    pub fn draw_queued_points(&mut self, handler: &mut MotionEventConsumer, events: &'a mut Events<'a>, matrix: &matrix::Matrix, undo_callback: &::lua_callbacks::UndoCallback) -> GLResult<()> {
         match (self.paintstate.pointshader, self.paintstate.copyshader, self.paintstate.brush) {
             (Some(point_shader), Some(copy_shader), Some(brush)) => {
                 gl2::enable(gl2::BLEND);
                 gl2::blend_func(gl2::ONE, gl2::ONE_MINUS_SRC_ALPHA);
-
                 let interp_error = match self.paintstate.interpolator {
                     Some(interpolator) => unsafe {
                         let dimensions = self.dimensions;
-                        let mut callback = try!(LuaCallbackType::new(self, events, handler));
+                        let mut callback = try!(LuaCallbackType::new(self, events, handler, undo_callback));
                         do_interpolate_lua(interpolator, dimensions, &mut callback)
                     },
                     None => Ok(())
                 };
 
                 let (target, source) = self.targetdata.get_texturetargets();
+
                 let back_buffer = &source.texture;
                 let drawvecs = self.points.as_mut_slice();
                 let matrix = matrix.as_slice();
@@ -350,7 +421,7 @@ impl<'a> GLInit<'a> {
         }
     }
 
-    pub unsafe fn destroy(self) {
+    pub unsafe fn destroy(&mut self) {
         gl2::finish();
     }
 }

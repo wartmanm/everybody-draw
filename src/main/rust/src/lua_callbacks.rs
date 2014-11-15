@@ -21,21 +21,25 @@ static DONE: u8 = 1u8;
 static DOWN: u8 = 2u8;
 static UP:   u8 = 3u8;
 
-pub struct LuaCallbackType<'a, 'b, 'c: 'b> {
+pub type UndoCallback<'a> = ::rustjni::JNICallbackClosure<'a>;
+
+pub struct LuaCallbackType<'a, 'b, 'c: 'b, 'd> {
     consumer: &'a mut MotionEventConsumer,
     events: &'c mut Events<'c>,
     glinit: &'b mut GLInit<'c>,
     pub lua: *mut lua_State,
+    undo_callback: &'d UndoCallback<'d>,
 }
 
-impl<'a, 'b, 'c> LuaCallbackType<'a, 'b, 'c> {
-    pub fn new(glinit: &'b mut GLInit<'c>, events: &'c mut Events<'c>, s: &'a mut MotionEventConsumer) -> GLResult<LuaCallbackType<'a, 'b, 'c>> {
+impl<'a, 'b, 'c, 'd> LuaCallbackType<'a, 'b, 'c, 'd> {
+    pub fn new(glinit: &'b mut GLInit<'c>, events: &'c mut Events<'c>, s: &'a mut MotionEventConsumer, undo_callback: &'d UndoCallback) -> GLResult<LuaCallbackType<'a, 'b, 'c, 'd>> {
         match unsafe { ::lua_geom::get_existing_lua() } {
             Some(lua) => Ok(LuaCallbackType {
                 consumer: s,
                 events: events,
                 glinit: glinit,
                 lua: lua,
+                undo_callback: undo_callback,
             }),
             None => Err("couldn't get lua state!".into_string()),
         }
@@ -60,7 +64,7 @@ pub extern "C" fn lua_nextpoint(data: &mut LuaCallbackType, points: &mut (Shader
 #[allow(non_snake_case)]
 pub unsafe fn rust_raise_lua_err(L: *mut lua_State, msg: *const i8) -> ! {
     ::lua::aux::raw::luaL_error(L, msg);
-    fail!("luaL_error() returned, this should never happen!");
+    panic!("luaL_error() returned, this should never happen!");
 }
 
 macro_rules! rust_raise_lua_err(
@@ -121,3 +125,10 @@ pub unsafe extern "C" fn lua_pushcatmullrom(data: &mut LuaCallbackType, queue: i
 pub unsafe extern "C" fn lua_pushcubicbezier(data: &mut LuaCallbackType, queue: i32, points: &[ShaderPaintPoint, ..4]) {
     glpoint::push_cubicbezier(&mut data.glinit.points.as_mut_slice()[queue as uint], points);
 }
+
+#[no_mangle]
+pub unsafe extern "C" fn lua_saveundobuffer(data: &mut LuaCallbackType) {
+    let result = data.glinit.push_undo_frame();
+    (data.undo_callback)(result);
+}
+

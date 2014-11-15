@@ -80,7 +80,12 @@ class MainActivity extends Activity with TypedActivity with AndroidImplicits {
   val onTextureThreadStarted = (x: Int, y: Int, producer: MotionEventProducer) => (thread: TextureSurfaceThread) => this.runOnUiThread(() => {
     Log.i("main", "got handler")
     textureThread = Some(thread)
-    thread.beginGL(x, y, onTextureCreated(thread, producer) _)
+    val undoCallback = new UndoCallback() {
+      override def undoBufferChanged(newSize: Int): Unit = {
+        Log.i("main", s"new undo buffer size: ${newSize}")
+      }
+    }
+    thread.beginGL(x, y, onTextureCreated(thread, producer) _, undoCallback)
     thread.startFrames()
     Log.i("main", "sent begin_gl message")
     ()

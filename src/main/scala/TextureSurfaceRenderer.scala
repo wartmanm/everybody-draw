@@ -77,7 +77,8 @@ extends Thread with Handler.Callback with AndroidImplicits {
         eglHelper = new EGLHelper()
         eglHelper.init(surface)
         Log.i("tst", "egl inited");
-        val gl = GLInit(msg.arg1, msg.arg2)
+        val (undoCallback, beginGLCallback) = msg.obj.asInstanceOf[(UndoCallback, ()=>Unit)]
+        val gl = GLInit(msg.arg1, msg.arg2, undoCallback)
         glinit = Some(gl)
         initOutputShader(gl)
         android.opengl.Matrix.orthoM(matrix, 0,
@@ -92,14 +93,14 @@ extends Thread with Handler.Callback with AndroidImplicits {
           matrix(12), matrix(13), matrix(14), matrix(15)))
         Log.i("tst", "gl inited");
         updateGL(gl)
-        msg.obj.asInstanceOf[()=>Unit]()
+        beginGLCallback()
       }
     }
     true
   }
 
-  def beginGL(x: Int, y: Int, callback: ()=>Unit): Unit = {
-    handler.obtainMessage(MSG_BEGIN_GL, x, y, callback).sendToTarget()
+  def beginGL(x: Int, y: Int, callback: ()=>Unit, undoCallback: UndoCallback): Unit = {
+    handler.obtainMessage(MSG_BEGIN_GL, x, y, (callback, undoCallback)).sendToTarget()
   }
   
   def startFrames() = {

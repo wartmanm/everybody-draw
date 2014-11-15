@@ -50,6 +50,7 @@ struct CaseClass {
 struct GLInitEvents<'a> {
     glinit: GLInit<'a>,
     events: Events<'a>,
+    jni_undo_callback: JNIUndoCallback,
 }
 
 impl CaseClass {
@@ -71,6 +72,45 @@ impl CaseClass {
 static mut SCALA_LEFT: CaseClass = CaseClass { constructor: 0 as jmethodID, class: 0 as jclass };
 static mut SCALA_RIGHT: CaseClass = CaseClass { constructor: 0 as jmethodID, class: 0 as jclass };
 static mut BOXED_JINT: CaseClass = CaseClass { constructor: 0 as jmethodID, class: 0 as jclass };
+
+struct JNIUndoCallback {
+    callback_obj: jobject,
+}
+
+pub struct JNICallbackClosure<'a> {
+    undo_callback: &'a JNIUndoCallback,
+    env: *mut JNIEnv,
+}
+
+impl<'a> ::core::ops::Fn<(i32,), ()> for JNICallbackClosure<'a> {
+    extern "rust-call" fn call(&self, args: (i32,)) -> () {
+        let (arg,) = args;
+        unsafe {
+            self.undo_callback.call(self.env, arg);
+        }
+    }
+}
+
+static mut JNI_UNDO_CALLBACK_METHOD: jmethodID = 0 as jmethodID;
+static mut JNI_UNDO_CALLBACK_CLASS: jclass = 0 as jclass;
+
+impl JNIUndoCallback {
+    pub unsafe fn new(env: *mut JNIEnv, obj: jobject) -> JNIUndoCallback {
+        ((**env).NewGlobalRef)(env, obj);
+        JNIUndoCallback { callback_obj: obj }
+    }
+
+    pub unsafe fn call(&self, env: *mut JNIEnv, new_undo_size: i32) {
+        ((**env).CallVoidMethod)(env, self.callback_obj, JNI_UNDO_CALLBACK_METHOD, new_undo_size as jint);
+    }
+
+    pub unsafe fn destroy(self, env: *mut JNIEnv) {
+        ((**env).DeleteGlobalRef)(env, self.callback_obj);
+    }
+    pub fn create_closure(&self, env: *mut JNIEnv) -> JNICallbackClosure {
+        JNICallbackClosure { undo_callback: self, env: env }
+    }
+}
 
 unsafe fn glresult_to_either<T>(env: *mut JNIEnv, result: GLResult<DrawObjectIndex<T>>) -> jobject {
     logi!("in glresult_to_either");
@@ -99,15 +139,17 @@ fn get_safe_data<'a>(data: i32) -> &'a mut GLInitEvents<'a> {
     unsafe { mem::transmute(data) }
 }
 
-unsafe extern "C" fn init_gl(env: *mut JNIEnv, thiz: jobject, w: jint, h: jint) -> jint {
+unsafe extern "C" fn init_gl(env: *mut JNIEnv, thiz: jobject, w: jint, h: jint, callback: jobject) -> jint {
     mem::transmute(box GLInitEvents {
         glinit: GLInit::setup_graphics(w, h),
         events: Events::new(),
+        jni_undo_callback: JNIUndoCallback::new(env, callback),
     })
 }
 
 unsafe extern "C" fn finish_gl(env: *mut JNIEnv, thiz: jobject, data: jint) {
-    let data: Box<GLInitEvents> = mem::transmute(data);
+    let mut data: Box<GLInitEvents> = mem::transmute(data);
+    data.jni_undo_callback.destroy(env);
     data.glinit.destroy();
     logi!("finished deinit");
 }
@@ -123,15 +165,20 @@ unsafe fn rethrow_lua_result(env: *mut JNIEnv, result: GLResult<()>) {
 
 unsafe extern "C" fn native_draw_queued_points(env: *mut JNIEnv, thiz: jobject, data: i32, handler: i32, java_matrix: jfloatArray) {
     let data = get_safe_data(data);
+    let callback = data.jni_undo_callback.create_closure(env);
+    //let callback = |&: x: i32| {
+        //data.jni_undo_callback.call(env, x);
+    //};
     let mut matrix: Matrix = mem::uninitialized();
     ((**env).GetFloatArrayRegion)(env, java_matrix, 0, 16, matrix.as_mut_ptr());
-    let luaerr = data.glinit.draw_queued_points(mem::transmute(handler), &mut data.events, &matrix);
+    let luaerr = data.glinit.draw_queued_points(mem::transmute(handler), &mut data.events, &matrix, &callback);
     rethrow_lua_result(env, luaerr);
 }
 
 unsafe extern "C" fn native_finish_lua_script(env: *mut JNIEnv, thiz: jobject, data: i32, handler: i32) {
     let data = get_safe_data(data);
-    let luaerr = data.glinit.unload_interpolator(mem::transmute(handler), &mut data.events);
+    let callback = data.jni_undo_callback.create_closure(env);
+    let luaerr = data.glinit.unload_interpolator(mem::transmute(handler), &mut data.events, &callback);
     rethrow_lua_result(env, luaerr);
 }
 
@@ -291,7 +338,7 @@ impl AndroidBitmap {
         let pixelsize = match self.info.format as u32 {
             ANDROID_BITMAP_FORMAT_RGBA_8888 => 4,
             ANDROID_BITMAP_FORMAT_A_8 => 1,
-            x => fail!("bitmap format {} not implemented!", x),
+            x => panic!("bitmap format {} not implemented!", x),
         };
         let pixelvec = raw::Slice { data: self.pixels as *const u8, len: (self.info.width * self.info.height * pixelsize) as uint };
         mem::transmute(pixelvec)
@@ -357,7 +404,8 @@ unsafe extern "C" fn jni_replay_advance_frame(env: *mut JNIEnv, thiz: jobject, d
     let mut matrix: Matrix = mem::uninitialized();
     ((**env).GetFloatArrayRegion)(env, java_matrix, 0, 16, matrix.as_mut_ptr());
     let done = replay.advance_frame(&mut data.glinit, &mut data.events);
-    data.glinit.draw_queued_points(&mut replay.consumer, &mut data.events, &matrix);
+    let callback = data.jni_undo_callback.create_closure(env);
+    data.glinit.draw_queued_points(&mut replay.consumer, &mut data.events, &matrix, &callback);
     if done { JNI_TRUE as jboolean } else { JNI_FALSE as jboolean }
 }
 
@@ -387,6 +435,10 @@ pub unsafe extern "C" fn JNI_OnLoad(vm: *mut JavaVM, reserved: *mut c_void) -> j
     SCALA_LEFT = CaseClass::new(env, cstr!("scala/util/Left"), cstr!("(Ljava/lang/Object;)V"));
     SCALA_RIGHT = CaseClass::new(env, cstr!("scala/util/Right"), cstr!("(Ljava/lang/Object;)V"));
     BOXED_JINT = CaseClass::new(env, cstr!("java/lang/Integer"), cstr!("(I)V"));
+
+    let undo_callback_class = ((**env).FindClass)(env, cstr!("com/github/wartman4404/gldraw/UndoCallback"));
+    JNI_UNDO_CALLBACK_METHOD = ((**env).GetMethodID)(env, undo_callback_class, cstr!("undoBufferChanged"), cstr!("(I)V"));
+    JNI_UNDO_CALLBACK_CLASS = ((**env).NewGlobalRef)(env, undo_callback_class);
 
     let mainmethods = [
         native_method!("nativeAppendMotionEvent", "(ILandroid/view/MotionEvent;)V", native_append_motion_event),
@@ -440,7 +492,7 @@ pub unsafe extern "C" fn JNI_OnLoad(vm: *mut JavaVM, reserved: *mut c_void) -> j
     logi!("registered lua methods!");
 
     let glinitstaticmethods = [
-        native_method!("initGL", "(II)I", init_gl),
+        native_method!("initGL", "(IILcom/github/wartman4404/gldraw/UndoCallback;)I", init_gl),
         native_method!("destroy", "(I)V", finish_gl),
     ];
     register_classmethods(env, cstr!("com/github/wartman4404/gldraw/GLInit$"), glinitstaticmethods);
@@ -475,4 +527,5 @@ pub unsafe extern "C" fn JNI_OnUnload(vm: *mut JavaVM, reserved: *mut c_void) {
     SCALA_LEFT.destroy(env);
     SCALA_RIGHT.destroy(env);
     BOXED_JINT.destroy(env);
+    ((**env).DeleteGlobalRef)(env, JNI_UNDO_CALLBACK_CLASS);
 }
