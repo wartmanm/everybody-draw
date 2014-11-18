@@ -4,7 +4,8 @@ import android.os.Message
 
 class CopyShader private (private val nativePtr: Int) extends AnyVal
 class PointShader private (private val nativePtr: Int) extends AnyVal
-class Texture private (private val nativePtr: Int) extends AnyVal
+class Texture private (val ptr: TexturePtr, val bitmap: Bitmap)
+class TexturePtr private (private val nativePtr: Int) extends AnyVal
 class LuaScript private (private val nativePtr: Int) extends AnyVal
 class MotionEventHandler private (private val nativePtr: Int) extends AnyVal
 class MotionEventProducer private (private val nativePtr: Int) extends AnyVal
@@ -50,11 +51,11 @@ object PointShader extends Shader[PointShader] {
 }
 
 object Texture {
-  @native def init(data: GLInit, image: Bitmap): GLResult[Int];
+  @native def init(data: GLInit, image: Bitmap): GLResult[TexturePtr];
   def apply(data: GLInit, image: Bitmap): GLResult[Texture] = {
     init(data, image) match {
       case Left(x) => Left(x)
-      case Right(x) => Right(new Texture(x))
+      case Right(x) => Right(new Texture(x, image))
     }
   }
 }

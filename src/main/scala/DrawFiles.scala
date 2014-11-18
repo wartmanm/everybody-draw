@@ -46,7 +46,10 @@ object DrawFiles {
     val out: (ManagedResource[InputStream])=>GLResult[T] = (m: ManagedResource[InputStream]) => {
       m.map(reader).opt match {
         case Some(x) => x
-        case None => Left("Failed to load file")
+        case None => {
+          new Exception("failed to load file").printStackTrace()
+          Left("Failed to load file")
+        }
       }
     }
     out
@@ -87,13 +90,9 @@ object DrawFiles {
     (default.toSeq ++ shaders).toArray
   }
 
-  def loadBrushes(c: Context): Array[(String, (GLInit)=>GLResult[(Bitmap, Texture)])] = {
-    val decoder: ((GLInit, InputStream)=>GLResult[(Bitmap, Texture)]) = (data: GLInit, is: InputStream) => {
-      (decodeBitmap(Bitmap.Config.ALPHA_8)(is).right.flatMap(bitmap => {
-        Texture(data, bitmap).right.map((bitmap, _))
-      }))
-    }
-    loadShader[(Bitmap, Texture)](c, decoder, "brushes", null, None)
+  def loadBrushes(c: Context): Array[(String, (GLInit)=>GLResult[Texture])] = {
+    val decoder: ((GLInit, InputStream)=>GLResult[Texture]) = (data: GLInit, is: InputStream) => (decodeBitmap(Bitmap.Config.ALPHA_8)(is).right.flatMap(Texture(data, _)))
+    loadShader[Texture](c, decoder, "brushes", null, None)
   }
 
   // TODO: make these safe
