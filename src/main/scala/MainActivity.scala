@@ -25,6 +25,8 @@ import unibrush.{UniBrush, Layer}
 
 import resource._
 
+import com.larswerkman.holocolorpicker.{ColorPicker, ScaleBar}
+
 import scala.concurrent.ExecutionContext
 import scala.concurrent.Future
 import java.util.concurrent.Executors
@@ -60,6 +62,10 @@ class MainActivity extends Activity with TypedActivity with AndroidImplicits {
   lazy val sidebarAdapter = new SidebarAdapter()
   lazy val undoButton = findView(TR.undo_button)
   lazy val redoButton = findView(TR.redo_button)
+  lazy val clearButton = findView(TR.clear_button)
+  lazy val loadButton = findView(TR.load_button)
+  lazy val saveButton = findView(TR.save_button)
+  lazy val colorPicker = findView(TR.brush_colorpicker_main)
 
   var textureThread: Option[TextureSurfaceThread] = None
 
@@ -159,6 +165,24 @@ class MainActivity extends Activity with TypedActivity with AndroidImplicits {
     undoButton.setOnClickListener(() => moveUndo(-1))
     redoButton.setOnClickListener(() => moveUndo(1))
 
+    saveButton.setOnClickListener(saveFile _)
+    loadButton.setOnClickListener(loadFile _)
+    clearButton.setOnClickListener(() => textureThread.foreach(_.clearScreen()))
+
+    colorPicker.addSVBar(findView(TR.brush_colorpicker_svbar))
+    val scaleBar = findView(TR.brush_colorpicker_scalebar)
+    colorPicker.addScaleBar(scaleBar)
+    colorPicker.setShowOldCenterColor(false)
+    colorPicker.setOnColorChangedListener(new ColorPicker.OnColorChangedListener() {
+      override def onColorChanged(color: Int) = {
+        textureThread.foreach(t => t.withGL(gl => t.setBrushColor(gl, color)))
+      }
+    })
+    scaleBar.setOnScaleChangedListener(new ScaleBar.OnScaleChangedListener() {
+      override def onScaleChanged(size: Float) = {
+        textureThread.foreach(t => t.withGL(gl => t.setBrushSize(gl, size)))
+      }
+    })
 
     drawerParent.setDrawerListener(drawerToggle)
     getActionBar().setDisplayHomeAsUpEnabled(true)
@@ -374,7 +398,7 @@ class MainActivity extends Activity with TypedActivity with AndroidImplicits {
     MainActivity.this.runOnUiThread(() => {
       // TODO: make hardcoded shaders accessible a better way
       val interpLoader = loadInterpolatorSynchronized(thread, producer)
-      populatePicker(controls.brushpicker, brushes,  thread.setBrushTexture _, thread)
+      populatePicker(controls.brushpicker, brushes, loadBrush(thread), thread)
       populatePicker(controls.animpicker, anims,  thread.setAnimShader _, thread)
       populatePicker(controls.paintpicker, paints,  thread.setPointShader _, thread)
       populatePicker(controls.interppicker, interpscripts,  interpLoader, thread)
@@ -388,6 +412,13 @@ class MainActivity extends Activity with TypedActivity with AndroidImplicits {
   def loadUniBrushControls(unibrush: UniBrush) = {
     runOnUiThread(() => {
       sidebarAdapter.updateUnibrush(unibrush)
+    })
+  }
+
+  def loadBrush(thread: TextureSurfaceThread) = (gl: GLInit, bmtx: (Bitmap, Texture)) => {
+    thread.setBrushTexture(gl, bmtx._2)
+    runOnUiThread(() => {
+      colorPicker.setNewCenterBitmap(bmtx._1)
     })
   }
 
@@ -412,7 +443,7 @@ class MainActivity extends Activity with TypedActivity with AndroidImplicits {
     //Log.i("main", s"copypicker is enabled: ${controls.copypicker.enabled}")
     Log.i("unibrush", "loading unibrushes and old values...")
     Log.i("unibrush", "loading brush")
-    val brush = unibrush.brush.orElse(getSelectedValue(controls.brushpicker))
+    val brush = unibrush.brush.orElse(getSelectedValue(controls.brushpicker).map(_._2))
     Log.i("unibrush", "loading anim")
     val anim = unibrush.baseanimshader.orElse(getSelectedValue(controls.animpicker))
     Log.i("unibrush", "loading point")

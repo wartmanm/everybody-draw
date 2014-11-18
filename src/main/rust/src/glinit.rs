@@ -136,6 +136,8 @@ pub struct PaintState<'a> {
     pub interpolator: Option<&'a LuaScript>,
     pub layers: Vec<PaintLayer<'a>>,
     pub undo_targets: UndoTargets,
+    pub brush_color: [f32, ..3],
+    pub brush_size: f32,
 }
 
 impl<'a> PaintState<'a> {
@@ -148,6 +150,8 @@ impl<'a> PaintState<'a> {
             interpolator: None,
             layers: Vec::new(),
             undo_targets: UndoTargets::new(),
+            brush_color: [1f32, 1f32, 0f32],
+            brush_size: 1f32,
         }
     }
 }
@@ -165,11 +169,11 @@ fn perform_copy(dest_framebuffer: GLuint, source_texture: &Texture, shader: &Cop
     check_gl_error("drew elements");
 }
 
-fn draw_layer(layer: CompletedLayer, matrix: &[f32], color: [f32, ..3]
+fn draw_layer(layer: CompletedLayer, matrix: &[f32], color: [f32, ..3], size: f32
               , brush: &Texture, back_buffer: &Texture, points: &[ShaderPaintPoint]) {
     if points.len() > 0 {
         gl2::bind_framebuffer(gl2::FRAMEBUFFER, layer.target.framebuffer);
-        layer.pointshader.prep(matrix.as_slice(), points, color, brush, back_buffer);
+        layer.pointshader.prep(matrix.as_slice(), points, color, size, brush, back_buffer);
         gl2::draw_arrays(gl2::POINTS, 0, points.len() as i32);
         check_gl_error("draw_arrays");
     }
@@ -263,6 +267,16 @@ impl<'a> GLInit<'a> {
 
     pub fn set_brush_texture(&mut self, texture: &'a Texture) {
         self.paintstate.brush = Some(texture);
+    }
+
+    pub fn set_brush_size(&mut self, size: f32) {
+        self.paintstate.brush_size = size;
+    }
+
+    pub fn set_brush_color(&mut self, color: i32) {
+        self.paintstate.brush_color[0] = (((color & 0x00ff0000) >> 16) as f32) / 255f32;
+        self.paintstate.brush_color[1] = (((color & 0x0000ff00) >> 8) as f32) / 255f32;
+        self.paintstate.brush_color[2] = (((color & 0x000000ff) >> 0) as f32) / 255f32;
     }
 
     pub fn add_layer(&mut self, layer: PaintLayer<'a>) -> () {
@@ -369,18 +383,19 @@ impl<'a> GLInit<'a> {
                 let back_buffer = &source.texture;
                 let drawvecs = self.points.as_mut_slice();
                 let matrix = matrix.as_slice();
-                let color = [1f32, 1f32, 0f32]; // TODO: brush color selection
+                let color = self.paintstate.brush_color;
+                let size = self.paintstate.brush_size;
                 let baselayer = CompletedLayer {
                     copyshader: copy_shader,
                     pointshader: point_shader,
                     target: target,
                 };
-                draw_layer(baselayer, matrix, color, brush, back_buffer, drawvecs[0].as_slice());
+                draw_layer(baselayer, matrix, color, size, brush, back_buffer, drawvecs[0].as_slice());
 
                 for layer in self.paintstate.layers.iter() {
                     let completed = layer.complete(copy_shader, point_shader);
                     let points = drawvecs[layer.pointidx as uint].as_slice();
-                    draw_layer(completed, matrix, color, brush, back_buffer, points);
+                    draw_layer(completed, matrix, color, size, brush, back_buffer, points);
                 }
 
                 for drawvec in drawvecs.iter_mut() {

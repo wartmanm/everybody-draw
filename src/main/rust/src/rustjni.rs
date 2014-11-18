@@ -7,7 +7,7 @@ use libc::{c_void, c_char};
 use collections::string::String;
 use collections::vec::Vec;
 
-use jni::{jobject, jclass, jfieldID, jmethodID, JNIEnv, jint, jstring, jboolean, jfloatArray, JNINativeMethod, JavaVM};
+use jni::{jobject, jclass, jfieldID, jmethodID, JNIEnv, jint, jfloat, jstring, jboolean, jfloatArray, JNINativeMethod, JavaVM};
 use android::input::AInputEvent;
 use android::bitmap::{AndroidBitmap_getInfo, AndroidBitmap_lockPixels, AndroidBitmap_unlockPixels, AndroidBitmapInfo};
 use android::bitmap::{ANDROID_BITMAP_FORMAT_RGBA_8888, ANDROID_BITMAP_FORMAT_A_8};
@@ -418,6 +418,14 @@ unsafe extern "C" fn jni_load_undo(_: *mut JNIEnv, _: jobject, data: jint, idx: 
     data.glinit.load_undo_frame(idx);
 }
 
+unsafe extern "C" fn jni_set_brush_color(_: *mut JNIEnv, _: jobject, data: jint, color: jint) {
+    get_safe_data(data).glinit.set_brush_color(color);
+}
+
+unsafe extern "C" fn jni_set_brush_size(_: *mut JNIEnv, _: jobject, data: jint, size: jfloat) {
+    get_safe_data(data).glinit.set_brush_size(size);
+}
+
 unsafe fn register_classmethods(env: *mut JNIEnv, classname: *const i8, methods: &[JNINativeMethod]) {
     let class = ((**env).FindClass)(env, classname);
     ((**env).RegisterNatives)(env, class, methods.as_ptr(), methods.len() as i32);
@@ -461,6 +469,8 @@ pub unsafe extern "C" fn JNI_OnLoad(vm: *mut JavaVM, reserved: *mut c_void) -> j
         native_method!("nativeAddLayer", "(IIII)V", jni_add_layer),
         native_method!("nativeClearLayers", "(I)V", jni_clear_layers),
         native_method!("nativeLoadUndo", "(II)V", jni_load_undo),
+        native_method!("nativeSetBrushColor", "(II)V", jni_set_brush_color),
+        native_method!("nativeSetBrushSize", "(IF)V", jni_set_brush_size),
     ];
     register_classmethods(env, cstr!("com/github/wartman4404/gldraw/TextureSurfaceThread"), texturemethods);
     logi!("registered texture thread methods!");
