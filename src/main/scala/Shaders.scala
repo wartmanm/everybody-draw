@@ -96,3 +96,5 @@ object MotionEventHandlerPair {
   @native def init(): MotionEventHandlerPair
   @native def destroy(m: MotionEventHandlerPair): Unit
 }
+
+//case class BrushProperties(color: Int, size: Float)

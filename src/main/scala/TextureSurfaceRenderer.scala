@@ -36,6 +36,9 @@ extends Thread with Handler.Callback with AndroidImplicits {
   @native protected def nativeAddLayer(data: GLInit, copyshader: CopyShader, pointshader: PointShader, pointidx: Int): Unit
   @native protected def nativeClearLayers(data: GLInit): Unit
   @native protected def nativeLoadUndo(data: GLInit, pos: Int): Unit
+  //@native protected def nativeSetBrushProperties(props: BrushProperties): Unit
+  @native protected def nativeSetBrushColor(data: GLInit, color: Int): Unit
+  @native protected def nativeSetBrushSize(data: GLInit, size: Float): Unit
 
   override def run() = {
     Looper.prepare()
@@ -214,6 +217,8 @@ extends Thread with Handler.Callback with AndroidImplicits {
   def setPointShader(gl: GLInit, shader: PointShader) = nativeSetPointShader(gl, shader)
   def setInterpScript(gl: GLInit, script: LuaScript) = nativeSetInterpolator(gl, script)
   def setCopyShader(gl: GLInit, shader: CopyShader) = nativeSetCopyShader(gl, shader)
+  def setBrushColor(gl: GLInit, color: Int) = nativeSetBrushColor(gl, color)
+  def setBrushSize(gl: GLInit, size: Float) = nativeSetBrushSize(gl, size)
 
   def withGL(cb: (GLInit) => Unit) = {
     for (gl <- glinit) { runHere {

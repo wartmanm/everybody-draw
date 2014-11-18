@@ -5,6 +5,7 @@ import android.content.Context
 import android.view.View
 import android.widget.{AdapterView, Adapter, GridView, ListAdapter}
 import android.util.Log
+import android.graphics.Bitmap
 
 import java.io.{InputStream, OutputStream, OutputStreamWriter, BufferedWriter}
 
@@ -15,7 +16,7 @@ import PaintControls._
 import GLResultTypeDef._
 
 class PaintControls
-  (val animpicker: UP[CopyShader], val brushpicker: UP[Texture], val paintpicker: UP[PointShader], val interppicker: UP[LuaScript], val unipicker: UP[UniBrush], val copypicker: UUP[CopyShader], val sidebar: FIP) 
+  (val animpicker: UP[CopyShader], val brushpicker: UP[(Bitmap, Texture)], val paintpicker: UP[PointShader], val interppicker: UP[LuaScript], val unipicker: UP[UniBrush], val copypicker: UUP[CopyShader], val sidebar: FIP) 
 extends AutoProductFormat {
 
   val namedPickers = Map(
@@ -60,7 +61,7 @@ object PaintControls extends AndroidImplicits {
   (animpicker: LAV, brushpicker: LAV, paintpicker: LAV, interppicker: LAV, unipicker: LAV, sidebar: LAV) = {
     new PaintControls (
       new UnnamedPicker[CopyShader](animpicker),
-      new UnnamedPicker[Texture](brushpicker),
+      new UnnamedPicker[(Bitmap, Texture)](brushpicker),
       new UnnamedPicker[PointShader](paintpicker),
       new UnnamedPicker[LuaScript](interppicker),
       new UnnamedPicker[UniBrush](unipicker),

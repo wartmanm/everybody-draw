@@ -102,6 +102,45 @@
                 android:text=">" />
         </LinearLayout>
 
+        <com.larswerkman.holocolorpicker.ColorPicker
+            android:id="@+id/brush_colorpicker_main"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_below="@id/undo_redo_layout" />
+
+        <com.larswerkman.holocolorpicker.SVBar
+            android:id="@+id/brush_colorpicker_svbar"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_below="@id/brush_colorpicker_main" />
+
+        <com.larswerkman.holocolorpicker.ScaleBar
+            android:id="@+id/brush_colorpicker_scalebar"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_below="@id/brush_colorpicker_svbar" />
+
+        <Button
+            android:id="@+id/load_button"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_alignParentBottom="true"
+            android:text="Load" />
+
+        <Button
+            android:id="@+id/save_button"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_above="@id/load_button"
+            android:text="Save" />
+
+        <Button
+            android:id="@+id/clear_button"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_above="@id/save_button"
+            android:layout_marginBottom="15dp"
+            android:text="Clear" />
     </RelativeLayout>
 
 </android.support.v4.widget.DrawerLayout>
