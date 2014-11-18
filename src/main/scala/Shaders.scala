@@ -50,10 +50,19 @@ object PointShader extends Shader[PointShader] {
   }
 }
 
-object Texture {
-  @native def init(data: GLInit, image: Bitmap): GLResult[TexturePtr];
-  def apply(data: GLInit, image: Bitmap): GLResult[Texture] = {
+object TexturePtr {
+  @native def init(data: GLInit, image: Bitmap): GLResult[Int]
+  def apply(data: GLInit, image: Bitmap): GLResult[TexturePtr] = {
     init(data, image) match {
+      case Left(x) => Left(x)
+      case Right(x) => Right(new TexturePtr(x))
+    }
+  }
+}
+
+object Texture {
+  def apply(data: GLInit, image: Bitmap): GLResult[Texture] = {
+    TexturePtr(data, image) match {
       case Left(x) => Left(x)
       case Right(x) => Right(new Texture(x, image))
     }
