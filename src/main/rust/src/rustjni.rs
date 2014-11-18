@@ -486,7 +486,7 @@ pub unsafe extern "C" fn JNI_OnLoad(vm: *mut JavaVM, reserved: *mut c_void) -> j
     ];
     register_classmethods(env, cstr!("com/github/wartman4404/gldraw/PointShader$"), pointshaderstaticmethods);
     register_classmethods(env, cstr!("com/github/wartman4404/gldraw/CopyShader$"), copyshaderstaticmethods);
-    register_classmethods(env, cstr!("com/github/wartman4404/gldraw/Texture$"), texturestaticmethods);
+    register_classmethods(env, cstr!("com/github/wartman4404/gldraw/TexturePtr$"), texturestaticmethods);
     logi!("registered point|copy|texture static methods!");
 
     let eglhelpermethods = [
