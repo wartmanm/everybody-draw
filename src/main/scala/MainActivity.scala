@@ -415,10 +415,10 @@ class MainActivity extends Activity with TypedActivity with AndroidImplicits {
     })
   }
 
-  def loadBrush(thread: TextureSurfaceThread) = (gl: GLInit, bmtx: (Bitmap, Texture)) => {
-    thread.setBrushTexture(gl, bmtx._2)
+  def loadBrush(thread: TextureSurfaceThread) = (gl: GLInit, bmtx: Texture) => {
+    thread.setBrushTexture(gl, bmtx)
     runOnUiThread(() => {
-      colorPicker.setNewCenterBitmap(bmtx._1)
+      colorPicker.setNewCenterBitmap(bmtx.bitmap)
     })
   }
 
@@ -443,7 +443,7 @@ class MainActivity extends Activity with TypedActivity with AndroidImplicits {
     //Log.i("main", s"copypicker is enabled: ${controls.copypicker.enabled}")
     Log.i("unibrush", "loading unibrushes and old values...")
     Log.i("unibrush", "loading brush")
-    val brush = unibrush.brush.orElse(getSelectedValue(controls.brushpicker).map(_._2))
+    val brush = unibrush.brush.orElse(getSelectedValue(controls.brushpicker))
     Log.i("unibrush", "loading anim")
     val anim = unibrush.baseanimshader.orElse(getSelectedValue(controls.animpicker))
     Log.i("unibrush", "loading point")

@@ -30,7 +30,7 @@ extends Thread with Handler.Callback with AndroidImplicits {
   @native protected def nativeSetAnimShader(data: GLInit, shader: CopyShader): Boolean
   @native protected def nativeSetCopyShader(data: GLInit, shader: CopyShader): Boolean
   @native protected def nativeSetPointShader(data: GLInit, shader: PointShader): Boolean
-  @native protected def nativeSetBrushTexture(data: GLInit, t: Texture): Unit
+  @native protected def nativeSetBrushTexture(data: GLInit, t: TexturePtr): Unit
   @native protected def exportPixels(data: GLInit): Bitmap
   @native protected def nativeSetInterpolator(data: GLInit, script: LuaScript): Unit
   @native protected def nativeAddLayer(data: GLInit, copyshader: CopyShader, pointshader: PointShader, pointidx: Int): Unit
@@ -195,7 +195,7 @@ extends Thread with Handler.Callback with AndroidImplicits {
 
   def setBrushTexture(gl: GLInit, texture: Texture) {
     Log.i("tst", s"setting brush texture to ${texture}")
-    nativeSetBrushTexture(gl, texture)
+    nativeSetBrushTexture(gl, texture.ptr)
   }
 
   def beginReplay() {
