@@ -46,10 +46,7 @@ object DrawFiles {
     val out: (ManagedResource[InputStream])=>GLResult[T] = (m: ManagedResource[InputStream]) => {
       m.map(reader).opt match {
         case Some(x) => x
-        case None => {
-          new Exception("failed to load file").printStackTrace()
-          Left("Failed to load file")
-        }
+        case None => throw new GLException("failed to load file")
       }
     }
     out
@@ -72,18 +69,18 @@ object DrawFiles {
     options.inPreferredConfig = config
     options.inScaled = false
     Option(BitmapFactory.decodeStream(stream, null, options)) match {
-      case None => Left("unable to load bitmap!")
+      case None => throw new GLException("unable to load bitmap!")
       case Some(bitmap) => {
         Log.i("drawfiles", "bitmap: config %s, w: %d, h: %d, alpha: %b".format(
           bitmap.getConfig(), bitmap.getHeight(), bitmap.getWidth(), bitmap.hasAlpha()))
-        Right(bitmap)
+        bitmap
       }
     }
   }
 
   def loadShader[T](c: Context, constructor: (GLInit, InputStream)=>GLResult[T], 
       folder: String, defaultName: String, defaultObj: Option[(GLInit)=>T]): Array[(String, (GLInit)=>GLResult[T])] = {
-        val default: Option[(String, (GLInit)=>GLResult[T])] = defaultObj.map(x => (defaultName, (data: GLInit) => Right(x(data))))
+        val default: Option[(String, (GLInit)=>GLResult[T])] = defaultObj.map(x => (defaultName, (data: GLInit) => x(data)))
     val filenamed = withFilename[T](constructor)
     val files = allfiles[T](c, folder)
     val shaders: Seq[(String, (GLInit)=>GLResult[T])] = files.map(filenamed)
@@ -91,24 +88,24 @@ object DrawFiles {
   }
 
   def loadBrushes(c: Context): Array[(String, (GLInit)=>GLResult[Texture])] = {
-    val decoder: ((GLInit, InputStream)=>GLResult[Texture]) = (data: GLInit, is: InputStream) => (decodeBitmap(Bitmap.Config.ALPHA_8)(is).right.flatMap(Texture(data, _)))
+    val decoder: ((GLInit, InputStream)=>GLResult[Texture]) = (data: GLInit, is: InputStream) => Texture(data, decodeBitmap(Bitmap.Config.ALPHA_8)(is))
     loadShader[Texture](c, decoder, "brushes", null, None)
   }
 
   // TODO: make these safe
   def loadPointShaders(c: Context): Seq[(String, (GLInit)=>GLResult[PointShader])] = {
     val constructor = readShader(PointShader.apply _) _
-    loadShader[PointShader](c, constructor, "pointshaders", "Default Paint", Some((data: GLInit) => PointShader(data, null, null).right.get))
+    loadShader[PointShader](c, constructor, "pointshaders", "Default Paint", Some((data: GLInit) => PointShader(data, null, null)))
   }
 
   def loadAnimShaders(c: Context): Seq[(String, (GLInit)=>GLResult[CopyShader])] = {
     val constructor = readShader(CopyShader.apply _) _
-    loadShader(c, constructor, "animshaders", "Default Animation", Some((data: GLInit) => CopyShader(data, null, null).right.get))
+    loadShader(c, constructor, "animshaders", "Default Animation", Some((data: GLInit) => CopyShader(data, null, null)))
   }
 
   def loadScripts(c: Context): Seq[(String, (GLInit)=>GLResult[LuaScript])] = {
     val constructor = (data: GLInit, is: InputStream) => LuaScript(data, readStream(is))
-    loadShader(c, constructor, "interpolators", "Default Interpolator", Some((data: GLInit) => LuaScript(data, null).right.get))
+    loadShader(c, constructor, "interpolators", "Default Interpolator", Some((data: GLInit) => LuaScript(data, null)))
   }
 
   def loadUniBrushes(c: Context): Seq[(String, (GLInit)=>GLResult[UniBrush])] = {
@@ -126,7 +123,7 @@ object DrawFiles {
   def readShader[T](constructor: (GLInit, String, String)=>GLResult[T])(data: GLInit, src: InputStream): GLResult[T] = {
     halfShaderPair(readStream(src)) match {
       case Some((vec, frag)) => constructor(data, vec, frag)
-      case None => Left("unable to load file")
+      case None => throw new GLException("unable to load file")
     }
   }
 

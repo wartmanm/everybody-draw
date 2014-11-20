@@ -62,7 +62,7 @@ extends Thread with Handler.Callback with AndroidImplicits {
             }
           } catch {
             case e: LuaException => {
-              nativeSetInterpolator(gl, LuaScript(gl, null).right.get)
+              nativeSetInterpolator(gl, LuaScript(gl, null))
               errorCallback(e)
             }
           }
@@ -164,7 +164,7 @@ extends Thread with Handler.Callback with AndroidImplicits {
 
   // private
   private def initOutputShader(g: GLInit) = {
-    pOutputShader = CopyShader(g, null, null).right.toOption
+    pOutputShader = Some(CopyShader(g, null, null))
     pOutputShader.map((x) => {
         nativeSetCopyShader(g, x)
       })

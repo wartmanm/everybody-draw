@@ -88,12 +88,12 @@ object PaintControls extends AndroidImplicits {
 
   trait GLControl[T] {
     var enabled: Boolean = true
-    def currentValue(gl: GLInit): GLResult[T]
+    def currentValue(gl: GLInit): GLStoredResult[T]
   }
 
   class UnnamedPicker[T](override val control: AdapterView[ListAdapter]) extends SavedControl with GLControl[T] with SelectedListener with AutoProductFormat {
     type U = AdapterView[LazyPicker[T]]
-    override def currentValue(gl: GLInit) = {
+    override def currentValue(gl: GLInit): GLStoredResult[T] = {
       Log.i("picker", s"getting value at idx ${selected}: '${adapter.lazified(selected)._1}'")
       adapter.getState(selected, gl)
     }
@@ -136,8 +136,9 @@ object PaintControls extends AndroidImplicits {
   class UnnamedUnpicker[T](var value: Option[T] = None) extends SavedControl with GLControl[T] with AutoProductFormat {
     override def save() = enabled.toJson
     override def load(j: JsValue) = enabled = j.convertTo[Boolean]
-    override def currentValue(gl: GLInit) = {
+    override def currentValue(gl: GLInit): GLStoredResult[T] = {
       Log.i("picker", "getting unpicker value")
+      value.getOrElse(throw new GLException("No value present?"))
       value match {
         case None => Left("No value present?")
         case Some(x) => Right(x)
