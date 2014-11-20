@@ -473,13 +473,13 @@ pub unsafe extern "C" fn JNI_OnLoad(vm: *mut JavaVM, reserved: *mut c_void) -> j
     logi!("registered texture thread methods!");
 
     let pointshaderstaticmethods = [
-        native_method!("compile", "(ILjava/lang/String;Ljava/lang/String;)Lscala/util/Either;", compile_pointshader),
+        native_method!("compile", "(ILjava/lang/String;Ljava/lang/String;)I", compile_pointshader),
     ];
     let copyshaderstaticmethods = [
-        native_method!("compile", "(ILjava/lang/String;Ljava/lang/String;)Lscala/util/Either;", compile_copyshader),
+        native_method!("compile", "(ILjava/lang/String;Ljava/lang/String;)I", compile_copyshader),
     ];
     let texturestaticmethods = [
-        native_method!("init", "(ILandroid/graphics/Bitmap;)Lscala/util/Either;", create_texture),
+        native_method!("init", "(ILandroid/graphics/Bitmap;)I", create_texture),
     ];
     register_classmethods(env, cstr!("com/github/wartman4404/gldraw/PointShader$"), pointshaderstaticmethods);
     register_classmethods(env, cstr!("com/github/wartman4404/gldraw/CopyShader$"), copyshaderstaticmethods);
@@ -494,7 +494,7 @@ pub unsafe extern "C" fn JNI_OnLoad(vm: *mut JavaVM, reserved: *mut c_void) -> j
     logi!("registered egl methods!");
 
     let luastaticmethods = [
-        native_method!("init", "(ILjava/lang/String;)Lscala/util/Either;", jni_lua_compile_script),
+        native_method!("init", "(ILjava/lang/String;)I", jni_lua_compile_script),
     ];
     register_classmethods(env, cstr!("com/github/wartman4404/gldraw/LuaScript$"), luastaticmethods);
     logi!("registered lua methods!");
