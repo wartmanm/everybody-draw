@@ -8,7 +8,6 @@ import android.view._
 import android.graphics.{SurfaceTexture, Bitmap}
 import android.content.{Context, Intent}
 import android.content.res.Configuration
-import android.opengl.GLException
 
 import java.io.{BufferedInputStream}
 import java.io.{OutputStream, FileOutputStream, BufferedOutputStream}
@@ -317,12 +316,12 @@ class MainActivity extends Activity with TypedActivity with AndroidImplicits {
     Log.i("main", "loading from file")
     try {
       for (input <- managed(new BufferedInputStream(MainActivity.this.openFileInput("screen")))) {
-        savedBitmap = DrawFiles.decodeBitmap(Bitmap.Config.ARGB_8888)(input).right.toOption
+        savedBitmap = Some(DrawFiles.decodeBitmap(Bitmap.Config.ARGB_8888)(input))
         val input2 = MainActivity.this.openFileInput("status")
         controls.load(input2)
       }
     } catch {
-      case e: IOException => { 
+      case e @ (_: IOException | _: GLException) => { 
         Log.i("main", "loading from file failed: %s".format(e))
       }
     }
@@ -425,25 +424,32 @@ class MainActivity extends Activity with TypedActivity with AndroidImplicits {
   def loadUniBrush(thread: TextureSurfaceThread, producer: MotionEventProducer) =
   (gl: GLInit, unibrush: UniBrush) => {
     Log.i("main", "loading unibrush")
-    def getSelectedValue[T](picker: GLControl[T]) = {
+    def getSelectedValue[T](picker: GLControl[T]): Option[T] = {
       // return None if the control is already active, or we're trying to restore a missing value
       // TODO: the missing-value part is probably busted
-      if (picker.enabled) None
-      else picker.currentValue(gl) match {
-        case Left(msg) => {
-          runOnUiThread(() => {
-            Toast.makeText(MainActivity.this, "unable to load old control!" + msg, Toast.LENGTH_LONG).show()
-          })
-          Log.i("main", s"unable to load old control: ${msg}")
-          None
+      if (picker.enabled) {
+        None
+      } else {
+        val tmp: GLStoredResult[T] = picker.currentValue(gl)
+        tmp match {
+          case Left(msg) => {
+            runOnUiThread(() => {
+              Toast.makeText(MainActivity.this, "unable to load old control!" + msg, Toast.LENGTH_LONG).show()
+            })
+            Log.i("main", s"unable to load old control: ${msg}")
+            None
+          }
+          case Right(value) => {
+            val tmp: T = value
+            Some(tmp)
+          }
         }
-        case Right(value) => Some(value)
       }
     }
     //Log.i("main", s"copypicker is enabled: ${controls.copypicker.enabled}")
     Log.i("unibrush", "loading unibrushes and old values...")
     Log.i("unibrush", "loading brush")
-    val brush = unibrush.brush.orElse(getSelectedValue(controls.brushpicker))
+    val brush: Option[Texture] = unibrush.brush.orElse(getSelectedValue(controls.brushpicker))
     Log.i("unibrush", "loading anim")
     val anim = unibrush.baseanimshader.orElse(getSelectedValue(controls.animpicker))
     Log.i("unibrush", "loading point")
@@ -507,7 +513,13 @@ class MainActivity extends Activity with TypedActivity with AndroidImplicits {
       Log.i("main", s"got activity result: ${data}")
       if (resultCode == Activity.RESULT_OK) {
         val path = FileUtils.getPath(this, data.getData())
-        val bitmap = DrawFiles.withFileStream(new File(path)).map(DrawFiles.decodeBitmap(Bitmap.Config.ARGB_8888) _).opt.map(x => x.right.toOption).flatten
+        val bitmap = (try {
+          val tmp: Option[Bitmap] = DrawFiles.withFileStream(new File(path))
+          .acquireAndGet(fs => Some(DrawFiles.decodeBitmap(Bitmap.Config.ARGB_8888)(fs)))
+          tmp
+        } catch {
+          case e: Exception => None
+        })
         Log.i("main", s"got bitmap ${bitmap}")
         for (b <- bitmap; thread <- textureThread) {
           Log.i("main", "drawing bitmap...")

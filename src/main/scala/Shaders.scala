@@ -21,7 +21,9 @@ trait UndoCallback {
   def undoBufferChanged(newSize: Int): Unit
 }
 object GLResultTypeDef {
-  type GLResult[T] = Either[String, T]
+  type GLResult[T] = T
+  type GLStoredResult[T] = Either[String, T]
+  class GLException(msg: String) extends Exception(msg)
 }
 
 import GLResultTypeDef._
@@ -33,49 +35,34 @@ trait Shader[T] {
 object CopyShader extends Shader[CopyShader] {
   @native def compile(data: GLInit, vec: String, frag: String): GLResult[Int]
   def apply(data: GLInit, vec: String, frag: String): GLResult[CopyShader] = {
-    compile(data, vec, frag) match {
-      case Left(x) => Left(x)
-      case Right(x) => Right(new CopyShader(x))
-    }
+    new CopyShader(compile(data, vec, frag))
   }
 }
 
 object PointShader extends Shader[PointShader] {
   @native def compile(data: GLInit, vec: String, frag: String): GLResult[Int]
   def apply(data: GLInit, vec: String, frag: String): GLResult[PointShader] = {
-    compile(data, vec, frag) match {
-      case Left(x) => Left(x)
-      case Right(x) => Right(new PointShader(x))
-    }
+    new PointShader(compile(data, vec, frag))
   }
 }
 
 object TexturePtr {
   @native def init(data: GLInit, image: Bitmap): GLResult[Int]
   def apply(data: GLInit, image: Bitmap): GLResult[TexturePtr] = {
-    init(data, image) match {
-      case Left(x) => Left(x)
-      case Right(x) => Right(new TexturePtr(x))
-    }
+    new TexturePtr(init(data, image))
   }
 }
 
 object Texture {
   def apply(data: GLInit, image: Bitmap): GLResult[Texture] = {
-    TexturePtr(data, image) match {
-      case Left(x) => Left(x)
-      case Right(x) => Right(new Texture(x, image))
-    }
+    new Texture(TexturePtr(data, image), image)
   }
 }
 
 object LuaScript {
   @native def init(data: GLInit, script: String): GLResult[Int]
   def apply(data: GLInit, script: String): GLResult[LuaScript] = {
-    init(data, script) match {
-      case Left(x) => Left(x)
-      case Right(x) => Right(new LuaScript(x))
-    }
+    new LuaScript(init(data, script))
   }
 }
 
