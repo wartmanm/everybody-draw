@@ -44,10 +44,7 @@ object DrawFiles {
 
   def useInputStream[T](reader: (InputStream)=>GLResult[T]) = {
     val out: (ManagedResource[InputStream])=>GLResult[T] = (m: ManagedResource[InputStream]) => {
-      m.map(reader).opt match {
-        case Some(x) => x
-        case None => throw new GLException("failed to load file")
-      }
+      m.acquireAndGet(stream => reader(stream))
     }
     out
   }
