@@ -17,8 +17,8 @@ void main() {
     time = vTime;
     float tmpSize = vSize * 1500.0 * vSizeFactor;
     size = clamp(tmpSize, 7.5, 60.0);
-    color = vec3(1.0, 1.0, 0.0);
-    gl_PointSize = 30.0;
+    color = vColor;
+    gl_PointSize = size;
     gl_Position = (textureMatrix * vPosition);
     position = vec2(textureMatrix * vPosition);
 }

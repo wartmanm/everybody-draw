@@ -70,7 +70,7 @@ impl Shader for PointShader {
 
 impl PointShader {
 
-    pub fn prep(&self, matrix: &[f32], points: &[ShaderPaintPoint], color: [f32, ..3], size: f32, brush: &Texture, backbuffer: &Texture) {
+    pub fn prep(&self, matrix: &[f32], points: &[ShaderPaintPoint], color: [f32, ..3], brushsize: f32, brush: &Texture, backbuffer: &Texture) {
         gl2::use_program(self.program);
         check_gl_error("pointshader: use_program");
 
@@ -110,11 +110,11 @@ impl PointShader {
         let (w, h) = backbuffer.dimensions;
         gl2::uniform_2f(self.texture_size_handle, w as f32, h as f32);
 
-        unsafe { gl2::glUniform3fv(self.color_handle, 3, color.as_ptr() as *mut f32); }
-
-        gl2::uniform_1f(self.size_factor_handle, size);
-
+        unsafe { gl2::glUniform3fv(self.color_handle, 1, color.as_ptr() as *mut f32); }
         check_gl_error("uniform3fv");
+
+        gl2::uniform_1f(self.size_factor_handle, brushsize);
+        check_gl_error("uniform1f");
     }
 
 }
