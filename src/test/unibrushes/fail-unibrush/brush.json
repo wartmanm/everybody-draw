@@ -1,0 +1,16 @@
+{
+  "interpolator": "neko.lua", 
+  "brushpath": "xneko.png", 
+  "pointshaders": [
+    {
+      "vertexshader": "neko.vsh", 
+      "fragmentshader": "neko.fsh"
+    }
+  ],
+  "layers": [
+    {
+      "pointsrc": 1,
+      "pointshader": 0
+    }
+  ]
+}
