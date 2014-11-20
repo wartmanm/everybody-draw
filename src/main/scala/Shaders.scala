@@ -20,11 +20,13 @@ class GLInit private (private val nativePtr: Int) extends AnyVal {
 trait UndoCallback {
   def undoBufferChanged(newSize: Int): Unit
 }
+class GLException(msg: String) extends Exception(msg)
 object GLResultTypeDef {
   type GLResult[T] = T
   type GLStoredResult[T] = Either[String, T]
-  class GLException(msg: String) extends Exception(msg)
+  type GLException = com.github.wartman4404.gldraw.GLException
 }
+
 
 import GLResultTypeDef._
 
