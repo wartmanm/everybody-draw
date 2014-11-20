@@ -116,6 +116,9 @@ object General {
         -keepclassmembers class com.github.wartman4404.gldraw.LuaException {
           <init>(java.lang.String);
         }
+        -keepclassmembers class com.github.wartman4404.gldraw.GLException {
+          <init>(java.lang.String);
+        }
         -keepclassmembers class com.github.wartman4404.gldraw.MainActivity$MainUndoListener {
           void undoBufferChanged(int);
         }
