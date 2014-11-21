@@ -1,0 +1,184 @@
+#include <pthread.h>
+#include <sys/select.h>
+#include <unistd.h>
+#include <sys/types.h>
+#include <sys/stat.h>
+#include <fcntl.h>
+#include <string.h>
+#include <stdlib.h>
+#include <stdio.h>
+
+#include <android/log.h>
+struct readpipes {
+  int pipe_stdout;
+  int pipe_stderr;
+  int pipe_done;
+};
+
+struct selectstream {
+  int fd;
+  FILE* stream;
+  int loglevel;
+}
+
+struct stdout_forwarder {
+  pthread_t threadid;
+  int stdout_pipes[2];
+  int stderr_pipes[2];
+  int done_pipes[2];
+  struct readpipes* thread_pipes;
+}
+
+static int pipe_or_err(int fds[], int newfd) {
+  int pipes[2];
+  if (0 != pipe(pipes)) {
+    return -1;
+  }
+  int dupedfd = dup2(pipes[1], newfd);
+  if (-1 == dupedfd) {
+    close(pipes[0]);
+    close(pipes[1]);
+    return -1;
+  }
+  if (-1 == close(pipes[1])) {
+    close(pipes[0]);
+    close(dupedfd);
+    return -1;
+  }
+  fds[0] = pipes[0];
+  fds[1] = dupedfd;
+  return 0;
+}
+
+static int selectstream_create(struct selectstream* s, int fd, char* name) {
+  FILE* stream = fdopen(fd, "r");
+  if (stream == NULL) {
+    return -1;
+  }
+  (*s) = (struct selectstream) {
+    .fd = fd,
+    .stream = stream,
+    .name = name,
+  };
+  return 0;
+}
+
+static int selectstream_copyline(struct selectstream* s, char* buffer) {
+  if (NULL == fgets(buffer, size, s -> stream)) {
+    return -1;
+  }
+  __android_log_write(s -> loglevel, "glinit", buffer);
+  return 0;
+}
+
+static void* perform_read(void* args) {
+  struct readpipes* readpipe = (struct readpipes*) args;
+  fd_set readfds;
+  FD_ZERO(&readfds);
+  struct selectstream streams[2];
+  if (selectstream_create(&streams[0], readpipe -> pipe_stdout, "stdout") == -1) {
+    goto done;
+  }
+  if (selectstream_create(&streams[1], readpipe -> pipe_stderr, "stderr") == -1) {
+    goto cleanup_pstdout;
+  }
+  int fds[3] = (int[3]) readpipes;
+  int max = 0;
+  for (int i = 0; i < sizeof fds / sizeof fds[0]; i++) {
+    max = max > fds[i] ? max : fds[i];
+  }
+  while (1) {
+    FD_ZERO(&readfds);
+    for (int i = 0; i < sizeof fds / sizeof fds[0]; i++) {
+      FD_SET(fds[i], &readfds);
+    }
+    char buffer[4096];
+    int selected = select(max, &readfds, NULL, NULL, NULL);
+    if (selected == -1) {
+      goto cleanup_pstderr;
+    }
+    for (int i = 0; selected > 0 && i < sizeof streams / sizeof streams[0]; i++) {
+      struct selectstream* stream = &streams[i];
+      if (FD_ISSET(stream -> fd, &readfds)) {
+        selected -= 1;
+        if (selectstream_copyline(stream, buffer, sizeof buffer, true_stdout)) {
+          goto cleanup_pstderr;
+        }
+      }
+    }
+    if (selected > 0) { // only the "done" pipe is left, this must be it
+      break;
+    }
+  }
+cleanup_pstderr:
+  fclose(streams[1].stream);
+cleanup_pstdout:
+  fclose(streams[0].stream);
+done:
+  fprintf(true_stdout, "finished thread cleanup\n");
+  return NULL;
+}
+
+int begin_forwarding(struct stdout_forwarder* f) {
+  pthread_attr_t logthread_attrs;
+  pthread_attr_init(&logthread_attrs);
+
+  // The fgetpos() calls matter.  No idea why.
+  fpos_t pos;
+  fflush(stdout);
+  fgetpos(stdout, &pos);
+  fflush(stderr);
+  fgetpos(stderr, &pos);
+  if (pipe_or_err(&f -> stdout_pipes, STDOUT_FILENO) == -1) {
+    goto abort_done;
+    return -1;
+  }
+  if (pipe_or_err(&f -> stderr_pipes, STDOUT_FILENO) == -1) {
+    goto abort_stdout_pipes;
+  }
+  if (-1 == pipe(f -> done_pipes)) {
+    goto abort_stderr_pipes;
+  }
+  struct readpipes* thread_pipes = malloc(sizeof (struct readpipes));
+  thread_pipes -> pipe_stdout = f -> stdout_pipes[0];
+  thread_pipes -> pipe_stderr = f -> stderr_pipes[0];
+  thread_pipes -> pipe_done = f -> done_pipes[0];
+  f -> thread_pipes = thread_pipes;
+
+  if (pthread_create(&f->threadid, &logthread_attrs, perform_read, thread_pipes) != 0) {
+    goto abort_thread_pipes;
+  }
+  pthread_attr_destroy(&logthread_attrs);
+  return 0;
+
+abort_thread_pipes:
+  free(readpipes);
+  close(f -> done_pipes[0]);
+  close(f -> done_pipes[1]);
+abort_stderr_pipes:
+  close(f -> stderr_pipes[0]);
+  close(f -> stderr_pipes[1]);
+abort_stdout_pipes:
+  close(f -> stdout_pipes[0]);
+  close(f -> stdout_pipes[1]);
+done:
+  return -1;
+}
+
+int end_forwarding(struct stdout_forwarder* f) {
+  write(f->done_pipes[1], ".", 1);
+  pthread_join(f->threadid, result);
+  free(thread_pipes);
+  free(readpipes);
+  close(f -> done_pipes[0]);
+  close(f -> done_pipes[1]);
+
+  close(f -> stderr_pipes[0]);
+  close(f -> stderr_pipes[1]);
+
+  close(f -> stdout_pipes[0]);
+  close(f -> stdout_pipes[1]);
+}
+
+
+
