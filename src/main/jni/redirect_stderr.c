@@ -43,7 +43,7 @@ static int pipe_or_err(int fds[2], int newfd) {
   return 0;
 }
 
-static int selectstream_create(struct selectstream* s, int fd) {
+static int selectstream_create(struct selectstream* s, int fd, int level) {
   FILE* stream = fdopen(fd, "r");
   if (stream == NULL) {
     return -1;
@@ -51,6 +51,7 @@ static int selectstream_create(struct selectstream* s, int fd) {
   (*s) = (struct selectstream) {
     .fd = fd,
     .stream = stream,
+    .loglevel = level,
   };
   return 0;
 }
@@ -69,11 +70,11 @@ static void* perform_read(void* args) {
   fd_set readfds;
   FD_ZERO(&readfds);
   struct selectstream streams[2];
-  if (selectstream_create(&streams[0], readpipe -> pipe_stdout) == -1) {
+  if (selectstream_create(&streams[0], readpipe -> pipe_stdout, ANDROID_LOG_INFO) == -1) {
     LOGERR();
     goto done;
   }
-  if (selectstream_create(&streams[1], readpipe -> pipe_stderr) == -1) {
+  if (selectstream_create(&streams[1], readpipe -> pipe_stderr, ANDROID_LOG_ERROR) == -1) {
     LOGERR();
     goto cleanup_pstdout;
   }
