@@ -7,23 +7,33 @@
 #include <string.h>
 #include <stdlib.h>
 #include <stdio.h>
+#include <errno.h>
 
 #include <android/log.h>
 
 #include "redirect_stderr.h"
 
+#define LOGI(...) ((void)__android_log_print(ANDROID_LOG_INFO, "redirector", __VA_ARGS__))
+#define LOGERR() __android_log_print(ANDROID_LOG_ERROR, "redirector", "error in %s at %s:%d :: %s", __func__, __FILE__, __LINE__, strerror(errno))
+/*static void logi(char* msg) {*/
+  /*__android_log_write(ANDROID_LOG_INFO, "redirector", msg);*/
+/*}*/
+
 static int pipe_or_err(int fds[2], int newfd) {
   int pipes[2];
   if (0 != pipe(pipes)) {
+    LOGERR();
     return -1;
   }
   int dupedfd = dup2(pipes[1], newfd);
   if (-1 == dupedfd) {
+    LOGERR();
     close(pipes[0]);
     close(pipes[1]);
     return -1;
   }
   if (-1 == close(pipes[1])) {
+    LOGERR();
     close(pipes[0]);
     close(dupedfd);
     return -1;
@@ -54,14 +64,17 @@ static int selectstream_copyline(struct selectstream* s, char* buffer, int size)
 }
 
 static void* perform_read(void* args) {
+  LOGI("in listener thread");
   struct readpipes* readpipe = (struct readpipes*) args;
   fd_set readfds;
   FD_ZERO(&readfds);
   struct selectstream streams[2];
   if (selectstream_create(&streams[0], readpipe -> pipe_stdout) == -1) {
+    LOGERR();
     goto done;
   }
   if (selectstream_create(&streams[1], readpipe -> pipe_stderr) == -1) {
+    LOGERR();
     goto cleanup_pstdout;
   }
   int* fds = (int*) (void*) readpipe;
@@ -75,8 +88,10 @@ static void* perform_read(void* args) {
       FD_SET(fds[i], &readfds);
     }
     char buffer[4096];
+    LOGI("listening");
     int selected = select(max, &readfds, NULL, NULL, NULL);
     if (selected == -1) {
+      LOGERR();
       goto cleanup_pstderr;
     }
     for (unsigned int i = 0; selected > 0 && i < sizeof streams / sizeof streams[0]; i++) {
@@ -97,6 +112,7 @@ cleanup_pstderr:
 cleanup_pstdout:
   fclose(streams[0].stream);
 done:
+  LOGI("ended listener thread");
   return NULL;
 }
 
