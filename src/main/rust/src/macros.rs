@@ -12,6 +12,10 @@ macro_rules! write(
     })
 )
 
+macro_rules! println(
+    ($($arg:tt)*) => (format_args!(::std::io::stdio::println_args, $($arg)*))
+)
+
 macro_rules! panic(
     () => ({
         panic!("explicit panic")

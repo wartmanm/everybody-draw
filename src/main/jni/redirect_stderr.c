@@ -9,27 +9,10 @@
 #include <stdio.h>
 
 #include <android/log.h>
-struct readpipes {
-  int pipe_stdout;
-  int pipe_stderr;
-  int pipe_done;
-};
 
-struct selectstream {
-  int fd;
-  FILE* stream;
-  int loglevel;
-}
+#include "redirect_stderr.h"
 
-struct stdout_forwarder {
-  pthread_t threadid;
-  int stdout_pipes[2];
-  int stderr_pipes[2];
-  int done_pipes[2];
-  struct readpipes* thread_pipes;
-}
-
-static int pipe_or_err(int fds[], int newfd) {
+static int pipe_or_err(int fds[2], int newfd) {
   int pipes[2];
   if (0 != pipe(pipes)) {
     return -1;
@@ -50,7 +33,7 @@ static int pipe_or_err(int fds[], int newfd) {
   return 0;
 }
 
-static int selectstream_create(struct selectstream* s, int fd, char* name) {
+static int selectstream_create(struct selectstream* s, int fd) {
   FILE* stream = fdopen(fd, "r");
   if (stream == NULL) {
     return -1;
@@ -58,12 +41,11 @@ static int selectstream_create(struct selectstream* s, int fd, char* name) {
   (*s) = (struct selectstream) {
     .fd = fd,
     .stream = stream,
-    .name = name,
   };
   return 0;
 }
 
-static int selectstream_copyline(struct selectstream* s, char* buffer) {
+static int selectstream_copyline(struct selectstream* s, char* buffer, int size) {
   if (NULL == fgets(buffer, size, s -> stream)) {
     return -1;
   }
@@ -76,20 +58,20 @@ static void* perform_read(void* args) {
   fd_set readfds;
   FD_ZERO(&readfds);
   struct selectstream streams[2];
-  if (selectstream_create(&streams[0], readpipe -> pipe_stdout, "stdout") == -1) {
+  if (selectstream_create(&streams[0], readpipe -> pipe_stdout) == -1) {
     goto done;
   }
-  if (selectstream_create(&streams[1], readpipe -> pipe_stderr, "stderr") == -1) {
+  if (selectstream_create(&streams[1], readpipe -> pipe_stderr) == -1) {
     goto cleanup_pstdout;
   }
-  int fds[3] = (int[3]) readpipes;
+  int* fds = (int*) (void*) readpipe;
   int max = 0;
-  for (int i = 0; i < sizeof fds / sizeof fds[0]; i++) {
+  for (int i = 0; i < 3; i++) {
     max = max > fds[i] ? max : fds[i];
   }
   while (1) {
     FD_ZERO(&readfds);
-    for (int i = 0; i < sizeof fds / sizeof fds[0]; i++) {
+    for (int i = 0; i < 3; i++) {
       FD_SET(fds[i], &readfds);
     }
     char buffer[4096];
@@ -97,11 +79,11 @@ static void* perform_read(void* args) {
     if (selected == -1) {
       goto cleanup_pstderr;
     }
-    for (int i = 0; selected > 0 && i < sizeof streams / sizeof streams[0]; i++) {
+    for (unsigned int i = 0; selected > 0 && i < sizeof streams / sizeof streams[0]; i++) {
       struct selectstream* stream = &streams[i];
       if (FD_ISSET(stream -> fd, &readfds)) {
         selected -= 1;
-        if (selectstream_copyline(stream, buffer, sizeof buffer, true_stdout)) {
+        if (selectstream_copyline(stream, buffer, sizeof buffer)) {
           goto cleanup_pstderr;
         }
       }
@@ -115,7 +97,6 @@ cleanup_pstderr:
 cleanup_pstdout:
   fclose(streams[0].stream);
 done:
-  fprintf(true_stdout, "finished thread cleanup\n");
   return NULL;
 }
 
@@ -129,11 +110,11 @@ int begin_forwarding(struct stdout_forwarder* f) {
   fgetpos(stdout, &pos);
   fflush(stderr);
   fgetpos(stderr, &pos);
-  if (pipe_or_err(&f -> stdout_pipes, STDOUT_FILENO) == -1) {
+  if (pipe_or_err(f -> stdout_pipes, STDOUT_FILENO) == -1) {
     goto abort_done;
     return -1;
   }
-  if (pipe_or_err(&f -> stderr_pipes, STDOUT_FILENO) == -1) {
+  if (pipe_or_err(f -> stderr_pipes, STDOUT_FILENO) == -1) {
     goto abort_stdout_pipes;
   }
   if (-1 == pipe(f -> done_pipes)) {
@@ -152,7 +133,7 @@ int begin_forwarding(struct stdout_forwarder* f) {
   return 0;
 
 abort_thread_pipes:
-  free(readpipes);
+  free(thread_pipes);
   close(f -> done_pipes[0]);
   close(f -> done_pipes[1]);
 abort_stderr_pipes:
@@ -161,15 +142,16 @@ abort_stderr_pipes:
 abort_stdout_pipes:
   close(f -> stdout_pipes[0]);
   close(f -> stdout_pipes[1]);
-done:
+abort_done:
   return -1;
 }
 
 int end_forwarding(struct stdout_forwarder* f) {
   write(f->done_pipes[1], ".", 1);
+  void *result = NULL;
   pthread_join(f->threadid, result);
-  free(thread_pipes);
-  free(readpipes);
+  free(result);
+  free(f->thread_pipes);
   close(f -> done_pipes[0]);
   close(f -> done_pipes[1]);
 
@@ -178,6 +160,7 @@ int end_forwarding(struct stdout_forwarder* f) {
 
   close(f -> stdout_pipes[0]);
   close(f -> stdout_pipes[1]);
+  return 0;
 }
 
 
