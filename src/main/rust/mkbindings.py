@@ -52,9 +52,11 @@ class Module:
 def flatten(x):
   return list(chain.from_iterable(x))
 
-def run_bindgen(args, outfile):
+def run_bindgen(args, outfile, verbosity):
   allargs = ['bindgen'] + args
   #print('running ' + ' '.join(allargs))
+  if verbosity > 0:
+    sys.stderr.write(' '.join(allargs) + '\n')
   p = subprocess.Popen(allargs, stdout=subprocess.PIPE)
   return p.communicate()[0]
 
@@ -62,7 +64,7 @@ def append_allow_prelude(outfile):
   for lint in prelude_lints:
     outfile.write('#![allow({})]\n'.format(lint))
 
-def gen_bindings(binding):
+def gen_bindings(binding, verbosity):
   dest = joinprefix(binding.path + '.rs')
   if os.path.exists(dest):
     binding.preexisting = True
@@ -82,7 +84,7 @@ def gen_bindings(binding):
     for dep in binding.deps:
       outfile.write('use {}::*;\n'.format(dep))
     args = flatten(includeargs + matches + [[header]])
-    stdout = run_bindgen(args, outfile)
+    stdout = run_bindgen(args, outfile, verbosity)
     if binding.remove_fnptr_opts:
       stdout = re.sub(fnptr_re, '\\1', stdout)
     outfile.write(stdout)
@@ -138,8 +140,10 @@ if __name__ == '__main__':
   parser.add_argument('--prefix', help='prefix for rust source directory', default='.')
   parser.add_argument('source', help='source file for bindings')
   parser.add_argument('mode', choices=['build','clean'], help='generate or delete bindings')
+  parser.add_argument('-v', '--verbose', action='count')
   args = parser.parse_args()
   prefix = args.prefix
+  verbosity = args.verbose
   with open(args.source) as bindingfile:
     bindings = [Binding(**x) for x in json.load(bindingfile)]
 
@@ -147,7 +151,7 @@ if __name__ == '__main__':
     add_include_roots(bindings)
     gen_builtins()
     for binding in bindings:
-      gen_bindings(binding)
+      gen_bindings(binding, verbosity)
     for path, mods in gathermods(bindings).items():
       gen_modfile(path, mods)
 
