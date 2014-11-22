@@ -112,7 +112,8 @@ object UniBrush extends AutoProductFormat {
       case e: DeserializationException => {
         logAbort(s"unable to parse brush.json: ${e}")
       }
-      case e: IOException => logAbort(s"IOException ${e}")
+      case e: IOException => logAbort(s"Error reading unibrush ${e}")
+      case e: GLException => logAbort(s"Error in unibrush files ${e}")
       case e: Exception => logAbort(s"Other exception ${e}")
     }
   }
