@@ -98,7 +98,7 @@ unsafe fn runstring(L: *mut lua_State, s: &str, filename: *const i8, env: Sandbo
             key.push_self(L);
             lua_setfenv(L, -2);
         }
-        let result = lua_pcall(L, 0, MULTRET, 0);
+        let result = lua_pcall(L, 0, 0, 0);
         if 0 != result {
             false
             //Err(format!("script failed to run: {}", err_to_str(L)));
