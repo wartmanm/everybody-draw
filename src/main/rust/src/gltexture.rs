@@ -5,9 +5,11 @@ use core::fmt::Show;
 use opengles::gl2;
 use opengles::gl2::GLuint;
 
-use glcommon::{check_gl_error, GLResult};
+use glcommon::{check_gl_error, GLResult, FillDefaults, Defaults};
 
 use log::logi;
+
+use collections::vec::Vec;
 
 #[deriving(PartialEq, Eq, Hash)]
 pub enum PixelFormat {
@@ -23,6 +25,11 @@ pub trait ToPixelFormat {
 pub struct Texture {
     pub texture: GLuint,
     pub dimensions: (i32, i32),
+}
+
+pub struct BrushTexture {
+    pub texture: Texture,
+    pub source: (PixelFormat, (i32, i32), Vec<u8>),
 }
 
 impl Texture {
@@ -62,5 +69,11 @@ impl Drop for Texture {
 impl Show for Texture {
     fn fmt(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
         write!(formatter, "texture 0x{:x}, dimensions {}", self.texture, self.dimensions)
+    }
+}
+
+impl FillDefaults<(PixelFormat, (i32, i32), Vec<u8>), (PixelFormat, (i32, i32), Vec<u8>), BrushTexture> for BrushTexture {
+    fn fill_defaults(init: (PixelFormat, (i32, i32), Vec<u8>)) -> Defaults<(PixelFormat, (i32, i32), Vec<u8>), BrushTexture> {
+        Defaults { val: init }
     }
 }

@@ -100,7 +100,15 @@ pub fn get_uniform_handle_option(program: GLuint, name: &str) -> Option<GLint> {
 }
 
 pub trait Shader {
-    fn new(vertopt: Option<&str>, fragopt: Option<&str>) -> GLResult<Self>;
+    fn new(vertopt: String, fragopt: String) -> GLResult<Self>;
+}
+
+pub struct Defaults<Init, Base> {
+    pub val: Init
+}
+
+pub trait FillDefaults<T, Init, Base> {
+    fn fill_defaults(T) -> Defaults<Init, Base>;
 }
 
 macro_rules! glattrib_f32 (

@@ -2,6 +2,7 @@ use core::prelude::*;
 use core::{mem, fmt};
 use core::fmt::Show;
 use collections::str::StrAllocating;
+use collections::string::String;
 
 use log::{logi};
 
@@ -9,7 +10,7 @@ use opengles::gl2;
 use opengles::gl2::{GLint, GLuint};
 
 use glcommon;
-use glcommon::{check_gl_error, get_shader_handle, get_uniform_handle_option, Shader, GLResult};
+use glcommon::{check_gl_error, get_shader_handle, get_uniform_handle_option, Shader, GLResult, FillDefaults, Defaults};
 use point::ShaderPaintPoint;
 use gltexture::Texture;
 
@@ -34,9 +35,7 @@ pub struct PointShader {
 }
 
 impl Shader for PointShader {
-    fn new(vertopt: Option<String>, fragopt: Option<String>) -> GLResult<PointShader> {
-        let vert = vertopt.unwrap_or_else(|| { logi("point shader: using default vertex shader"); DEFAULT_VERTEX_SHADER.to_string()});
-        let frag = fragopt.unwrap_or_else(|| { logi("point shader: using default fragment shader"); DEFAULT_FRAGMENT_SHADER.to_string()});
+    fn new(vert: String, frag: String) -> GLResult<PointShader> {
         let program = try!(glcommon::create_program(vert.as_slice(), frag.as_slice()));
 
         let position_option = get_shader_handle(program, "vPosition"); 
@@ -131,6 +130,16 @@ impl Drop for PointShader {
 impl Show for PointShader {
     fn fmt(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
         write!(formatter, "point shader 0x{:x}", self.program)
+    }
+}
+
+
+impl FillDefaults<(Option<String>, Option<String>), (String, String), PointShader> for PointShader {
+    fn fill_defaults(init: (Option<String>, Option<String>)) -> Defaults<(String, String), PointShader> {
+        let (vertopt, fragopt) = init;
+        let vert = vertopt.unwrap_or_else(|| { logi("point shader: using default vertex shader"); DEFAULT_VERTEX_SHADER.into_string()});
+        let frag = fragopt.unwrap_or_else(|| { logi("point shader: using default fragment shader"); DEFAULT_FRAGMENT_SHADER.into_string()});
+        Defaults { val: (vert, frag) }
     }
 }
 

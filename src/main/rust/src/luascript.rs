@@ -2,9 +2,10 @@ use core::prelude::*;
 use core::fmt;
 use core::fmt::Show;
 use log::logi;
-use glcommon::GLResult;
+use glcommon::{GLResult, FillDefaults, Defaults};
 use lua_geom::{load_lua_script, destroy_lua_script, push_lua_script};
-use collections::str::{MaybeOwned, IntoMaybeOwned};
+use collections::str::{MaybeOwned, IntoMaybeOwned, StrAllocating};
+use collections::string::String;
 
 static DEFAULT_SCRIPT: &'static str = include_str!("../includes/lua/default_interpolator.lua");
 
@@ -15,12 +16,11 @@ pub struct LuaScript {
 }
 
 impl LuaScript {
-    pub fn new(script: Option<String>) -> GLResult<LuaScript> {
+    pub fn new(source: String) -> GLResult<LuaScript> {
         //let (ptr, len) = script.map_or((ptr::null(), 0), |x| (x.as_bytes().as_ptr(), x.as_bytes().len()));
         //let source = script.map(|x| x.into_maybe_owned())
-        let source = script.unwrap_or_else(|| DEFAULT_SCRIPT.to_string());
-        let registry_id = unsafe { try!(load_lua_script(script.as_slice())) };
-        let script = LuaScript { registry_id: registry_id, source: script };
+        let registry_id = unsafe { try!(load_lua_script(source.as_slice())) };
+        let script = LuaScript { registry_id: registry_id, source: source };
         logi!("created {}", script);
         Ok(script)
     }
@@ -47,3 +47,10 @@ impl Show for LuaScript {
         write!(formatter, "lua script 0x{:x}", self.registry_id)
     }
 }
+
+impl FillDefaults<Option<String>, String, LuaScript> for LuaScript {
+    fn fill_defaults(init: Option<String>) -> Defaults<String, LuaScript> {
+        Defaults { val: init.unwrap_or_else(|| DEFAULT_SCRIPT.into_string()) }
+    }
+}
+

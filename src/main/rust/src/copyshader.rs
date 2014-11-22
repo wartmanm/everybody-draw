@@ -2,6 +2,7 @@ use core::prelude::*;
 use core::{mem, fmt};
 use core::fmt::Show;
 use collections::str::StrAllocating;
+use collections::string::String;
 
 use opengles::gl2;
 use opengles::gl2::{GLint, GLuint, GLfloat};
@@ -9,7 +10,7 @@ use opengles::gl2::{GLint, GLuint, GLfloat};
 use log::logi;
 
 use glcommon;
-use glcommon::{check_gl_error, get_shader_handle, get_uniform_handle_option, Shader, GLResult};
+use glcommon::{check_gl_error, get_shader_handle, get_uniform_handle_option, Shader, GLResult, FillDefaults, Defaults};
 use gltexture::{Texture};
     
 static TRIANGLE_VERTICES: [GLfloat, ..8] = [
@@ -35,13 +36,11 @@ pub struct CopyShader {
     texture_handle: GLint,
     matrix_handle: GLint,
     texture_size_handle: Option<GLint>,
-    source: (String, String),
+    pub source: (String, String),
 }
 
 impl Shader for CopyShader {
-    fn new(vertopt: Option<String>, fragopt: Option<String>) -> GLResult<CopyShader> {
-        let vert = vertopt.unwrap_or_else(|| { logi("copy shader: using default vertex shader"); DEFAULT_VERTEX_SHADER.to_string()});
-        let frag = fragopt.unwrap_or_else(|| { logi("copy shader: using default fragment shader"); DEFAULT_FRAGMENT_SHADER.to_string()});
+    fn new(vert: String, frag: String) -> GLResult<CopyShader> {
         let program = try!(glcommon::create_program(vert.as_slice(), frag.as_slice()));
 
         let position_option = get_shader_handle(program, "vPosition");
@@ -58,6 +57,7 @@ impl Shader for CopyShader {
                     texture_handle: texture,
                     matrix_handle: matrix,
                     texture_size_handle: texturesize_option,
+                    source: (vert, frag),
                 };
                 logi!("created {}", shader);
                 Ok(shader)
@@ -100,5 +100,14 @@ impl Drop for CopyShader {
 impl Show for CopyShader {
     fn fmt(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
         write!(formatter, "copy shader 0x{:x}", self.program)
+    }
+}
+
+impl FillDefaults<(Option<String>, Option<String>), (String, String), CopyShader> for CopyShader {
+    fn fill_defaults(init: (Option<String>, Option<String>)) -> Defaults<(String, String), CopyShader> {
+        let (vertopt, fragopt) = init;
+        let vert = vertopt.unwrap_or_else(|| { logi("point shader: using default vertex shader"); DEFAULT_VERTEX_SHADER.into_string()});
+        let frag = fragopt.unwrap_or_else(|| { logi("point shader: using default fragment shader"); DEFAULT_FRAGMENT_SHADER.into_string()});
+        Defaults { val: (vert, frag) }
     }
 }

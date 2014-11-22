@@ -26,7 +26,7 @@ use jni_constants::*;
 use drawevent::Events;
 use drawevent::event_stream::EventStream;
 use gltexture::ToPixelFormat;
-use gltexture::Texture;
+use gltexture::{Texture, BrushTexture};
 use redirect_stderr;
 use redirect_stderr::Struct_stdout_forwarder;
 
@@ -236,10 +236,10 @@ unsafe extern "C" fn set_point_shader(_: *mut JNIEnv, _: jobject, data: jint, sh
 unsafe extern "C" fn set_brush_texture(_: *mut JNIEnv, _: jobject, data: jint, texture: jint) {
     let data = get_safe_data(data);
     let brush = data.events.use_brush(mem::transmute(texture));
-    data.glinit.set_brush_texture(brush);
+    data.glinit.set_brush_texture(&brush.texture);
 }
 
-unsafe fn safe_create_texture(env: *mut JNIEnv, data: jint, bitmap: jobject) -> GLResult<DrawObjectIndex<Texture>> {
+unsafe fn safe_create_texture(env: *mut JNIEnv, data: jint, bitmap: jobject) -> GLResult<DrawObjectIndex<BrushTexture>> {
     let bitmap = AndroidBitmap::from_jobject(env, bitmap);
     let (w, h) = (bitmap.info.width, bitmap.info.height);
     let format: AndroidBitmapFormat = mem::transmute(bitmap.info.format);
