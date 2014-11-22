@@ -43,7 +43,7 @@ static int pipe_or_err(int fds[2], int newfd) {
   return 0;
 }
 
-static int selectstream_create(struct selectstream* s, int fd, int level) {
+int selectstream_create(struct selectstream* s, int fd, int level) {
   FILE* stream = fdopen(fd, "r");
   if (stream == NULL) {
     return -1;
@@ -52,19 +52,31 @@ static int selectstream_create(struct selectstream* s, int fd, int level) {
     .fd = fd,
     .stream = stream,
     .loglevel = level,
+    .errcount = 0,
   };
   return 0;
 }
 
-static int selectstream_copyline(struct selectstream* s, char* buffer, int size) {
+int selectstream_copyline(struct selectstream* s, char* buffer, int size) {
   if (NULL == fgets(buffer, size, s -> stream)) {
-    return -1;
+    if (errno) {
+      LOGI("failed to read line from stdout: %s", strerror(errno));
+      if (s -> errcount++ < 100) {
+        errno = 0;
+        return 0;
+      } else {
+        LOGI("too many errors, aborting!");
+        return -1;
+      }
+    }
+  } else {
+    s -> errcount = 0;
+    __android_log_write(s -> loglevel, "redirect_log", buffer);
   }
-  __android_log_write(s -> loglevel, "redirect_log", buffer);
   return 0;
 }
 
-static void* perform_read(void* args) {
+void* perform_read(void* args) {
   LOGI("in listener thread");
   struct readpipes* readpipe = (struct readpipes*) args;
   fd_set readfds;
@@ -89,7 +101,7 @@ static void* perform_read(void* args) {
       FD_SET(fds[i], &readfds);
     }
     char buffer[4096];
-    LOGI("listening");
+    /*LOGI("listening");*/
     int selected = select(max, &readfds, NULL, NULL, NULL);
     if (selected == -1) {
       LOGERR();

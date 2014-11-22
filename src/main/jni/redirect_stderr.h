@@ -11,6 +11,7 @@ struct selectstream {
   int fd;
   FILE* stream;
   int loglevel;
+  int errcount;
 };
 
 struct stdout_forwarder {
