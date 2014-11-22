@@ -35,13 +35,14 @@ pub struct CopyShader {
     texture_handle: GLint,
     matrix_handle: GLint,
     texture_size_handle: Option<GLint>,
+    source: (String, String),
 }
 
 impl Shader for CopyShader {
-    fn new(vertopt: Option<&str>, fragopt: Option<&str>) -> GLResult<CopyShader> {
-        let vert = vertopt.unwrap_or_else(|| { logi("copy shader: using default vertex shader"); DEFAULT_VERTEX_SHADER});
-        let frag = fragopt.unwrap_or_else(|| { logi("copy shader: using default fragment shader"); DEFAULT_FRAGMENT_SHADER});
-        let program = try!(glcommon::create_program(vert, frag));
+    fn new(vertopt: Option<String>, fragopt: Option<String>) -> GLResult<CopyShader> {
+        let vert = vertopt.unwrap_or_else(|| { logi("copy shader: using default vertex shader"); DEFAULT_VERTEX_SHADER.to_string()});
+        let frag = fragopt.unwrap_or_else(|| { logi("copy shader: using default fragment shader"); DEFAULT_FRAGMENT_SHADER.to_string()});
+        let program = try!(glcommon::create_program(vert.as_slice(), frag.as_slice()));
 
         let position_option = get_shader_handle(program, "vPosition");
         let tex_coord_option = get_shader_handle(program, "vTexCoord");

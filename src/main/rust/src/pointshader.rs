@@ -30,13 +30,14 @@ pub struct PointShader {
     distance_handle: Option<GLuint>,
     back_buffer_handle: Option<GLint>,
     texture_size_handle: GLint,
+    pub source: (String, String),
 }
 
 impl Shader for PointShader {
-    fn new(vertopt: Option<&str>, fragopt: Option<&str>) -> GLResult<PointShader> {
-        let vert = vertopt.unwrap_or_else(|| { logi("point shader: using default vertex shader"); DEFAULT_VERTEX_SHADER});
-        let frag = fragopt.unwrap_or_else(|| { logi("point shader: using default fragment shader"); DEFAULT_FRAGMENT_SHADER});
-        let program = try!(glcommon::create_program(vert, frag));
+    fn new(vertopt: Option<String>, fragopt: Option<String>) -> GLResult<PointShader> {
+        let vert = vertopt.unwrap_or_else(|| { logi("point shader: using default vertex shader"); DEFAULT_VERTEX_SHADER.to_string()});
+        let frag = fragopt.unwrap_or_else(|| { logi("point shader: using default fragment shader"); DEFAULT_FRAGMENT_SHADER.to_string()});
+        let program = try!(glcommon::create_program(vert.as_slice(), frag.as_slice()));
 
         let position_option = get_shader_handle(program, "vPosition"); 
         let matrix_option = gl2::get_uniform_location(program, "textureMatrix");
@@ -56,6 +57,7 @@ impl Shader for PointShader {
                     distance_handle: get_shader_handle(program, "vDistance"),
                     back_buffer_handle: get_uniform_handle_option(program, "backbuffer"),
                     texture_size_handle: gl2::get_uniform_location(program, "texturesize"),
+                    source: (vert, frag),
                 };
                 logi!("created {}", shader);
                 Ok(shader)
