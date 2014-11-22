@@ -419,6 +419,30 @@ unsafe extern "C" fn jni_set_brush_size(_: *mut JNIEnv, _: jobject, data: jint, 
     get_safe_data(data).glinit.set_brush_size(size);
 }
 
+unsafe fn get_shader_source_tuple(env: *mut JNIEnv, source: &(MString, MString)) -> jobject {
+    let &(ref vert, ref frag) = source;
+    let tuple2 = ((**env).FindClass)(env, cstr!("scala/Tuple2"));
+    let tuple2_init = ((**env).GetMethodID)(env, tuple2, cstr!("<init>"), cstr!("(Ljava/lang/Object;Ljava/lang/Object)V"));
+    let jvert = str_to_jstring(env, vert.as_slice());
+    let jfrag = str_to_jstring(env, frag.as_slice());
+    ((**env).NewObject)(env, tuple2, tuple2_init, jvert, jfrag)
+}
+
+unsafe extern "C" fn jni_get_copyshader_source(env: *mut JNIEnv, _: jobject, data: jint, copyshader: jint) -> jobject {
+    let source = get_safe_data(data).events.get_copyshader_source(mem::transmute(copyshader));
+    get_shader_source_tuple(env, source)
+}
+
+unsafe extern "C" fn jni_get_pointshader_source(env: *mut JNIEnv, _: jobject, data: jint, pointshader: jint) -> jobject {
+    let source = get_safe_data(data).events.get_pointshader_source(mem::transmute(pointshader));
+    get_shader_source_tuple(env, source)
+}
+
+unsafe extern "C" fn jni_get_luascript_source(env: *mut JNIEnv, _: jobject, data: jint, luascript: jint) -> jstring {
+    let source = get_safe_data(data).events.get_luascript_source(mem::transmute(luascript));
+    str_to_jstring(env, source.as_slice())
+}
+
 unsafe fn register_classmethods(env: *mut JNIEnv, classname: *const i8, methods: &[JNINativeMethod]) {
     let class = ((**env).FindClass)(env, classname);
     ((**env).RegisterNatives)(env, class, methods.as_ptr(), methods.len() as i32);

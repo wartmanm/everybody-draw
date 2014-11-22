@@ -16,6 +16,7 @@ use point::PointEntry;
 use glstore::{DrawObjectIndex, DrawObjectList};
 use glstore::{ShaderInitValues, BrushInitValues, LuaInitValues};
 use glstore::{ShaderUnfilledValues, BrushUnfilledValues, LuaUnfilledValues};
+use glstore::MaybeInitFromCache; // FIXME separate out get_source()
 use gltexture::{BrushTexture, PixelFormat};
 use pointshader::PointShader;
 use copyshader::CopyShader;
@@ -108,6 +109,18 @@ impl<'a> Events<'a> {
 
     pub fn clear_layers(&mut self) {
         self.eventlist.push(ClearLayers);
+    }
+
+    pub fn get_pointshader_source(&mut self, pointshader: DrawObjectIndex<PointShader>) -> &(MString, MString) {
+        self.pointshaders.get_object(pointshader).get_source()
+    }
+
+    pub fn get_copyshader_source(&mut self, copyshader: DrawObjectIndex<CopyShader>) -> &(MString, MString) {
+        self.copyshaders.get_object(copyshader).get_source()
+    }
+
+    pub fn get_luascript_source(&mut self, luascript: DrawObjectIndex<LuaScript>) -> &MString {
+        self.luascripts.get_object(luascript).get_source()
     }
 
     pub fn pushpoint(&mut self, event: PointEntry) {
