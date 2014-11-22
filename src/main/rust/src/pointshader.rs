@@ -1,7 +1,7 @@
 use core::prelude::*;
 use core::{mem, fmt};
 use core::fmt::Show;
-use collections::str::StrAllocating;
+use collections::str::{StrAllocating, IntoMaybeOwned};
 use collections::string::String;
 
 use log::{logi};
@@ -10,7 +10,7 @@ use opengles::gl2;
 use opengles::gl2::{GLint, GLuint};
 
 use glcommon;
-use glcommon::{check_gl_error, get_shader_handle, get_uniform_handle_option, Shader, GLResult, FillDefaults, Defaults};
+use glcommon::{check_gl_error, get_shader_handle, get_uniform_handle_option, Shader, GLResult, FillDefaults, Defaults, MString};
 use point::ShaderPaintPoint;
 use gltexture::Texture;
 
@@ -31,11 +31,11 @@ pub struct PointShader {
     distance_handle: Option<GLuint>,
     back_buffer_handle: Option<GLint>,
     texture_size_handle: GLint,
-    pub source: (String, String),
+    pub source: (MString, MString),
 }
 
 impl Shader for PointShader {
-    fn new(vert: String, frag: String) -> GLResult<PointShader> {
+    fn new(vert: MString, frag: MString) -> GLResult<PointShader> {
         let program = try!(glcommon::create_program(vert.as_slice(), frag.as_slice()));
 
         let position_option = get_shader_handle(program, "vPosition"); 
@@ -134,11 +134,11 @@ impl Show for PointShader {
 }
 
 
-impl FillDefaults<(Option<String>, Option<String>), (String, String), PointShader> for PointShader {
-    fn fill_defaults(init: (Option<String>, Option<String>)) -> Defaults<(String, String), PointShader> {
+impl FillDefaults<(Option<MString>, Option<MString>), (MString, MString), PointShader> for PointShader {
+    fn fill_defaults(init: (Option<MString>, Option<MString>)) -> Defaults<(MString, MString), PointShader> {
         let (vertopt, fragopt) = init;
-        let vert = vertopt.unwrap_or_else(|| { logi("point shader: using default vertex shader"); DEFAULT_VERTEX_SHADER.into_string()});
-        let frag = fragopt.unwrap_or_else(|| { logi("point shader: using default fragment shader"); DEFAULT_FRAGMENT_SHADER.into_string()});
+        let vert = vertopt.unwrap_or_else(|| { logi("point shader: using default vertex shader"); DEFAULT_VERTEX_SHADER.into_maybe_owned()});
+        let frag = fragopt.unwrap_or_else(|| { logi("point shader: using default fragment shader"); DEFAULT_FRAGMENT_SHADER.into_maybe_owned()});
         Defaults { val: (vert, frag) }
     }
 }

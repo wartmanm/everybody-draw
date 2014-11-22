@@ -2,7 +2,7 @@ extern crate opengles;
 use core::prelude::*;
 use core::mem;
 use collections::vec::Vec;
-use collections::str::StrAllocating;
+use collections::str::{StrAllocating, IntoMaybeOwned};
 use collections::string::String;
 
 use log::{logi,loge};
@@ -228,7 +228,7 @@ impl<'a> GLInit<'a> {
         // The only purpose of the shader copy is to flip the image from gl coords to bitmap coords.
         // it might be better to finagle the output copy matrix so the rest of the targets
         // can stay in bitmap coords?  Or have a dedicated target for this.
-        let saveshader = ::glstore::init_from_defaults((None, Some(include_str!("../includes/shaders/noalpha_copy.fsh").into_string()))).unwrap();
+        let saveshader = ::glstore::init_from_defaults((None, Some(include_str!("../includes/shaders/noalpha_copy.fsh").into_maybe_owned()))).unwrap();
         let newtarget = TextureTarget::new(x, y, gltexture::RGB);
         let matrix = [1f32,  0f32,  0f32,  0f32,
                       0f32, -1f32,  0f32,  0f32,

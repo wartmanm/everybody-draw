@@ -5,6 +5,7 @@ use core::raw;
 use alloc::boxed::Box;
 use libc::{c_void, c_char};
 use collections::string::String;
+use collections::str::{MaybeOwned, IntoMaybeOwned};
 use collections::vec::Vec;
 
 use jni::{jobject, jclass, jfieldID, jmethodID, JNIEnv, jint, jfloat, jstring, jboolean, jfloatArray, JNINativeMethod, JavaVM};
@@ -13,7 +14,7 @@ use android::bitmap::{AndroidBitmap_getInfo, AndroidBitmap_lockPixels, AndroidBi
 use android::bitmap::{ANDROID_BITMAP_FORMAT_RGBA_8888, ANDROID_BITMAP_FORMAT_A_8};
 use android::native_window_jni::{ANativeWindow_fromSurface};//, ANativeWindow_release};
 use android::native_window::ANativeWindow_release;
-use glcommon::GLResult;
+use glcommon::{GLResult, MString};
 
 use log::{logi, loge};
 
@@ -257,23 +258,14 @@ unsafe extern "C" fn clear_framebuffer(_: *mut JNIEnv, _: jobject, data: jint) {
     data.glinit.clear_buffer();
 }
 
-unsafe fn get_string(env: *mut JNIEnv, string: jstring) -> Option<String> {
-    match string.as_mut() {
-        Some(string) => {
-            let chars = ((**env).GetStringChars)(env, string, ptr::null_mut()).as_ref();
-            match chars {
-                Some(c) => {
-                    let len = ((**env).GetStringLength)(env, string);
-                    let strslice: &[u16] = mem::transmute(raw::Slice { data: c, len: len as uint });
-                    let ruststr = String::from_utf16(strslice);
-                    ((**env).ReleaseStringChars)(env, string as jstring, strslice.as_ptr());
-                    ruststr
-                },
-                None => None,
-            }
-        },
-        None => None,
-    }
+unsafe fn get_string(env: *mut JNIEnv, string: jstring) -> Option<MString> {
+    let string = try_opt!(string.as_mut());
+    let c = try_opt!(((**env).GetStringChars)(env, string, ptr::null_mut()).as_ref());
+    let len = ((**env).GetStringLength)(env, string);
+    let strslice: &[u16] = mem::transmute(raw::Slice { data: c, len: len as uint });
+    let ruststr = String::from_utf16(strslice);
+    ((**env).ReleaseStringChars)(env, string as jstring, strslice.as_ptr());
+    Some(try_opt!(ruststr).into_maybe_owned())
 }
 
 unsafe extern "C" fn compile_copyshader(env: *mut JNIEnv, _: jobject, data: i32, vec: jstring, frag: jstring) -> jint {

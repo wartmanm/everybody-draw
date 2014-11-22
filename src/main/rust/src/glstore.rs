@@ -22,7 +22,7 @@ use glcommon::Shader;
 use luascript::LuaScript;
 use arena::TypedArena;
 use glcommon::GLResult;
-use glcommon::FillDefaults;
+use glcommon::{FillDefaults, MString};
 
 /// Holds GL objects that can be inited using the given keys.
 /// The list is to avoid having to pass those keys around, and serialize more easily.
@@ -44,15 +44,15 @@ impl<T> DrawObjectIndex<T> {
     }
 }
 
-pub type ShaderInitValues = (String, String);
+pub type ShaderInitValues = (MString, MString);
 pub type BrushInitValues = (PixelFormat, (i32, i32), Vec<u8>);
-pub type LuaInitValues = String;
+pub type LuaInitValues = MString;
 //pub type ShaderKeyValues = &(String, String);
 //pub type BrushKeyValues = (PixelFormat, (i32, i32), Vec<u8>>);
 //pub type LuaKeyValues = &String;
-pub type ShaderUnfilledValues = (Option<String>, Option<String>);
+pub type ShaderUnfilledValues = (Option<MString>, Option<MString>);
 pub type BrushUnfilledValues = BrushInitValues;
-pub type LuaUnfilledValues = Option<String>;
+pub type LuaUnfilledValues = Option<MString>;
 pub type PointShaderIndex = DrawObjectIndex<PointShader>;
 pub type CopyShaderIndex = DrawObjectIndex<CopyShader>;
 pub type BrushIndex = DrawObjectIndex<Texture>;
@@ -69,17 +69,17 @@ pub trait MaybeInitFromCache<Init> {
 // this and the two shader impls were originally a single
 // impl<T: Shader> InitFromCache<ShaderInitValues> for Option<T>
 // but that counts as the impl for all of Option, not just Option<Shader>
-fn _init_copy_shader<T: Shader>(value: (String, String)) -> GLResult<T> {
+fn _init_copy_shader<T: Shader>(value: (MString, MString)) -> GLResult<T> {
     let (vert, frag) = value;
     Shader::new(vert, frag)
 }
 impl MaybeInitFromCache<ShaderInitValues> for CopyShader {
-    fn maybe_init(value: (String, String)) -> GLResult<CopyShader> { _init_copy_shader(value) }
-    fn get_source(&self) -> &(String, String) { &self.source }
+    fn maybe_init(value: (MString, MString)) -> GLResult<CopyShader> { _init_copy_shader(value) }
+    fn get_source(&self) -> &(MString, MString) { &self.source }
 }
 impl MaybeInitFromCache<ShaderInitValues> for PointShader {
-    fn maybe_init(value: (String, String)) -> GLResult<PointShader> { _init_copy_shader(value) }
-    fn get_source(&self) -> &(String, String) { &self.source }
+    fn maybe_init(value: (MString, MString)) -> GLResult<PointShader> { _init_copy_shader(value) }
+    fn get_source(&self) -> &(MString, MString) { &self.source }
 }
 // TODO: use this as the impl for all InitFromCache<Init>
 impl MaybeInitFromCache<BrushInitValues> for BrushTexture {
@@ -106,10 +106,10 @@ impl InitFromCache<BrushInitValues> for BrushTexture {
 }
 
 impl MaybeInitFromCache<LuaInitValues> for LuaScript {
-    fn maybe_init(value: String) -> GLResult<LuaScript> {
+    fn maybe_init(value: MString) -> GLResult<LuaScript> {
         LuaScript::new(value)
     }
-    fn get_source(&self) -> &String { &self.source }
+    fn get_source(&self) -> &MString { &self.source }
 }
 
 impl<'a, Unfilled, T: MaybeInitFromCache<Init> + FillDefaults<Unfilled, Init, T>, Init: Hash+Eq> DrawObjectList<'a, T, Init> {

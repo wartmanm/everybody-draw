@@ -66,6 +66,10 @@ macro_rules! try(
     ($e:expr) => (match $e { Ok(e) => e, Err(e) => return Err(e) })
 )
 
+macro_rules! try_opt(
+    ($e:expr) => (match $e { Some(e) => e, None => return None })
+)
+
 macro_rules! assert(
     ($cond:expr) => (
         if !$cond {

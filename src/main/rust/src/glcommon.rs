@@ -4,9 +4,10 @@ use opengles::gl2;
 use opengles::gl2::{GLuint, GLint};
 use log::{logi, loge};
 use collections::string::String;
-use collections::str::StrAllocating;
+use collections::str::{StrAllocating, MaybeOwned};
 
 pub type GLResult<T> = Result<T, String>;
+pub type MString = MaybeOwned<'static>;
 
 fn get_gl_error_name(error: u32) -> &'static str {
     match error {
@@ -100,7 +101,7 @@ pub fn get_uniform_handle_option(program: GLuint, name: &str) -> Option<GLint> {
 }
 
 pub trait Shader {
-    fn new(vertopt: String, fragopt: String) -> GLResult<Self>;
+    fn new(vertopt: MString, fragopt: MString) -> GLResult<Self>;
 }
 
 pub struct Defaults<Init, Base> {
