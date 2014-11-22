@@ -34,7 +34,7 @@ include $(CLEAR_VARS)
 LOCAL_MODULE    := gl-stuff
 LOCAL_SRC_FILES := hello-jni.c unwind.c lua_geom.c
 
-LOCAL_CFLAGS := -std=c99 -Wall -Wextra -Wno-unused -Werror -g
+LOCAL_CFLAGS := -std=c99 -Wall -Wextra -Wno-unused -Werror -g -fexceptions
 LOCAL_LDFLAGS := -L/opt/android-ndk/android-ndk-r9b/sources/cxx-stl/gnu-libstdc++/4.6/libs/armeabi -z muldefs
 LOCAL_LDLIBS    := -lGLESv2 -ldl -llog -lc -lEGL -landroid -ljnigraphics
 LOCAL_STATIC_LIBRARIES := rustgl luajit

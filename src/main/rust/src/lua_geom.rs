@@ -79,6 +79,20 @@ unsafe fn runstring(L: *mut lua_State, s: &str, filename: *const i8, env: Sandbo
     }
 }
 
+static mut LUA_ORIGINAL_PANICFN: *mut c_void = 0 as *mut c_void;
+//static mut LUA_ORIGINAL_PANICFN: unsafe extern "C" fn (*mut lua_State)->i32 = 0i32 as unsafe extern "C" fn (lua_State)->i32;
+
+#[no_mangle]
+unsafe extern "C" fn panic_wrapper(L: *mut lua_State) -> i32 {
+    loge!("inside lua panic handler!");
+    let errorcstr = lua_tostring(L, -1);
+    let errorstr = if errorcstr.is_null() { "" } else { c_str_to_static_slice(errorcstr) };
+    loge!("error is {}", errorstr);
+    let panicfn: lua_CFunction = mem::transmute(LUA_ORIGINAL_PANICFN);
+    panicfn(L); // should never return
+    panic!("lua panic");
+}
+
 unsafe fn init_lua() -> GLResult<*mut lua_State> {
     GLDRAW_LUA_SANDBOX = &mut GLDRAW_LUA_SANDBOX as *mut *mut c_void as *mut c_void;
     GLDRAW_LUA_STOPFNS = &mut GLDRAW_LUA_STOPFNS as *mut *mut c_void as *mut c_void;
@@ -97,6 +111,8 @@ unsafe fn init_lua() -> GLResult<*mut lua_State> {
         lua_pushlightuserdata(L, GLDRAW_LUA_STOPFNS);
         lua_newtable(L);
         lua_settable(L, LUA_REGISTRYINDEX);
+
+        LUA_ORIGINAL_PANICFN = lua_atpanic(L, panic_wrapper) as *mut c_void;
         Ok(L)
     } else {
         let err = format!("ffi init script failed to load: {}\nThis should never happen!", err_to_str(L));
@@ -250,6 +266,7 @@ pub unsafe fn finish_lua_script<T: LuaCallback>(output: &mut T, script: &::luasc
     logi!("type of stopfn for {} is {}", script, c_str_to_static_slice(lua_typename(L, lua_type(L, -1))));
     // stack is stopfns -- stopfn
     lua_pushlightuserdata(L, output as *mut T as *mut c_void);
+    logi!("calling lua ondone()");
     let result = match lua_pcall(L, 1, 0, 0) {
         0 => Ok(()),
         _ => log_err(format!("ondone() script failed to run: {}", err_to_str(L))),
