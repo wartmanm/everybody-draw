@@ -25,6 +25,7 @@ static mut GLDRAW_LUA_STOPFNS: *mut c_void = 0 as *mut c_void;
 static mut gldraw_lua_key: i32 = 0;
 static LUA_FFI_SCRIPT: &'static str = include_str!("../includes/lua/ffi_loader.lua");
 static LUA_RUNNER: &'static str = include_str!("../includes/lua/lua_runner.lua");
+static LUA_INTERPOLATOR_DEFAULTS: &'static str = include_str!("../includes/lua/init_defaults.lua");
 
 static mut STATIC_LUA: Option<*mut lua_State> = None;
 
@@ -228,6 +229,12 @@ pub unsafe fn load_lua_script(script: &str) -> GLResult<i32> {
 
     create_sandbox(L); {
         let sandbox_idx = IndexValue(lua_gettop(L));
+        if !runstring(L, LUA_INTERPOLATOR_DEFAULTS, cstr!("interpolator defaults"), Sandboxed(sandbox_idx)) {
+            let err = format!("default loader failed to load: {}\nThis should never happen!", err_to_str(L)).into_maybe_owned();
+            lua_pop(L, 1);
+            assert_eq!(stacksize, lua_gettop(L));
+            return log_err(err);
+        }
 
         lua_pushlightuserdata(L, key as *mut c_void); {
 
@@ -241,6 +248,7 @@ pub unsafe fn load_lua_script(script: &str) -> GLResult<i32> {
                 lua_getfield(L, -1, cstr!("main")); {
                     if !lua_isfunction(L, -1) {
                         lua_pop(L, 3);
+                        assert_eq!(stacksize, lua_gettop(L));
                         return log_err("no main function defined :(".into_maybe_owned());
                     }
                     luaJIT_setmode(L, 0, LUAJIT_MODE_ENGINE as i32|LUAJIT_MODE_ON as i32);

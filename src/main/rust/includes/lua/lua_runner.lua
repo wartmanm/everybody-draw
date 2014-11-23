@@ -8,45 +8,16 @@ if type(_main) ~= "function" then
   return
 end
 
-local queue_layer_save = false
-local downcount = 0
-local function default_ondown(pointer, output)
-  downcount = downcount + 1
-  loglua("new pointer, count is " .. downcount)
-end
-local function default_onup(pointer, output)
-  downcount = downcount - 1
-  loglua("lifted pointer, count is " .. downcount)
-  if downcount == 0 then
-    queue_layer_save = true
-  end
-end
-local function default_onframe(x, y, output)
-  if queue_layer_save == true then
-    loglua("saving layers")
-    savelayers(output)
-    saveundo(output)
-    queue_layer_save = false
-  end
-end
-local function default_ondone(output)
-  loglua("in ondone callback")
-  savelayers(output)
-end
-
-callbacks.default_ondone = default_ondone
-callbacks.default_onframe = default_onframe
-callbacks.default_onup = default_onup
-callbacks.default_ondown = default_ondown
-
 if _onup == nil and _ondown == nil and _onframe == nil and _ondone == nil then
   loglua("setting default pointer callbacks")
-  _ondown = default_ondown
-  _onup = default_onup
-  _onframe = default_onframe
-  _ondone = default_ondone
-elseif _ondone == nil then
+  _ondown = callbacks.default_ondown
+  _onup = callbacks.default_onup
+  _onframe = callbacks.default_onframe
+  _ondone = callbacks.default_ondone
+end
+if _ondone == nil then -- script could have set callbacks.default_ondone to nil
   _ondone = function(output) end
+  setfenv(_ondone, callbacks)
 end
 callbacks.ondone = _ondone
 
