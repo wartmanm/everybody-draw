@@ -31,6 +31,7 @@ use gltexture::ToPixelFormat;
 use gltexture::{Texture, BrushTexture};
 use redirect_stderr;
 use redirect_stderr::Struct_stdout_forwarder;
+use rustjni::android_bitmap::{AndroidBitmap};
 
 macro_rules! native_method(
     ($name:expr, $sig:expr, $fn_ptr:expr) => (
@@ -274,73 +275,106 @@ unsafe extern "C" fn compile_pointshader(env: *mut JNIEnv, _: jobject, data: i32
     glresult_or_exception(env, get_safe_data(data).events.load_pointshader(get_string(env, vec), get_string(env, frag)))
 }
 
-unsafe extern "C" fn draw_image(env: *mut JNIEnv, _: jobject, data: i32, bitmap: jobject) {
+pub unsafe extern "C" fn draw_image(env: *mut JNIEnv, _: jobject, data: i32, bitmap: jobject) {
     // TODO: ensure rgba_8888 format and throw error
     let bitmap = AndroidBitmap::from_jobject(env, bitmap);
     let pixels = bitmap.as_slice();
     get_safe_data(data).glinit.draw_image(bitmap.info.width as i32, bitmap.info.height as i32, pixels);
 }
 
-unsafe extern "C" fn export_pixels(env: *mut JNIEnv, _: jobject, data: i32) -> jobject {
+pub unsafe extern "C" fn export_pixels(env: *mut JNIEnv, _: jobject, data: i32) -> jobject {
     get_safe_data(data).glinit.with_pixels(|w, h, pixels| {
         logi!("in callback!");
-        let bitmapclass = ((**env).FindClass)(env, cstr!("android/graphics/Bitmap"));
-        let bitmap = AndroidBitmap::new(env, w, h);
-        let outpixels = bitmap.as_slice();
-        ptr::copy_nonoverlapping_memory(outpixels.as_mut_ptr(), pixels.as_ptr(), outpixels.len());
-        let bitmap = bitmap.obj;
-        let premult = ((**env).GetMethodID)(env, bitmapclass, cstr!("setPremultiplied"), cstr!("(Z)V"));
-        let voidmethod: extern "C" fn(*mut JNIEnv, jobject, jmethodID, ...) = mem::transmute((**env).CallVoidMethod);
-        voidmethod(env, bitmap, premult, JNI_TRUE);
+        let bitmap = android_bitmap::export_pixels(env, w, h, pixels);
         logi!("done with callback");
         bitmap
     })
 }
 
-struct AndroidBitmap {
-    env: *mut JNIEnv,
-    obj: jobject,
-    pixels: *mut u8,
-    info: AndroidBitmapInfo,
-}
-impl AndroidBitmap {
-    unsafe fn from_jobject(env: *mut JNIEnv, bitmap: jobject) -> AndroidBitmap {
-        let mut pixels: *mut c_void = ptr::null_mut();
-        AndroidBitmap_lockPixels(env, bitmap, &mut pixels);
-        logi!("locked pixels in {}", pixels);
-        let mut result = AndroidBitmap { env: env, obj: bitmap, pixels: pixels as *mut u8, info: mem::zeroed() };
-        AndroidBitmap_getInfo(env, bitmap, &mut result.info);
-        result
-    }
+mod android_bitmap {
+    use core::prelude::*;
+    use core::raw;
+    use core::{ptr, mem};
+    use libc::{c_void, c_char};
+    use jni::{jobject, jclass, jfieldID, jmethodID, JNIEnv, jint, jfloat, jstring, jboolean, jvalue, jfloatArray, JNINativeMethod, JavaVM};
+    use jni_constants::JNI_TRUE;
+    use log::{logi, loge};
+    use android::bitmap::{AndroidBitmap_getInfo, AndroidBitmap_lockPixels, AndroidBitmap_unlockPixels, AndroidBitmapInfo};
+    use android::bitmap::{ANDROID_BITMAP_FORMAT_RGBA_8888, ANDROID_BITMAP_FORMAT_A_8};
+    static mut BITMAP_CLASS: jclass = 0 as jclass;
+    static mut CONFIG_ARGB_8888: jobject = 0 as jobject;
+    static mut CREATE_BITMAP: jmethodID = 0 as jmethodID;
+    static mut SET_PREMULTIPLIED: jmethodID = 0 as jmethodID;
 
-    unsafe fn new(env: *mut JNIEnv, w: i32, h: i32) -> AndroidBitmap {
+    pub struct AndroidBitmap {
+        env: *mut JNIEnv,
+        obj: jobject,
+        pixels: *mut u8,
+        pub info: AndroidBitmapInfo,
+    }
+    
+    pub unsafe fn init(env: *mut JNIEnv) {
         let bitmapclass = ((**env).FindClass)(env, cstr!("android/graphics/Bitmap"));
         let configclass = ((**env).FindClass)(env, cstr!("android/graphics/Bitmap$Config"));
         let argbfield = ((**env).GetStaticFieldID)(env, configclass, cstr!("ARGB_8888"), cstr!("Landroid/graphics/Bitmap$Config;"));
         let argb = ((**env).GetStaticObjectField)(env, configclass, argbfield);
         let createbitmap = ((**env).GetStaticMethodID)(env, bitmapclass, cstr!("createBitmap"), cstr!("(IILandroid/graphics/Bitmap$Config;)Landroid/graphics/Bitmap;"));
-        let bitmap = ((**env).CallStaticObjectMethod)(env, bitmapclass, createbitmap, w, h, argb);
-        logi!("created bitmap");
-        AndroidBitmap::from_jobject(env, bitmap)
+        let premult = ((**env).GetMethodID)(env, bitmapclass, cstr!("setPremultiplied"), cstr!("(Z)V"));
+        BITMAP_CLASS = ((**env).NewGlobalRef)(env, bitmapclass);
+        CONFIG_ARGB_8888 = ((**env).NewGlobalRef)(env, argb);
+        CREATE_BITMAP = createbitmap;
+        SET_PREMULTIPLIED = premult;
     }
-    
-    unsafe fn as_slice(&self) -> &mut [u8] {
-        let pixelsize = match self.info.format as u32 {
-            ANDROID_BITMAP_FORMAT_RGBA_8888 => 4,
-            ANDROID_BITMAP_FORMAT_A_8 => 1,
-            x => panic!("bitmap format {} not implemented!", x),
-        };
-        let pixelvec = raw::Slice { data: self.pixels as *const u8, len: (self.info.width * self.info.height * pixelsize) as uint };
-        mem::transmute(pixelvec)
-    }
-}
 
-impl Drop for AndroidBitmap {
-    fn drop(&mut self) {
-        unsafe {
-            AndroidBitmap_unlockPixels(self.env, self.obj);
+    #[inline]
+    pub unsafe fn export_pixels(env: *mut JNIEnv, w: i32, h: i32, pixels: &[u8]) -> jobject {
+        let bitmap = AndroidBitmap::new(env, w, h);
+        let outpixels = bitmap.as_slice();
+        ptr::copy_nonoverlapping_memory(outpixels.as_mut_ptr(), pixels.as_ptr(), outpixels.len());
+        let bitmap = bitmap.obj;
+        ((**env).CallVoidMethod)(env, BITMAP_CLASS, SET_PREMULTIPLIED, JNI_TRUE);
+        bitmap
+    }
+
+    impl AndroidBitmap {
+        pub unsafe fn from_jobject(env: *mut JNIEnv, bitmap: jobject) -> AndroidBitmap {
+            let mut pixels: *mut c_void = ptr::null_mut();
+            AndroidBitmap_lockPixels(env, bitmap, &mut pixels);
+            logi!("locked pixels in {}", pixels);
+            let mut result = AndroidBitmap { env: env, obj: bitmap, pixels: pixels as *mut u8, info: mem::zeroed() };
+            AndroidBitmap_getInfo(env, bitmap, &mut result.info);
+            result
         }
-        logi!("unlocked pixels");
+
+        pub unsafe fn new(env: *mut JNIEnv, w: i32, h: i32) -> AndroidBitmap {
+            let bitmap = ((**env).CallStaticObjectMethod)(env, BITMAP_CLASS, CREATE_BITMAP, w, h, CONFIG_ARGB_8888);
+            logi!("created bitmap");
+            AndroidBitmap::from_jobject(env, bitmap)
+        }
+    
+        pub unsafe fn as_slice(&self) -> &mut [u8] {
+            let pixelsize = match self.info.format as u32 {
+                ANDROID_BITMAP_FORMAT_RGBA_8888 => 4,
+                ANDROID_BITMAP_FORMAT_A_8 => 1,
+                x => panic!("bitmap format {} not implemented!", x),
+            };
+            let pixelvec = raw::Slice { data: self.pixels as *const u8, len: (self.info.width * self.info.height * pixelsize) as uint };
+            mem::transmute(pixelvec)
+        }
+    }
+
+    impl Drop for AndroidBitmap {
+        fn drop(&mut self) {
+            unsafe {
+                AndroidBitmap_unlockPixels(self.env, self.obj);
+            }
+            logi!("unlocked pixels");
+        }
+    }
+
+    pub unsafe fn destroy(env: *mut JNIEnv) {
+        ((**env).DeleteGlobalRef)(env, BITMAP_CLASS);
+        ((**env).DeleteGlobalRef)(env, CONFIG_ARGB_8888);
     }
 }
 
