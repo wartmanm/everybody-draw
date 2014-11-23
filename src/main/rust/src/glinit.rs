@@ -2,7 +2,7 @@ extern crate opengles;
 use core::prelude::*;
 use core::mem;
 use collections::vec::Vec;
-use collections::str::{StrAllocating, IntoMaybeOwned};
+use collections::str::IntoMaybeOwned;
 
 use log::{logi,loge};
 
@@ -301,7 +301,7 @@ impl<'a> GLInit<'a> {
             0 => self.targetdata.get_current_texturetarget().framebuffer,
             _ => match self.paintstate.layers.as_slice().get((layer - 1) as uint) {
                 Some(layer) => layer.target.framebuffer,
-                None => return Err(format!("tried to erase layer {} of {}", layer - 1, self.paintstate.layers.len())),
+                None => return Err(format!("tried to erase layer {} of {}", layer - 1, self.paintstate.layers.len()).into_maybe_owned()),
             },
         };
         gl2::bind_framebuffer(gl2::FRAMEBUFFER, target);
@@ -464,7 +464,7 @@ impl gltexture::ToPixelFormat for AndroidBitmapFormat {
         match *self {
             ANDROID_BITMAP_FORMAT_RGBA_8888 => Ok(gltexture::RGBA),
             ANDROID_BITMAP_FORMAT_A_8 => Ok(gltexture::ALPHA),
-            _ => Err("Unsupported texture format!".into_string()),
+            _ => Err("Unsupported texture format!".into_maybe_owned()),
         }
     }
 }

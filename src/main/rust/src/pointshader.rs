@@ -1,7 +1,7 @@
 use core::prelude::*;
 use core::{mem, fmt};
 use core::fmt::Show;
-use collections::str::{StrAllocating, IntoMaybeOwned};
+use collections::str::IntoMaybeOwned;
 
 use log::{logi};
 
@@ -62,7 +62,7 @@ impl Shader for PointShader {
             }
             _ => {
                 gl2::delete_program(program);
-                Err("point shader missing vPosition or textureMatrix attribute".into_string())
+                Err("point shader missing vPosition or textureMatrix attribute".into_maybe_owned())
             }
         }
     }

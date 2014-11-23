@@ -58,8 +58,7 @@ pub extern "C" fn lua_nextpoint(data: &mut LuaCallbackType, points: &mut (Shader
 
 macro_rules! rust_raise_lua_err(
     ($L:expr, $fmt:expr, $($arg:tt)*) => ({
-        let formatted = format!(concat!($fmt, "\0"), $($arg)*);
-        rust_raise_lua_err($L, formatted.as_slice().as_ptr() as *const ::libc::c_char);
+        rust_raise_lua_err($L, (format!($fmt, $($arg)*).as_slice()));
     })
 )
 
@@ -93,10 +92,9 @@ pub unsafe extern "C" fn lua_log(message: *const c_char) {
 
 #[no_mangle]
 pub unsafe extern "C" fn lua_clearlayer(data: &mut LuaCallbackType, layer: i32) {
-    if let Err(mut msg) = data.glinit.erase_layer(layer) {
+    if let Err(msg) = data.glinit.erase_layer(layer) {
         loge!(msg.as_slice());
-        msg.push('\0');
-        rust_raise_lua_err(None, msg.as_slice().as_ptr() as *const i8);
+        rust_raise_lua_err(None, msg.as_slice());
     }
 }
 
