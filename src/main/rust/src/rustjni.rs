@@ -283,12 +283,8 @@ pub unsafe extern "C" fn draw_image(env: *mut JNIEnv, _: jobject, data: i32, bit
 }
 
 pub unsafe extern "C" fn export_pixels(env: *mut JNIEnv, _: jobject, data: i32) -> jobject {
-    get_safe_data(data).glinit.with_pixels(&|&: w, h, pixels: Vec<u8>| {
-        logi!("in callback!");
-        let bitmap = android_bitmap::export_pixels(env, w, h, pixels.as_slice());
-        logi!("done with callback");
-        bitmap
-    })
+    let ((w, h), pixels) = get_safe_data(data).glinit.get_pixels();
+    android_bitmap::export_pixels(env, w, h, pixels.as_slice())
 }
 
 mod android_bitmap {

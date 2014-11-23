@@ -219,7 +219,7 @@ impl<'a> GLInit<'a> {
         });
     }
 
-    pub fn with_pixels<T>(&mut self, callback: &Fn<(i32, i32, Vec<u8>),T>) -> T {
+    pub fn get_pixels(&mut self) -> ((i32, i32), Vec<u8>) {
         logi("in with_pixels");
         let oldtarget = self.targetdata.get_current_texturetarget();
         let (x,y) = oldtarget.texture.dimensions;
@@ -238,9 +238,7 @@ impl<'a> GLInit<'a> {
         gl2::finish();
         let pixels = gl2::read_pixels(0, 0, x, y, gl2::RGBA, gl2::UNSIGNED_BYTE);
         check_gl_error("read_pixels");
-        let result = callback.call((x, y, pixels));
-        logi("gl2::read_pixels()");
-        result
+        ((x, y), pixels)
     }
 
     // TODO: make an enum for these with a scala counterpart
