@@ -240,7 +240,7 @@ unsafe extern "C" fn set_brush_texture(_: *mut JNIEnv, _: jobject, data: jint, t
 }
 
 unsafe fn safe_create_texture(env: *mut JNIEnv, data: jint, bitmap: jobject) -> GLResult<DrawObjectIndex<BrushTexture>> {
-    let bitmap = AndroidBitmap::from_jobject(env, bitmap);
+    let mut bitmap = AndroidBitmap::from_jobject(env, bitmap);
     let (w, h) = (bitmap.info.width, bitmap.info.height);
     let format: AndroidBitmapFormat = mem::transmute(bitmap.info.format);
     let texformat = try!(format.to_pixelformat());
@@ -283,8 +283,12 @@ pub unsafe extern "C" fn draw_image(env: *mut JNIEnv, _: jobject, data: i32, bit
 }
 
 pub unsafe extern "C" fn export_pixels(env: *mut JNIEnv, _: jobject, data: i32) -> jobject {
-    let ((w, h), pixels) = get_safe_data(data).glinit.get_pixels();
-    android_bitmap::export_pixels(env, w, h, pixels.as_slice())
+    let glinit = &mut get_safe_data(data).glinit;
+    let (w, h) = glinit.get_buffer_dimensions();
+    let mut bitmap = AndroidBitmap::new(env, w, h);
+    glinit.get_pixels(bitmap.as_mut_slice());
+    bitmap.set_premultiplied(true);
+    bitmap.obj
 }
 
 mod android_bitmap {
@@ -293,7 +297,7 @@ mod android_bitmap {
     use core::{ptr, mem};
     use libc::{c_void, c_char};
     use jni::{jobject, jclass, jfieldID, jmethodID, JNIEnv, jint, jfloat, jstring, jboolean, jvalue, jfloatArray, JNINativeMethod, JavaVM};
-    use jni_constants::JNI_TRUE;
+    use jni_constants::{JNI_TRUE, JNI_FALSE};
     use log::{logi, loge};
     use android::bitmap::{AndroidBitmap_getInfo, AndroidBitmap_lockPixels, AndroidBitmap_unlockPixels, AndroidBitmapInfo};
     use android::bitmap::{ANDROID_BITMAP_FORMAT_RGBA_8888, ANDROID_BITMAP_FORMAT_A_8};
@@ -304,7 +308,7 @@ mod android_bitmap {
 
     pub struct AndroidBitmap {
         env: *mut JNIEnv,
-        obj: jobject,
+        pub obj: jobject,
         pixels: *mut u8,
         pub info: AndroidBitmapInfo,
     }
@@ -322,16 +326,6 @@ mod android_bitmap {
         SET_PREMULTIPLIED = premult;
     }
 
-    #[inline]
-    pub unsafe fn export_pixels(env: *mut JNIEnv, w: i32, h: i32, pixels: &[u8]) -> jobject {
-        let bitmap = AndroidBitmap::new(env, w, h);
-        let outpixels = bitmap.as_slice();
-        ptr::copy_nonoverlapping_memory(outpixels.as_mut_ptr(), pixels.as_ptr(), outpixels.len());
-        let bitmap = bitmap.obj;
-        ((**env).CallVoidMethod)(env, BITMAP_CLASS, SET_PREMULTIPLIED, JNI_TRUE);
-        bitmap
-    }
-
     impl AndroidBitmap {
         pub unsafe fn from_jobject(env: *mut JNIEnv, bitmap: jobject) -> AndroidBitmap {
             let mut pixels: *mut c_void = ptr::null_mut();
@@ -347,8 +341,8 @@ mod android_bitmap {
             logi!("created bitmap");
             AndroidBitmap::from_jobject(env, bitmap)
         }
-    
-        pub unsafe fn as_slice(&self) -> &mut [u8] {
+
+        unsafe fn as_slice_unsafe(&self) -> &mut [u8] {
             let pixelsize = match self.info.format as u32 {
                 ANDROID_BITMAP_FORMAT_RGBA_8888 => 4,
                 ANDROID_BITMAP_FORMAT_A_8 => 1,
@@ -356,6 +350,19 @@ mod android_bitmap {
             };
             let pixelvec = raw::Slice { data: self.pixels as *const u8, len: (self.info.width * self.info.height * pixelsize) as uint };
             mem::transmute(pixelvec)
+        }
+
+        pub unsafe fn as_mut_slice(&mut self) -> &mut [u8] {
+            self.as_slice_unsafe()
+        }
+
+        pub unsafe fn as_slice(&self) -> &[u8] {
+            self.as_slice_unsafe()
+        }
+
+        pub unsafe fn set_premultiplied(&mut self, premultiplied: bool) {
+            let pm = if premultiplied { JNI_TRUE } else { JNI_FALSE };
+            ((**self.env).CallVoidMethod)(self.env, BITMAP_CLASS, SET_PREMULTIPLIED, self.obj, pm);
         }
     }
 

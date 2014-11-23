@@ -219,7 +219,11 @@ impl<'a> GLInit<'a> {
         });
     }
 
-    pub fn get_pixels(&mut self) -> ((i32, i32), Vec<u8>) {
+    pub fn get_buffer_dimensions(&self) -> (i32, i32) {
+        self.targetdata.get_current_texturetarget().texture.dimensions
+    }
+
+    pub fn get_pixels(&mut self, pixels: &mut [u8]) {
         logi("in with_pixels");
         let oldtarget = self.targetdata.get_current_texturetarget();
         let (x,y) = oldtarget.texture.dimensions;
@@ -236,9 +240,8 @@ impl<'a> GLInit<'a> {
                       0f32,  1f32,  0f32,  1f32,];
         perform_copy(newtarget.framebuffer, &oldtarget.texture, &saveshader, matrix.as_slice());
         gl2::finish();
-        let pixels = gl2::read_pixels(0, 0, x, y, gl2::RGBA, gl2::UNSIGNED_BYTE);
+        gl2::read_pixels_into(0, 0, x, y, gl2::RGBA, gl2::UNSIGNED_BYTE, pixels);
         check_gl_error("read_pixels");
-        ((x, y), pixels)
     }
 
     // TODO: make an enum for these with a scala counterpart
