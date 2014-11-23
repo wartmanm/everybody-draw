@@ -11,6 +11,16 @@ function ondown(a, output)
   backlogpos[counter] = 0
   backlogcounter[counter] = 0
   loglua("done ondown")
+  default_ondown(a, output)
+end
+function onup(a, output)
+  default_onup(a, output)
+end
+function onframe(x, y, output)
+  default_onframe(x, y, output)
+end
+function ondone(output)
+  default_ondone(output)
 end
 
 function main(a, b, screenx, screeny, points)
