@@ -39,7 +39,7 @@ object CopyShader extends Shader[CopyShader] {
   def apply(data: GLInit, vec: String, frag: String): GLResult[CopyShader] = {
     new CopyShader(compile(data, vec, frag))
   }
-  @native def getSource(shader: PointShader)
+  @native def getSource(gl: GLInit, shader: CopyShader): (String, String)
 }
 
 object PointShader extends Shader[PointShader] {
@@ -47,7 +47,7 @@ object PointShader extends Shader[PointShader] {
   def apply(data: GLInit, vec: String, frag: String): GLResult[PointShader] = {
     new PointShader(compile(data, vec, frag))
   }
-  @native def getSource(shader: PointShader)
+  @native def getSource(gl: GLInit, shader: PointShader): (String, String)
 }
 
 object TexturePtr {
@@ -68,7 +68,7 @@ object LuaScript {
   def apply(data: GLInit, script: String): GLResult[LuaScript] = {
     new LuaScript(init(data, script))
   }
-  @native def getSource(shader: PointShader)
+  @native def getSource(gl: GLInit, script: LuaScript): String
 }
 
 object GLInit {

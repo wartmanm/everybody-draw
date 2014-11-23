@@ -422,23 +422,33 @@ unsafe extern "C" fn jni_set_brush_size(_: *mut JNIEnv, _: jobject, data: jint, 
 unsafe fn get_shader_source_tuple(env: *mut JNIEnv, source: &(MString, MString)) -> jobject {
     let &(ref vert, ref frag) = source;
     let tuple2 = ((**env).FindClass)(env, cstr!("scala/Tuple2"));
-    let tuple2_init = ((**env).GetMethodID)(env, tuple2, cstr!("<init>"), cstr!("(Ljava/lang/Object;Ljava/lang/Object)V"));
+    logi!("found tuple2 class: {}", tuple2);
+    let tuple2_init = ((**env).GetMethodID)(env, tuple2, cstr!("<init>"), cstr!("(Ljava/lang/Object;Ljava/lang/Object;)V"));
+    logi!("got tuple2 init: {}", tuple2_init);
     let jvert = str_to_jstring(env, vert.as_slice());
     let jfrag = str_to_jstring(env, frag.as_slice());
+    logi!("converted to jstring");
     ((**env).NewObject)(env, tuple2, tuple2_init, jvert, jfrag)
 }
 
-unsafe extern "C" fn jni_get_copyshader_source(env: *mut JNIEnv, _: jobject, data: jint, copyshader: jint) -> jobject {
+#[no_mangle]
+pub unsafe extern "C" fn jni_get_copyshader_source(env: *mut JNIEnv, _: jobject, data: jint, copyshader: jint) -> jobject {
+    logi!("getting copyshader source");
     let source = get_safe_data(data).events.get_copyshader_source(mem::transmute(copyshader));
-    get_shader_source_tuple(env, source)
+    logi!("got copyshader source");
+    let tuple = get_shader_source_tuple(env, source);
+    logi!("created tuple");
+    tuple
 }
 
 unsafe extern "C" fn jni_get_pointshader_source(env: *mut JNIEnv, _: jobject, data: jint, pointshader: jint) -> jobject {
+    logi!("getting pointshader source");
     let source = get_safe_data(data).events.get_pointshader_source(mem::transmute(pointshader));
     get_shader_source_tuple(env, source)
 }
 
 unsafe extern "C" fn jni_get_luascript_source(env: *mut JNIEnv, _: jobject, data: jint, luascript: jint) -> jstring {
+    logi!("getting luascript source");
     let source = get_safe_data(data).events.get_luascript_source(mem::transmute(luascript));
     str_to_jstring(env, source.as_slice())
 }
@@ -514,9 +524,11 @@ pub unsafe extern "C" fn JNI_OnLoad(vm: *mut JavaVM, reserved: *mut c_void) -> j
 
     let pointshaderstaticmethods = [
         native_method!("compile", "(ILjava/lang/String;Ljava/lang/String;)I", compile_pointshader),
+        native_method!("getSource", "(II)Lscala/Tuple2;", jni_get_pointshader_source),
     ];
     let copyshaderstaticmethods = [
         native_method!("compile", "(ILjava/lang/String;Ljava/lang/String;)I", compile_copyshader),
+        native_method!("getSource", "(II)Lscala/Tuple2;", jni_get_copyshader_source),
     ];
     let texturestaticmethods = [
         native_method!("init", "(ILandroid/graphics/Bitmap;)I", create_texture),
@@ -535,6 +547,7 @@ pub unsafe extern "C" fn JNI_OnLoad(vm: *mut JavaVM, reserved: *mut c_void) -> j
 
     let luastaticmethods = [
         native_method!("init", "(ILjava/lang/String;)I", jni_lua_compile_script),
+        native_method!("getSource", "(II)Ljava/lang/String;", jni_get_luascript_source),
     ];
     register_classmethods(env, cstr!("com/github/wartman4404/gldraw/LuaScript$"), luastaticmethods);
     logi!("registered lua methods!");
