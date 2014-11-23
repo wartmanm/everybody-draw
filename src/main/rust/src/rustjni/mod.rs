@@ -1,19 +1,26 @@
 use core::prelude::*;
-use core::{ptr, mem, raw};
+use alloc::boxed::Box;
+use collections::string::String;
+use core::{ptr, mem, raw, fmt};
 use core::ptr::RawMutPtr;
+use core::any::{Any, AnyRefExt};
+use core::fmt::Show;
+use core::iter;
 use libc::{c_void, c_char};
 use collections::str::IntoMaybeOwned;
-use collections::string::String;
 use collections::vec::Vec;
+use collections::str::MaybeOwned;
 
 use jni::{jobject, jclass, jmethodID, JNIEnv, jint, jstring, jvalue, JNINativeMethod, JavaVM};
 use jni_constants::*;
 
-use log::logi;
+use log::{logi, loge};
 
 use glinit::GLInit;
 use drawevent::Events;
 use glcommon::MString;
+
+use rustrt;
 
 
 mod macros;
@@ -110,6 +117,52 @@ fn get_safe_data<'a>(data: i32) -> &'a mut GLInitEvents<'a> {
     unsafe { mem::transmute(data) }
 }
 
+fn on_unwind(msg: &Any + Send, file: &'static str, line: uint) {
+    use core::fmt::FormatWriter;
+    // as far as I know there's no way to identify traits that can be cast to Show at runtime
+    if let Some(s) = msg.downcast_ref::<&Show>() {
+        loge!("fatal error in {}:{} as &Show: {}", file, line, s);
+    } else if let Some(s) = msg.downcast_ref::<Box<Show>>() {
+        loge!("fatal error in {}:{} as Box<Show>: {}", file, line, &**s);
+    } else if let Some(s) = msg.downcast_ref::<&str>() {
+        loge!("fatal error in {}:{} as &str: {}", file, line, s);
+    } else if let Some(s) = msg.downcast_ref::<String>() {
+        loge!("fatal error in {}:{} as String: {}", file, line, s);
+    } else if let Some(s) = msg.downcast_ref::<MaybeOwned<'static>>() {
+        loge!("fatal error in {}:{} as MaybeOwned: {}", file, line, s);
+    } else {
+        loge!("fatal error in {}:{}: unknown error message type {}!", file, line, msg.get_type_id());
+        loge!("Printing start:");
+        unsafe {
+            let mut line = Vec::new();
+            // stolen from unwind.rs
+            struct VecWriter<'a> { v: &'a mut Vec<u8> }
+            impl<'a> ::core::fmt::FormatWriter for VecWriter<'a> {
+                fn write(&mut self, buf: &[u8]) -> fmt::Result {
+                    self.v.push_all(buf);
+                    Ok(())
+                }
+            }
+
+            let width = 32;
+            let raw::TraitObject { data: msgptr, vtable: _ } = mem::transmute(msg);
+            let msgslice: &[u8] = mem::transmute(raw::Slice { data: msgptr as *const (), len: 1000 });
+            let poscounter = iter::count(msgptr as u32, width as u32);
+            for (chunk, pos) in msgslice.chunks(width).zip(poscounter) {
+                {
+                    let mut writer = VecWriter { v: &mut line };
+                    let _ = write!(&mut writer, "{:08x}: ", pos);
+                    for byte in chunk.iter() {
+                        let _ = write!(&mut writer, "{} ", byte);
+                    }
+                }
+                loge!(::core::str::from_utf8_unchecked(line.as_slice().init()));
+                line.clear();
+            }
+        }
+    }
+}
+
 #[allow(non_snake_case, unused_variables)]
 #[no_mangle]
 pub unsafe extern "C" fn JNI_OnLoad(vm: *mut JavaVM, reserved: *mut c_void) -> jint {
@@ -119,6 +172,7 @@ pub unsafe extern "C" fn JNI_OnLoad(vm: *mut JavaVM, reserved: *mut c_void) -> j
         return -1;
     }
     let env = env as *mut JNIEnv;
+    logi!("got environment!: {}", env);
 
     texturethread::init(env);
     texturethread::init(env);
@@ -126,7 +180,9 @@ pub unsafe extern "C" fn JNI_OnLoad(vm: *mut JavaVM, reserved: *mut c_void) -> j
     gldataclasses::init(env);
     motionevent::init(env);
 
-    logi!("got environment!: {}", env);
+    //rustrt::init(1, ["rustjni".as_ptr()].as_ptr());
+    rustrt::unwind::register(on_unwind);
+
     logi!("finished jni_onload");
     JNI_VERSION_1_2
 }
