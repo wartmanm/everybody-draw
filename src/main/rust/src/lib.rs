@@ -43,3 +43,4 @@ pub mod rustjni;
 pub mod lua_geom;
 pub mod lua_callbacks;
 pub mod redirect_stderr;
+pub mod jni_helpers;

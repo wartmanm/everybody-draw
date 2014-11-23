@@ -8,7 +8,7 @@ use collections::string::String;
 use collections::str::{MaybeOwned, IntoMaybeOwned};
 use collections::vec::Vec;
 
-use jni::{jobject, jclass, jfieldID, jmethodID, JNIEnv, jint, jfloat, jstring, jboolean, jfloatArray, JNINativeMethod, JavaVM};
+use jni::{jobject, jclass, jfieldID, jmethodID, JNIEnv, jint, jfloat, jstring, jboolean, jvalue, jfloatArray, JNINativeMethod, JavaVM};
 use android::input::AInputEvent;
 use android::bitmap::{AndroidBitmap_getInfo, AndroidBitmap_lockPixels, AndroidBitmap_unlockPixels, AndroidBitmapInfo};
 use android::bitmap::{ANDROID_BITMAP_FORMAT_RGBA_8888, ANDROID_BITMAP_FORMAT_A_8};
@@ -24,6 +24,7 @@ use glpoint;
 use matrix::Matrix;
 use eglinit;
 use jni_constants::*;
+use jni_helpers::ToJValue;
 use drawevent::Events;
 use drawevent::event_stream::EventStream;
 use gltexture::ToPixelFormat;
@@ -65,18 +66,17 @@ impl CaseClass {
 
         CaseClass { constructor: constructor, class: globalclass }
     }
-    pub unsafe fn construct<T>(&self, env: *mut JNIEnv, arg: T) -> jobject {
-        ((**env).NewObject)(env, self.class, self.constructor, arg)
+    pub unsafe fn construct(&self, env: *mut JNIEnv, arg: &mut [jvalue]) -> jobject {
+        ((**env).NewObjectA)(env, self.class, self.constructor, arg.as_mut_ptr())
     }
     pub unsafe fn destroy(self, env: *mut JNIEnv) {
         ((**env).DeleteGlobalRef)(env, self.class);
     }
 }
 
-//static mut GL_EXCEPTION: CaseClass = CaseClass { constructor: 0 as jmethodID, class: 0 as jclass };
-//static mut SCALA_LEFT: CaseClass = CaseClass { constructor: 0 as jmethodID, class: 0 as jclass };
-//static mut SCALA_RIGHT: CaseClass = CaseClass { constructor: 0 as jmethodID, class: 0 as jclass };
-//static mut BOXED_JINT: CaseClass = CaseClass { constructor: 0 as jmethodID, class: 0 as jclass };
+static mut LUA_EXCEPTION: CaseClass = CaseClass { constructor: 0 as jmethodID, class: 0 as jclass };
+static mut GL_EXCEPTION: CaseClass = CaseClass { constructor: 0 as jmethodID, class: 0 as jclass };
+static mut SCALA_TUPLE2: CaseClass = CaseClass { constructor: 0 as jmethodID, class: 0 as jclass };
 
 struct JNIUndoCallback {
     callback_obj: jobject,
@@ -121,11 +121,10 @@ unsafe fn glresult_or_exception<T>(env: *mut JNIEnv, result: GLResult<DrawObject
     logi!("in glresult_or_exception");
     match result {
         Err(msg) => {
-            let glerr_class = ((**env).FindClass)(env, cstr!("com/github/wartman4404/gldraw/GLException"));
-            let glerr_init = ((**env).GetMethodID)(env, glerr_class, cstr!("<init>"), cstr!("(Ljava/lang/String;)V"));
-            let err = ((**env).NewObject)(env, glerr_class, glerr_init, str_to_jstring(env, msg.as_slice()));
+            let errmsg = str_to_jstring(env, msg.as_slice()).as_jvalue();
+            let err = GL_EXCEPTION.construct(env, [errmsg].as_mut_slice());
             ((**env).Throw)(env, err);
-            0
+            -1
         },
         Ok(idx) => mem::transmute(idx),
     }
@@ -157,9 +156,8 @@ unsafe extern "C" fn finish_gl(env: *mut JNIEnv, _: jobject, data: jint) {
 
 unsafe fn rethrow_lua_result(env: *mut JNIEnv, result: GLResult<()>) {
     if let Err(msg) = result {
-        let luaerr_class = ((**env).FindClass)(env, cstr!("com/github/wartman4404/gldraw/LuaException"));
-        let luaerr_init = ((**env).GetMethodID)(env, luaerr_class, cstr!("<init>"), cstr!("(Ljava/lang/String;)V"));
-        let err = ((**env).NewObject)(env, luaerr_class, luaerr_init, str_to_jstring(env, msg.as_slice()));
+        let errmsg = str_to_jstring(env, msg.as_slice()).as_jvalue();
+        let err = LUA_EXCEPTION.construct(env, [errmsg].as_mut_slice());
         ((**env).Throw)(env, err);
     }
 }
@@ -421,14 +419,9 @@ unsafe extern "C" fn jni_set_brush_size(_: *mut JNIEnv, _: jobject, data: jint, 
 
 unsafe fn get_shader_source_tuple(env: *mut JNIEnv, source: &(MString, MString)) -> jobject {
     let &(ref vert, ref frag) = source;
-    let tuple2 = ((**env).FindClass)(env, cstr!("scala/Tuple2"));
-    logi!("found tuple2 class: {}", tuple2);
-    let tuple2_init = ((**env).GetMethodID)(env, tuple2, cstr!("<init>"), cstr!("(Ljava/lang/Object;Ljava/lang/Object;)V"));
-    logi!("got tuple2 init: {}", tuple2_init);
-    let jvert = str_to_jstring(env, vert.as_slice());
-    let jfrag = str_to_jstring(env, frag.as_slice());
-    logi!("converted to jstring");
-    ((**env).NewObject)(env, tuple2, tuple2_init, jvert, jfrag)
+    let mut jvert = str_to_jstring(env, vert.as_slice());
+    let mut jfrag = str_to_jstring(env, frag.as_slice());
+    SCALA_TUPLE2.construct(env, [jvert.as_jvalue(), jfrag.as_jvalue()].as_mut_slice())
 }
 
 #[no_mangle]
@@ -491,9 +484,10 @@ pub unsafe extern "C" fn JNI_OnLoad(vm: *mut JavaVM, reserved: *mut c_void) -> j
     MOTION_CLASS = ((**env).FindClass)(env, cstr!("android/view/MotionEvent"));
     MOTIONEVENT_NATIVE_PTR_FIELD = ((**env).GetFieldID)(env, MOTION_CLASS, cstr!("mNativePtr"), cstr!("I"));
     logi!("got motion classes");
-    //SCALA_LEFT = CaseClass::new(env, cstr!("scala/util/Left"), cstr!("(Ljava/lang/Object;)V"));
-    //SCALA_RIGHT = CaseClass::new(env, cstr!("scala/util/Right"), cstr!("(Ljava/lang/Object;)V"));
-    //BOXED_JINT = CaseClass::new(env, cstr!("java/lang/Integer"), cstr!("(I)V"));
+    GL_EXCEPTION = CaseClass::new(env, cstr!("com/github/wartman4404/gldraw/GLException"), cstr!("(Ljava/lang/String;)V"));
+    LUA_EXCEPTION = CaseClass::new(env, cstr!("com/github/wartman4404/gldraw/LuaException"), cstr!("(Ljava/lang/String;)V")); 
+    SCALA_TUPLE2 = CaseClass::new(env, cstr!("scala/Tuple2"), cstr!("(Ljava/lang/Object;Ljava/lang/Object;)V"));
+    android_bitmap::init(env);
 
     let mainmethods = [
         native_method!("nativeAppendMotionEvent", "(ILandroid/view/MotionEvent;)V", native_append_motion_event),
@@ -585,7 +579,8 @@ pub unsafe extern "C" fn JNI_OnUnload(vm: *mut JavaVM, reserved: *mut c_void) {
         return;
     }
     let env = env as *mut JNIEnv;
-    //SCALA_LEFT.destroy(env);
-    //SCALA_RIGHT.destroy(env);
-    //BOXED_JINT.destroy(env);
+    GL_EXCEPTION.destroy(env);
+    LUA_EXCEPTION.destroy(env);
+    SCALA_TUPLE2.destroy(env);
+    android_bitmap::destroy(env);
 }
