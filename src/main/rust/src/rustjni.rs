@@ -503,7 +503,7 @@ pub unsafe extern "C" fn JNI_OnLoad(vm: *mut JavaVM, reserved: *mut c_void) -> j
         native_method!("nativeAppendMotionEvent", "(ILandroid/view/MotionEvent;)V", native_append_motion_event),
         native_method!("nativePauseMotionEvent", "(I)V", native_pause_motion_event),
     ];
-    register_classmethods(env, cstr!("com/github/wartman4404/gldraw/MainActivity"), mainmethods);
+    register_classmethods(env, cstr!("com/github/wartman4404/gldraw/MainActivity"), &mainmethods);
 
     let texturemethods = [
         native_method!("nativeUpdateGL", "(I)V", native_update_gl),
@@ -523,7 +523,7 @@ pub unsafe extern "C" fn JNI_OnLoad(vm: *mut JavaVM, reserved: *mut c_void) -> j
         native_method!("nativeSetBrushColor", "(II)V", jni_set_brush_color),
         native_method!("nativeSetBrushSize", "(IF)V", jni_set_brush_size),
     ];
-    register_classmethods(env, cstr!("com/github/wartman4404/gldraw/TextureSurfaceThread"), texturemethods);
+    register_classmethods(env, cstr!("com/github/wartman4404/gldraw/TextureSurfaceThread"), &texturemethods);
     logi!("registered texture thread methods!");
 
     let pointshaderstaticmethods = [
@@ -537,36 +537,36 @@ pub unsafe extern "C" fn JNI_OnLoad(vm: *mut JavaVM, reserved: *mut c_void) -> j
     let texturestaticmethods = [
         native_method!("init", "(ILandroid/graphics/Bitmap;)I", create_texture),
     ];
-    register_classmethods(env, cstr!("com/github/wartman4404/gldraw/PointShader$"), pointshaderstaticmethods);
-    register_classmethods(env, cstr!("com/github/wartman4404/gldraw/CopyShader$"), copyshaderstaticmethods);
-    register_classmethods(env, cstr!("com/github/wartman4404/gldraw/TexturePtr$"), texturestaticmethods);
+    register_classmethods(env, cstr!("com/github/wartman4404/gldraw/PointShader$"), &pointshaderstaticmethods);
+    register_classmethods(env, cstr!("com/github/wartman4404/gldraw/CopyShader$"), &copyshaderstaticmethods);
+    register_classmethods(env, cstr!("com/github/wartman4404/gldraw/TexturePtr$"), &texturestaticmethods);
     logi!("registered point|copy|texture static methods!");
 
     let eglhelpermethods = [
         native_method!("nativeFinish", "()V", jni_egl_finish),
         native_method!("nativeInit", "(Landroid/view/Surface;)V", jni_egl_init),
     ];
-    register_classmethods(env, cstr!("com/github/wartman4404/gldraw/EGLHelper"), eglhelpermethods);
+    register_classmethods(env, cstr!("com/github/wartman4404/gldraw/EGLHelper"), &eglhelpermethods);
     logi!("registered egl methods!");
 
     let luastaticmethods = [
         native_method!("init", "(ILjava/lang/String;)I", jni_lua_compile_script),
         native_method!("getSource", "(II)Ljava/lang/String;", jni_get_luascript_source),
     ];
-    register_classmethods(env, cstr!("com/github/wartman4404/gldraw/LuaScript$"), luastaticmethods);
+    register_classmethods(env, cstr!("com/github/wartman4404/gldraw/LuaScript$"), &luastaticmethods);
     logi!("registered lua methods!");
 
     let glinitstaticmethods = [
         native_method!("initGL", "(IILcom/github/wartman4404/gldraw/UndoCallback;)I", init_gl),
         native_method!("destroy", "(I)V", finish_gl),
     ];
-    register_classmethods(env, cstr!("com/github/wartman4404/gldraw/GLInit$"), glinitstaticmethods);
+    register_classmethods(env, cstr!("com/github/wartman4404/gldraw/GLInit$"), &glinitstaticmethods);
 
     let motioneventhandlerstaticmethods = [
         native_method!("init", "()Lcom/github/wartman4404/gldraw/MotionEventHandlerPair;", init_motion_event_handler),
         native_method!("destroy", "(Lcom/github/wartman4404/gldraw/MotionEventHandlerPair;)V", destroy_motion_event_handler),
     ];
-    register_classmethods(env, cstr!("com/github/wartman4404/gldraw/MotionEventHandlerPair$"), motioneventhandlerstaticmethods);
+    register_classmethods(env, cstr!("com/github/wartman4404/gldraw/MotionEventHandlerPair$"), &motioneventhandlerstaticmethods);
     logi!("registered motionevent methods!");
 
     let replayhandlerstaticmethods = [
@@ -574,7 +574,7 @@ pub unsafe extern "C" fn JNI_OnLoad(vm: *mut JavaVM, reserved: *mut c_void) -> j
         native_method!("destroy", "(I)V", jni_replay_destroy),
         native_method!("advanceFrame", "(II[F)Z", jni_replay_advance_frame),
     ];
-    register_classmethods(env, cstr!("com/github/wartman4404/gldraw/Replay$"), replayhandlerstaticmethods);
+    register_classmethods(env, cstr!("com/github/wartman4404/gldraw/Replay$"), &replayhandlerstaticmethods);
     logi!("registered replay methods!");
     logi!("finished jni_onload");
     JNI_VERSION_1_2

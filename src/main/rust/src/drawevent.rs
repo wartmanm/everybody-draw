@@ -22,6 +22,7 @@ use copyshader::CopyShader;
 use luascript::LuaScript;
 use paintlayer::PaintLayer;
 use glcommon::{GLResult, MString};
+use drawevent::event_stream::EventState;
 
 enum DrawEvent {
     UseAnimShader(DrawObjectIndex<CopyShader>),
@@ -61,12 +62,12 @@ impl<'a> Events<'a> {
     }
 
     pub fn use_copyshader(&mut self, idx: DrawObjectIndex<CopyShader>) -> &'a CopyShader {
-        self.eventlist.push(UseCopyShader(idx));
+        self.eventlist.push(DrawEvent::UseCopyShader(idx));
         self.copyshaders.get_object(idx)
     }
 
     pub fn use_animshader(&mut self, idx: DrawObjectIndex<CopyShader>) -> &'a CopyShader {
-        self.eventlist.push(UseAnimShader(idx));
+        self.eventlist.push(DrawEvent::UseAnimShader(idx));
         self.copyshaders.get_object(idx)
     }
 
@@ -75,7 +76,7 @@ impl<'a> Events<'a> {
         self.pointshaders.push_object(initargs)
     }
     pub fn use_pointshader(&mut self, idx: DrawObjectIndex<PointShader>) -> &'a PointShader {
-        self.eventlist.push(UsePointShader(idx));
+        self.eventlist.push(DrawEvent::UsePointShader(idx));
         self.pointshaders.get_object(idx)
     }
     pub fn load_brush(&mut self, w: i32, h: i32, pixels: &[u8], format: PixelFormat) -> DrawObjectIndex<BrushTexture> {
@@ -84,7 +85,7 @@ impl<'a> Events<'a> {
         self.textures.safe_push_object(init)
     }
     pub fn use_brush(&mut self, idx: DrawObjectIndex<BrushTexture>) -> &'a BrushTexture {
-        self.eventlist.push(UseBrush(idx));
+        self.eventlist.push(DrawEvent::UseBrush(idx));
         self.textures.get_object(idx)
     }
     pub fn load_interpolator(&mut self, script: Option<MString>) -> GLResult<DrawObjectIndex<LuaScript>> {
@@ -93,21 +94,21 @@ impl<'a> Events<'a> {
     }
 
     pub fn use_interpolator(&mut self, idx: DrawObjectIndex<LuaScript>) -> &'a LuaScript {
-        self.eventlist.push(UseInterpolator(idx));
+        self.eventlist.push(DrawEvent::UseInterpolator(idx));
         self.luascripts.get_object(idx)
     }
 
     pub fn add_layer(&mut self, dimensions: (i32, i32)
                      , copyshader: Option<DrawObjectIndex<CopyShader>>, pointshader: Option<DrawObjectIndex<PointShader>>
                      , pointidx: i32) -> PaintLayer<'a> {
-        self.eventlist.push(AddLayer(copyshader, pointshader, pointidx));
+        self.eventlist.push(DrawEvent::AddLayer(copyshader, pointshader, pointidx));
         let copyshader = match copyshader { Some(x) => Some(self.copyshaders.get_object(x)), None => None };
         let pointshader = match pointshader { Some(x) => Some(self.pointshaders.get_object(x)), None => None };
         PaintLayer::new(dimensions, copyshader, pointshader, pointidx)
     }
 
     pub fn clear_layers(&mut self) {
-        self.eventlist.push(ClearLayers);
+        self.eventlist.push(DrawEvent::ClearLayers);
     }
 
     pub fn get_pointshader_source(&mut self, pointshader: DrawObjectIndex<PointShader>) -> &(MString, MString) {
@@ -123,10 +124,10 @@ impl<'a> Events<'a> {
     }
 
     pub fn pushpoint(&mut self, event: PointEntry) {
-        self.eventlist.push(Point(event));
+        self.eventlist.push(DrawEvent::Point(event));
     }
     pub fn pushframe(&mut self) {
-        self.eventlist.push(Frame);
+        self.eventlist.push(DrawEvent::Frame);
     }
     pub fn clear(&mut self) {
         self.eventlist.clear();
@@ -142,24 +143,24 @@ pub fn handle_event<'a>(gl: &mut ::glinit::GLInit<'a>, events: &mut Events<'a>, 
     // FIXME do this without exposing Events or GLInit internal details
     match events.get_event(eventidx as uint) {
         Some(&event) => match event {
-            UseAnimShader(idx) => gl.set_anim_shader(events.copyshaders.get_object(idx)),
-            UseCopyShader(idx) => gl.set_copy_shader(events.copyshaders.get_object(idx)),
-            UsePointShader(idx) => gl.set_point_shader(events.pointshaders.get_object(idx)),
-            UseBrush(idx) => gl.set_brush_texture(&events.textures.get_object(idx).texture),
-            UseInterpolator(idx) => gl.set_interpolator(events.luascripts.get_object(idx)),
-            Point(p) => queue.push(p),
-            AddLayer(copyshader, pointshader, pointidx) => {
+            DrawEvent::UseAnimShader(idx) => gl.set_anim_shader(events.copyshaders.get_object(idx)),
+            DrawEvent::UseCopyShader(idx) => gl.set_copy_shader(events.copyshaders.get_object(idx)),
+            DrawEvent::UsePointShader(idx) => gl.set_point_shader(events.pointshaders.get_object(idx)),
+            DrawEvent::UseBrush(idx) => gl.set_brush_texture(&events.textures.get_object(idx).texture),
+            DrawEvent::UseInterpolator(idx) => gl.set_interpolator(events.luascripts.get_object(idx)),
+            DrawEvent::Point(p) => queue.push(p),
+            DrawEvent::AddLayer(copyshader, pointshader, pointidx) => {
                 let copyshader = match copyshader { Some(x) => Some(events.copyshaders.get_object(x)), None => None };
                 let pointshader = match pointshader { Some(x) => Some(events.pointshaders.get_object(x)), None => None };
                 let layer = PaintLayer::new(gl.dimensions, copyshader, pointshader, pointidx);
                 gl.add_layer(layer);
             },
-            ClearLayers => gl.clear_layers(),
-            Frame => return event_stream::Frame,
+            DrawEvent::ClearLayers => gl.clear_layers(),
+            DrawEvent::Frame => return EventState::Frame,
         },
-        None => return event_stream::Done,
+        None => return EventState::Done,
     }
-    return event_stream::NoFrame;
+    return EventState::NoFrame;
 }
 
 pub mod event_stream {
@@ -193,9 +194,9 @@ pub mod event_stream {
         pub fn advance_frame<'a>(&mut self, init: &mut ::glinit::GLInit<'a>, events: &mut Events<'a>) -> bool {
             loop {
                 match handle_event(init, events, &mut self.producer.producer, self.position) {
-                    Done => return true,
-                    Frame => return false,
-                    NoFrame => { },
+                    EventState::Done => return true,
+                    EventState::Frame => return false,
+                    EventState::NoFrame => { },
                 }
             }
         }

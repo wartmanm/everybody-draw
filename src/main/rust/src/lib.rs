@@ -1,4 +1,4 @@
-#![feature(globs, macro_rules, default_type_params, if_let, unboxed_closures, unboxed_closure_sugar, overloaded_calls, unsafe_destructor)]
+#![feature(globs, macro_rules, default_type_params, if_let, unboxed_closures, unsafe_destructor)]
 #![crate_name = "rustgl"]
 #![crate_type = "staticlib"]
 #![no_std]

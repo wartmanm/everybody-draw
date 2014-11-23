@@ -5,7 +5,7 @@ use collections::vec::Vec;
 use android::log::{ANDROID_LOG_INFO, __android_log_write};
 use libc::{c_char, c_int};
 use point::ShaderPaintPoint;
-use point::{Move, Down, Up, NoEvent};
+use point::ShaderPointEvent::{Move, Down, Up, NoEvent};
 use glpoint;
 use glpoint::MotionEventConsumer;
 use glinit::GLInit;

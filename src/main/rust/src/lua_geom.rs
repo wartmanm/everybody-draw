@@ -1,7 +1,7 @@
 #![allow(non_snake_case)]
 use core::prelude::*;
 use core::{mem, ptr, raw};
-use core::str::raw::c_str_to_static_slice;
+use core::str;
 use collections::str::{StrAllocating, IntoMaybeOwned};
 use collections::string::String;
 use libc::{c_char, c_void, size_t};
@@ -16,6 +16,9 @@ use glcommon::{GLResult, MString};
 use log::{logi, loge};
 
 use lua_callbacks::LuaCallback;
+
+use lua_geom::SandboxMode::{Sandboxed, Unsandboxed};
+use lua_geom::LuaValue::{RegistryValue, IndexValue};
 
 static mut GLDRAW_LUA_CREATE_SANDBOX: *mut c_void = 0 as *mut c_void;
 static mut GLDRAW_LUA_STOPFNS: *mut c_void = 0 as *mut c_void;
@@ -115,7 +118,7 @@ static mut LUA_ORIGINAL_PANICFN: *mut c_void = 0 as *mut c_void;
 unsafe extern "C" fn panic_wrapper(L: *mut lua_State) -> i32 {
     loge!("inside lua panic handler!");
     let errorcstr = lua_tostring(L, -1);
-    let errorstr = if errorcstr.is_null() { "" } else { c_str_to_static_slice(errorcstr) };
+    let errorstr = if errorcstr.is_null() { "" } else { str::from_c_str(errorcstr) };
     loge!("error is {}", errorstr);
     let panicfn: lua_CFunction = mem::transmute(LUA_ORIGINAL_PANICFN);
     panicfn(L); // should never return
@@ -193,7 +196,7 @@ unsafe fn save_ondone(L: *mut lua_State, key: i32, sandbox: LuaValue) -> GLResul
     sandbox.push_self(L); {
         lua_pushlightuserdata(L, GLDRAW_LUA_STOPFNS); {
             lua_gettable(L, LUA_REGISTRYINDEX);
-            logi!("type of gldraw_lua_stopfns is {}", c_str_to_static_slice(lua_typename(L, lua_type(L, -1))));
+            logi!("type of gldraw_lua_stopfns is {}", str::from_c_str(lua_typename(L, lua_type(L, -1))));
             // stack holds sandbox -- stopfns
             lua_pushlightuserdata(L, key as *mut c_void); {
                 // stack holds sandbox -- stopfns -- stopidx
@@ -288,12 +291,12 @@ pub unsafe fn finish_lua_script<T: LuaCallback>(output: &mut T, script: &::luasc
     let stacksize = lua_gettop(L);
     lua_pushlightuserdata(L, GLDRAW_LUA_STOPFNS);
     lua_gettable(L, LUA_REGISTRYINDEX);
-    logi!("type of gldraw_lua_stopfns is {}", c_str_to_static_slice(lua_typename(L, lua_type(L, -1))));
+    logi!("type of gldraw_lua_stopfns is {}", str::from_c_str(lua_typename(L, lua_type(L, -1))));
 
     // stack is stopfns
     script.push_self();
     lua_gettable(L, -2);
-    logi!("type of stopfn for {} is {}", script, c_str_to_static_slice(lua_typename(L, lua_type(L, -1))));
+    logi!("type of stopfn for {} is {}", script, str::from_c_str(lua_typename(L, lua_type(L, -1))));
     // stack is stopfns -- stopfn
     lua_pushlightuserdata(L, output as *mut T as *mut c_void);
     logi!("calling lua ondone()");

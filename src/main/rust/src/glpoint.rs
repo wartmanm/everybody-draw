@@ -13,7 +13,7 @@ use motionevent::append_motion_event;
 use android::input::AInputEvent;
 
 use point;
-use point::{ShaderPaintPoint, Coordinate, PointEntry, PointConsumer, PointProducer};
+use point::{ShaderPaintPoint, Coordinate, PointEntry, PointConsumer, PointProducer, PointInfo, ShaderPointEvent};
 use drawevent::Events;
 
 rolling_average_count!(RollingAverage16, 16)
@@ -91,7 +91,7 @@ pub fn next_point(s: &mut MotionEventConsumer, e: &mut Events) -> (point::Shader
             }
             let oldpoint = current_points.get_mut(&(idx as uint)).unwrap();
             let pointevent = match (oldpoint.info, newpoint) {
-                (Some(op), point::Point(np)) => {
+                (Some(op), PointInfo::Point(np)) => {
                     let dist = manhattan_distance(op.pos, np.pos);
                     let avgsize = oldpoint.sizeavg.push(np.size);
                     let avgspeed = oldpoint.speedavg.push(op.pos - np.pos);
@@ -104,19 +104,19 @@ pub fn next_point(s: &mut MotionEventConsumer, e: &mut Events) -> (point::Shader
                         counter: op.counter,
                     };
                     oldpoint.info = Some(npdata);
-                    point::Move(op, npdata)
+                    ShaderPointEvent::Move(op, npdata)
                 },
-                (_, point::FrameStop) => {
-                    point::NoEvent
+                (_, PointInfo::FrameStop) => {
+                    ShaderPointEvent::NoEvent
                 },
-                (_, point::Stop) => {
+                (_, PointInfo::Stop) => {
                     oldpoint.info = None;
                     oldpoint.sizeavg.clear();
                     oldpoint.speedavg.clear();
                     s.point_count -= 1;
-                    point::Up
+                    ShaderPointEvent::Up
                 },
-                (_, point::Point(p)) => {
+                (_, PointInfo::Point(p)) => {
                     let old_counter = s.point_counter;
                     s.point_counter += 1;
                     s.point_count += 1;
@@ -129,13 +129,13 @@ pub fn next_point(s: &mut MotionEventConsumer, e: &mut Events) -> (point::Shader
                         counter: old_counter as f32,
                     };
                     oldpoint.info = Some(npdata);
-                    point::Down(npdata)
+                    ShaderPointEvent::Down(npdata)
                 },
             };
             (pointevent, idx as u8)
         },
         None => {
-            (point::NoEvent, 0u8)
+            (ShaderPointEvent::NoEvent, 0u8)
         }
     }
 }

@@ -8,7 +8,7 @@ use opengles::gl2::GLuint;
 use copyshader::CopyShader;
 use gltexture::Texture;
 use pointshader::PointShader;
-use gltexture;
+use gltexture::PixelFormat;
 
 pub struct TextureTarget {
     pub framebuffer: GLuint,
@@ -29,7 +29,7 @@ pub struct CompletedLayer<'a, 'b> {
 }
 
 impl TextureTarget {
-    pub fn new(w: i32, h: i32, format: gltexture::PixelFormat) -> TextureTarget {
+    pub fn new(w: i32, h: i32, format: PixelFormat) -> TextureTarget {
         let framebuffer = gl2::gen_framebuffers(1)[0];
         let texture = Texture::with_image(w, h, None, format);
 
@@ -55,7 +55,7 @@ impl<'a> PaintLayer<'a> {
         PaintLayer {
             copyshader: copyshader,
             pointshader: pointshader,
-            target: TextureTarget::new(w, h, gltexture::RGBA),
+            target: TextureTarget::new(w, h, PixelFormat::RGBA),
             pointidx: pointidx,
         }
     }
