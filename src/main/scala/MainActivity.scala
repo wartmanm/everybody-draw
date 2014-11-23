@@ -131,9 +131,12 @@ class MainActivity extends Activity with TypedActivity with AndroidImplicits {
   // runs on gl thread
   def onTextureCreated(thread: TextureSurfaceThread, producer: MotionEventProducer)(gl: GLInit) = {
     thread.initScreen(gl, savedBitmap)
+
     savedBitmap = None
     thread.startFrames(gl)
     populatePickers(producer, thread, gl)
+    thread.setBrushColor(gl, colorPicker.getColor())
+    thread.setBrushSize(gl, colorPicker.getScale())
     content.setOnTouchListener(createViewTouchListener(producer))
     Log.i("main", "set ontouch listener")
   }
