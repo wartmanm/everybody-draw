@@ -3,14 +3,13 @@ use core::prelude::*;
 use core::mem;
 use collections::vec::Vec;
 use collections::str::{StrAllocating, IntoMaybeOwned};
-use collections::string::String;
 
 use log::{logi,loge};
 
 use opengles::gl2;
 use opengles::gl2::{GLuint, GLenum, GLubyte};
 
-use glcommon::{Shader, check_gl_error, GLResult};
+use glcommon::{check_gl_error, GLResult};
 use glpoint::{MotionEventConsumer};
 use point::ShaderPaintPoint;
 use pointshader::PointShader;

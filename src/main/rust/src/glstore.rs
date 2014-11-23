@@ -11,7 +11,6 @@
 use core::prelude::*;
 use core::mem;
 use collections::vec::Vec;
-use collections::string::String;
 use collections::hash::Hash;
 use collections::hash::sip::SipHasher;
 use std::collections::HashMap;

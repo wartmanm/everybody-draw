@@ -1,5 +1,5 @@
 use jni::*;
-use core::{ptr, mem};
+use core::mem;
 
 pub trait ToJValue {
     fn as_jvalue(&mut self) -> jvalue;

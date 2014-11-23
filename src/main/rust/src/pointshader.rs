@@ -2,7 +2,6 @@ use core::prelude::*;
 use core::{mem, fmt};
 use core::fmt::Show;
 use collections::str::{StrAllocating, IntoMaybeOwned};
-use collections::string::String;
 
 use log::{logi};
 

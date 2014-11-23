@@ -11,11 +11,10 @@
 use core::prelude::*;
 use collections::slice::CloneSliceAllocPrelude;
 use collections::vec::Vec;
-use collections::string::String;
 use point::PointEntry;
 use glstore::{DrawObjectIndex, DrawObjectList};
 use glstore::{ShaderInitValues, BrushInitValues, LuaInitValues};
-use glstore::{ShaderUnfilledValues, BrushUnfilledValues, LuaUnfilledValues};
+use glstore::{BrushUnfilledValues, LuaUnfilledValues};
 use glstore::MaybeInitFromCache; // FIXME separate out get_source()
 use gltexture::{BrushTexture, PixelFormat};
 use pointshader::PointShader;

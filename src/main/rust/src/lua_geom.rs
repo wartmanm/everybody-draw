@@ -44,6 +44,7 @@ enum SandboxMode {
 }
 
 enum LuaValue {
+    #[allow(dead_code)]
     RegistryValue(*mut c_void),
     IndexValue(i32),
 }

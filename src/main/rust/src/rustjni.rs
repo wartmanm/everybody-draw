@@ -5,18 +5,16 @@ use core::raw;
 use alloc::boxed::Box;
 use libc::{c_void, c_char};
 use collections::string::String;
-use collections::str::{MaybeOwned, IntoMaybeOwned};
+use collections::str::{IntoMaybeOwned};
 use collections::vec::Vec;
 
 use jni::{jobject, jclass, jfieldID, jmethodID, JNIEnv, jint, jfloat, jstring, jboolean, jvalue, jfloatArray, JNINativeMethod, JavaVM};
 use android::input::AInputEvent;
-use android::bitmap::{AndroidBitmap_getInfo, AndroidBitmap_lockPixels, AndroidBitmap_unlockPixels, AndroidBitmapInfo};
-use android::bitmap::{ANDROID_BITMAP_FORMAT_RGBA_8888, ANDROID_BITMAP_FORMAT_A_8};
 use android::native_window_jni::{ANativeWindow_fromSurface};//, ANativeWindow_release};
 use android::native_window::ANativeWindow_release;
 use glcommon::{GLResult, MString};
 
-use log::{logi, loge};
+use log::logi;
 
 use glstore::DrawObjectIndex;
 use glinit::{GLInit, AndroidBitmapFormat};
@@ -27,10 +25,7 @@ use jni_constants::*;
 use jni_helpers::ToJValue;
 use drawevent::Events;
 use drawevent::event_stream::EventStream;
-use gltexture::ToPixelFormat;
-use gltexture::{Texture, BrushTexture};
-use redirect_stderr;
-use redirect_stderr::Struct_stdout_forwarder;
+use gltexture::{ToPixelFormat, BrushTexture};
 use rustjni::android_bitmap::{AndroidBitmap};
 
 macro_rules! native_method(
@@ -45,8 +40,6 @@ macro_rules! native_method(
 
 static mut MOTION_CLASS: jclass = 0 as jclass;
 static mut MOTIONEVENT_NATIVE_PTR_FIELD: jfieldID = 0 as jfieldID;
-
-static mut REDIRECT_PTR: *mut () = 0 as *mut ();
 
 struct CaseClass {
     constructor: jmethodID,
@@ -240,7 +233,7 @@ unsafe extern "C" fn set_brush_texture(_: *mut JNIEnv, _: jobject, data: jint, t
 }
 
 unsafe fn safe_create_texture(env: *mut JNIEnv, data: jint, bitmap: jobject) -> GLResult<DrawObjectIndex<BrushTexture>> {
-    let mut bitmap = AndroidBitmap::from_jobject(env, bitmap);
+    let bitmap = AndroidBitmap::from_jobject(env, bitmap);
     let (w, h) = (bitmap.info.width, bitmap.info.height);
     let format: AndroidBitmapFormat = mem::transmute(bitmap.info.format);
     let texformat = try!(format.to_pixelformat());
@@ -295,10 +288,10 @@ mod android_bitmap {
     use core::prelude::*;
     use core::raw;
     use core::{ptr, mem};
-    use libc::{c_void, c_char};
-    use jni::{jobject, jclass, jfieldID, jmethodID, JNIEnv, jint, jfloat, jstring, jboolean, jvalue, jfloatArray, JNINativeMethod, JavaVM};
+    use libc::c_void;
+    use jni::{jobject, jclass, jmethodID, JNIEnv};
     use jni_constants::{JNI_TRUE, JNI_FALSE};
-    use log::{logi, loge};
+    use log::logi;
     use android::bitmap::{AndroidBitmap_getInfo, AndroidBitmap_lockPixels, AndroidBitmap_unlockPixels, AndroidBitmapInfo};
     use android::bitmap::{ANDROID_BITMAP_FORMAT_RGBA_8888, ANDROID_BITMAP_FORMAT_A_8};
     static mut BITMAP_CLASS: jclass = 0 as jclass;
