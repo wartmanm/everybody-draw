@@ -40,6 +40,15 @@ macro_rules! assert_stacksize {
     )
 }
 
+macro_rules! safe_pop {
+    ($L:expr, $body:expr) => (
+        {
+            assert!(lua_gettop($L) as u32 >= $body as u32);
+            lua_pop($L, $body);
+        }
+    )
+}
+
 type ReaderState<'a> = (&'a str, bool);
 
 enum SandboxMode {
@@ -87,7 +96,7 @@ unsafe fn err_to_str(L: *mut lua_State) -> String {
     let strptr = lua_tolstring(L, -1, &mut size);
     let luastr: &str = mem::transmute(raw::Slice { data: strptr, len: size as uint });
     let result = luastr.into_string();
-    lua_pop(L, -1);
+    safe_pop!(L, 1);
     result
 }
 
@@ -204,7 +213,7 @@ unsafe fn save_ondone(L: *mut lua_State, key: i32, sandbox: LuaValue) -> GLResul
                 lua_getfield(L, -3, cstr!("ondone")); {
                     // stack holds sandbox -- stopfns -- stopidx -- ondone
                     if !lua_isfunction(L, -1) {
-                        lua_pop(L, 4);
+                        safe_pop!(L, 4);
                         assert_eq!(stacksize, lua_gettop(L));
                         return log_err("ondone not defined.\nThis should never happen!".into_maybe_owned());
                     }
@@ -213,7 +222,7 @@ unsafe fn save_ondone(L: *mut lua_State, key: i32, sandbox: LuaValue) -> GLResul
                 }
             }
             // stack holds sandbox -- stopfns
-            lua_pop(L, 2);
+            safe_pop!(L, 2);
             assert_eq!(stacksize, lua_gettop(L));
             Ok(())
         }
@@ -223,6 +232,18 @@ unsafe fn save_ondone(L: *mut lua_State, key: i32, sandbox: LuaValue) -> GLResul
 pub unsafe fn load_lua_script(script: &str) -> GLResult<i32> {
     let L = try!(get_lua());
     logi!("got lua");
+    lua_pushstring(L, cstr!("assert filler")); // lua_pop() on an empty stack is a no-op
+    lua_pushstring(L, cstr!("assert filler"));
+    lua_pushstring(L, cstr!("assert filler"));
+    let stacksize = lua_gettop(L);
+    let result = load_lua_script_internal(L, script);
+    assert_eq!(stacksize, lua_gettop(L));
+    safe_pop!(L, 3);
+    result
+}
+
+
+unsafe fn load_lua_script_internal(L: *mut lua_State, script: &str) -> GLResult<i32> {
     let stacksize = lua_gettop(L);
 
     let key = (&gldraw_lua_key) as *const i32 as i32 + gldraw_lua_key;
@@ -231,7 +252,7 @@ pub unsafe fn load_lua_script(script: &str) -> GLResult<i32> {
         let sandbox_idx = IndexValue(lua_gettop(L));
         if !runstring(L, LUA_INTERPOLATOR_DEFAULTS, cstr!("interpolator defaults"), Sandboxed(sandbox_idx)) {
             let err = format!("default loader failed to load: {}\nThis should never happen!", err_to_str(L)).into_maybe_owned();
-            lua_pop(L, 1);
+            safe_pop!(L, 1);
             assert_eq!(stacksize, lua_gettop(L));
             return log_err(err);
         }
@@ -240,6 +261,7 @@ pub unsafe fn load_lua_script(script: &str) -> GLResult<i32> {
 
             if !runstring(L, script, cstr!("interpolator script"), Sandboxed(sandbox_idx)) {
                 let err = format!("script failed to load: {}", err_to_str(L)).into_maybe_owned();
+                safe_pop!(L, 2);
                 assert_eq!(stacksize, lua_gettop(L));
                 return log_err(err);
             }
@@ -247,12 +269,12 @@ pub unsafe fn load_lua_script(script: &str) -> GLResult<i32> {
             sandbox_idx.push_self(L); {
                 lua_getfield(L, -1, cstr!("main")); {
                     if !lua_isfunction(L, -1) {
-                        lua_pop(L, 3);
+                        safe_pop!(L, 4);
                         assert_eq!(stacksize, lua_gettop(L));
                         return log_err("no main function defined :(".into_maybe_owned());
                     }
                     luaJIT_setmode(L, 0, LUAJIT_MODE_ENGINE as i32|LUAJIT_MODE_ON as i32);
-                    lua_pop(L, 1);
+                    safe_pop!(L, 1);
                 }
 
                 // make values defined in script available to lua_runner
@@ -262,21 +284,21 @@ pub unsafe fn load_lua_script(script: &str) -> GLResult<i32> {
             // FIXME compile runner once
             if !runstring(L, LUA_RUNNER, cstr!("built-in lua_runner script"), Unsandboxed) {
                 let err = format!("lua runner failed to load: {}\n This should never happen!", err_to_str(L)).into_maybe_owned();
-                lua_pop(L, 1);
+                safe_pop!(L, 2);
                 assert_eq!(stacksize, lua_gettop(L));
                 return log_err(err);
             }
 
             lua_getglobal(L, cstr!("runmain")); {
                 if !lua_isfunction(L, -1) {
-                    lua_pop(L, 2);
+                    safe_pop!(L, 3);
                     assert_eq!(stacksize, lua_gettop(L));
                     return log_err("runmain not defined.\nThis should never happen!".into_maybe_owned());
                 }
                 luaJIT_setmode(L, 0, LUAJIT_MODE_ENGINE as i32|LUAJIT_MODE_ON as i32);
 
                 if let Err(msg) = save_ondone(L, key, sandbox_idx) {
-                    lua_pop(L, 2);
+                    safe_pop!(L, 3);
                     assert_eq!(stacksize, lua_gettop(L));
                     return Err(msg);
                 }
@@ -285,7 +307,7 @@ pub unsafe fn load_lua_script(script: &str) -> GLResult<i32> {
             }
         }
 
-        lua_pop(L, 1);
+        safe_pop!(L, 1);
     }
 
     gldraw_lua_key += 1;
@@ -296,26 +318,34 @@ pub unsafe fn load_lua_script(script: &str) -> GLResult<i32> {
 
 pub unsafe fn finish_lua_script<T: LuaCallback>(output: &mut T, script: &::luascript::LuaScript) -> GLResult<()> {
     let L = get_lua().unwrap();
+    lua_pushstring(L, cstr!("assert filler")); // lua_pop() on an empty stack is a no-op
+    lua_pushstring(L, cstr!("assert filler"));
+    lua_pushstring(L, cstr!("assert filler"));
     let stacksize = lua_gettop(L);
     lua_pushlightuserdata(L, GLDRAW_LUA_STOPFNS);
-    lua_gettable(L, LUA_REGISTRYINDEX);
-    logi!("type of gldraw_lua_stopfns is {}", str::from_c_str(lua_typename(L, lua_type(L, -1))));
+    let result = {
+        lua_gettable(L, LUA_REGISTRYINDEX);
+        logi!("type of gldraw_lua_stopfns is {}", str::from_c_str(lua_typename(L, lua_type(L, -1))));
 
-    // stack is stopfns
-    script.push_self();
-    lua_gettable(L, -2);
-    logi!("type of stopfn for {} is {}", script, str::from_c_str(lua_typename(L, lua_type(L, -1))));
-    // stack is stopfns -- stopfn
-    lua_pushlightuserdata(L, output as *mut T as *mut c_void);
-    logi!("calling lua ondone()");
-    let result = match lua_pcall(L, 1, 0, 0) {
-        0 => {
-            lua_pop(L, 1); // remove stopfns
-            Ok(())
-        },
-        _ => log_err(format!("ondone() script failed to run: {}", err_to_str(L)).into_maybe_owned()),
+        // stack is stopfns
+        script.push_self();
+        lua_gettable(L, -2);
+        logi!("type of stopfn for {} is {}", script, str::from_c_str(lua_typename(L, lua_type(L, -1))));
+        // stack is stopfns -- stopfn
+        lua_pushlightuserdata(L, output as *mut T as *mut c_void);
+        logi!("calling lua ondone()");
+        let result = match lua_pcall(L, 1, 0, 0) {
+            0 => Ok(()),
+            _ => {
+                logi!("finish_lua_script failed, stack size is {}", lua_gettop(L));
+                log_err(format!("ondone() script failed to run: {}", err_to_str(L)).into_maybe_owned())
+            }
+        };
+        safe_pop!(L, 1);
+        result
     };
     assert_eq!(stacksize, lua_gettop(L));
+    safe_pop!(L, 3);
     result
 }
 
@@ -341,6 +371,9 @@ pub unsafe fn push_lua_script(key: i32) {
 
 pub unsafe fn do_interpolate_lua<T: LuaCallback>(script: &::luascript::LuaScript, dimensions: (i32, i32), output: &mut T) -> GLResult<()> {
     let L = try!(get_existing_lua_or_err());
+    lua_pushstring(L, cstr!("assert filler")); // lua_pop() on an empty stack is a no-op
+    lua_pushstring(L, cstr!("assert filler"));
+    lua_pushstring(L, cstr!("assert filler"));
     let stacksize = lua_gettop(L);
     script.push_self();
     lua_gettable(L, LUA_REGISTRYINDEX);
@@ -355,5 +388,6 @@ pub unsafe fn do_interpolate_lua<T: LuaCallback>(script: &::luascript::LuaScript
         _ => log_err(format!("script failed to run: {}", err_to_str(L)).into_maybe_owned()),
     };
     assert_eq!(stacksize, lua_gettop(L));
+    safe_pop!(L, 3);
     result
 }
