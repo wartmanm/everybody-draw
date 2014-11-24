@@ -206,7 +206,7 @@ unsafe fn save_ondone(L: *mut lua_State, key: i32, sandbox: LuaValue) -> GLResul
     sandbox.push_self(L); {
         lua_pushlightuserdata(L, GLDRAW_LUA_STOPFNS); {
             lua_gettable(L, LUA_REGISTRYINDEX);
-            logi!("type of gldraw_lua_stopfns is {}", str::from_c_str(lua_typename(L, lua_type(L, -1))));
+            logi!("save_ondone(): type of gldraw_lua_stopfns is {}", str::from_c_str(lua_typename(L, lua_type(L, -1))));
             // stack holds sandbox -- stopfns
             lua_pushlightuserdata(L, key as *mut c_void); {
                 // stack holds sandbox -- stopfns -- stopidx
