@@ -40,6 +40,7 @@ unsafe extern "C" fn init_gl(env: *mut JNIEnv, _: jobject, w: jint, h: jint, cal
         glinit: GLInit::setup_graphics(w, h),
         events: Events::new(),
         jni_undo_callback: JNIUndoCallback::new(env, callback),
+        owning_thread: ::rustjni::gettid(),
     })
 }
 
