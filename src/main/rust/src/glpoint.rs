@@ -49,7 +49,7 @@ pub fn create_motion_event_handler() -> (MotionEventConsumer, MotionEventProduce
         producer: producer,
         pointer_data: motionevent::Data::new(),
     };
-    logi("created statics");
+    logi("created motion event pair");
     (handler, producer)
 }
 

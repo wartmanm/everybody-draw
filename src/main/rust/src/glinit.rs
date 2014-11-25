@@ -223,7 +223,6 @@ impl<'a> GLInit<'a> {
     }
 
     pub fn get_pixels(&mut self, pixels: &mut [u8]) {
-        logi("in with_pixels");
         let oldtarget = self.targetdata.get_current_texturetarget();
         let (x,y) = oldtarget.texture.dimensions;
         gl2::bind_framebuffer(gl2::FRAMEBUFFER, oldtarget.framebuffer);
@@ -339,7 +338,7 @@ impl<'a> GLInit<'a> {
 
     pub fn unload_interpolator(&mut self, handler: &mut MotionEventConsumer, events: &'a mut Events<'a>, undo_callback: &JNICallbackClosure) -> GLResult<()> {
         if let Some(interpolator) = self.paintstate.interpolator {
-            logi!("finishing luascript {}", interpolator);
+            logi!("finishing {}", interpolator);
             unsafe {
                 let mut callback = LuaCallbackType::new(self, events, handler, undo_callback);
                 finish_lua_script(&mut callback, interpolator)
