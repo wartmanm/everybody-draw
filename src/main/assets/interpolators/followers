@@ -1,0 +1,47 @@
+local followersets = {}
+local backlogcounter = {}
+
+function ondown(a, output)
+  local newset = {}
+  local x = a.x
+  local y = a.y
+  for i = 1, 10 do
+    newset[i] = {x = x, y = y}
+  end
+  followersets[a.counter] = newset
+  backlogcounter[a.counter] = 0
+  default_ondown(a, output)
+end
+function onup(a, output)
+  followersets[a] = nil
+  default_onup(a, output)
+end
+onframe = default_onframe
+ondone = default_ondone
+
+function main(a, b, screenx, screeny, points)
+  local counter = a.counter
+  local olddist = backlogcounter[counter]
+  if b.distance > olddist then
+    backlogcounter[counter] = olddist + 35
+
+    local set = followersets[counter]
+    local oldx = a.x
+    local oldy = a.y
+    local newx = b.x
+    local newy = b.y
+    for i = 1, 10 do
+      local x = set[i].x
+      local y = set[i].y
+      local distx = newx - x
+      local disty = newy - y
+      a.x = x
+      a.y = y
+      b.x = x + distx / i
+      b.y = y + disty / i
+      set[i].x = b.x
+      set[i].y = b.y
+      pushline(points, 0, a, b)
+    end
+  end
+end
