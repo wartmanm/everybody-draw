@@ -1,0 +1,45 @@
+local positions = {}
+local indexes = {}
+local active = 0
+function ondown(a, output)
+  for i = 1,4 do
+    if positions[i] == nil then
+      positions[i] = {x = a.x, y = a.y}
+      positions[i].size = 2
+      positions[i].counter = a.counter
+      indexes[a.counter] = i
+      loglua("added " .. a.counter .. " as point " .. i)
+      active = active + 1
+      break
+    end
+  end
+  default_ondown(a, output)
+end
+function onup(a, output)
+  local idx = indexes[a]
+  if idx ~= nil then
+    loglua("pointer " .. "a" .. " lifted; removed point " .. idx)
+    positions[idx] = nil
+    active = active - 1
+    savelayers(output)
+  end
+  default_onup(a, output)
+end
+function main(a, b, x, y, points)
+  local idx = indexes[b.counter]
+  if idx ~= nil then
+    positions[idx].x = b.x
+    positions[idx].y = b.y
+  end
+end
+function onframe(x, y, points)
+  if active < 4 then return end
+  local outpoints = ShaderPaintPointArray(4)
+  outpoints[0] = positions[1]
+  outpoints[1] = positions[2]
+  outpoints[2] = positions[3]
+  outpoints[3] = positions[4]
+  loglua("pushing cubic bezier points!")
+  pushcubicbezier(points, 1, outpoints)
+end
+
