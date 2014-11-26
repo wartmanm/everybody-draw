@@ -44,11 +44,11 @@ pub unsafe fn init(env: *mut JNIEnv) {
     MOTIONEVENT_NATIVE_PTR_FIELD = ((**env).GetFieldID)(env, MOTION_CLASS, cstr!("mNativePtr"), cstr!("I"));
     logi!("got motion classes");
 
-    let mainmethods = [
+    let producermethods = [
         native_method!("nativeAppendMotionEvent", "(ILandroid/view/MotionEvent;)V", native_append_motion_event),
         native_method!("nativePauseMotionEvent", "(I)V", native_pause_motion_event),
     ];
-    register_classmethods(env, cstr!("com/github/wartman4404/gldraw/MainActivity"), &mainmethods);
+    register_classmethods(env, cstr!("com/github/wartman4404/gldraw/MotionEventProducer$"), &producermethods);
 
     let motioneventhandlerstaticmethods = [
         native_method!("init", "()Lcom/github/wartman4404/gldraw/MotionEventHandlerPair;", init_motion_event_handler),

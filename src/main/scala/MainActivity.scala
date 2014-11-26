@@ -9,6 +9,7 @@ import android.graphics.{SurfaceTexture, Bitmap}
 import android.content.{Context, Intent}
 import android.content.res.Configuration
 import android.app.AlertDialog
+import android.support.v4.widget.DrawerLayout
 
 import java.io.{BufferedInputStream}
 import java.io.{OutputStream, FileOutputStream, BufferedOutputStream}
@@ -57,7 +58,7 @@ class MainActivity extends Activity with TypedActivity with AndroidImplicits {
   lazy val controlflipper = findView(TR.controlflipper)
   lazy val controldrawer = findView(TR.control_drawer)
   lazy val sidebar = findView(TR.sidebar_parent)
-  lazy val drawerToggle = new android.support.v7.app.ActionBarDrawerToggle(
+  lazy val drawerToggle = new MotionEventDrawerToggle(
       this, drawerParent, R.string.sidebar_open, R.string.sidebar_close)
   lazy val sidebarAdapter = new SidebarAdapter()
   lazy val undoButton = findView(TR.undo_button)
@@ -73,8 +74,7 @@ class MainActivity extends Activity with TypedActivity with AndroidImplicits {
 
   lazy val saveThread = ExecutionContext.fromExecutor(Executors.newSingleThreadExecutor())
 
-  @native protected def nativeAppendMotionEvent(handler: MotionEventProducer, m: MotionEvent): Unit
-  @native protected def nativePauseMotionEvent(handler: MotionEventProducer): Unit
+  var drawerIsOpen = false
 
   // TODO: actually clean up
   var handlers: Option[MotionEventHandlerPair] = None
@@ -137,15 +137,14 @@ class MainActivity extends Activity with TypedActivity with AndroidImplicits {
     populatePickers(producer, thread, gl)
     thread.setBrushColor(gl, colorPicker.getColor())
     thread.setBrushSize(gl, colorPicker.getScale())
-    content.setOnTouchListener(createViewTouchListener(producer))
+    val listener = new ToggleableMotionEventListener(producer)
+    drawerToggle.setMotionEventListener(listener)
+    content.setOnTouchListener(listener)
     Log.i("main", "set ontouch listener")
   }
 
-  def createViewTouchListener(producer: MotionEventProducer) = new View.OnTouchListener() {
-    override def onTouch(v: View, evt: MotionEvent) = {
-      nativeAppendMotionEvent(producer, evt)
-      true
-    }
+  def createViewTouchListener(producer: MotionEventProducer) = {
+    new ToggleableMotionEventListener(producer)
   }
 
   override def onCreate(bundle: Bundle) {
@@ -368,7 +367,7 @@ class MainActivity extends Activity with TypedActivity with AndroidImplicits {
     val notify = new Object()
     notify.synchronized {
       runOnUiThread(() => {
-        nativePauseMotionEvent(producer)
+        MotionEventProducer.nativePauseMotionEvent(producer)
         Log.i("main", "loading interpolator - paused motion events")
         notify.synchronized {
           notify.notify()
@@ -666,6 +665,43 @@ object MainActivity {
 
   object Constants {
     final val ACTIVITY_CHOOSE_IMAGE = 0x1;
+  }
+
+  class ToggleableMotionEventListener(producer: MotionEventProducer)
+  extends View.OnTouchListener {
+    def setForwardEvents(forwardEvents: Boolean): Unit = {
+      this.forwardEvents = forwardEvents
+    }
+    final private var forwardEvents = true
+    override def onTouch(v: View, evt: MotionEvent) = {
+      if (forwardEvents) MotionEventProducer.nativeAppendMotionEvent(producer, evt)
+      true
+    }
+  }
+
+  class MotionEventDrawerToggle(activity: Activity, layout: DrawerLayout, openRes: Int, closeRes: Int)
+  extends android.support.v7.app.ActionBarDrawerToggle(activity, layout, openRes, closeRes) {
+    private final var motionEventListener: Option[ToggleableMotionEventListener] = None
+    def setMotionEventListener(listener: ToggleableMotionEventListener): Unit = {
+      motionEventListener = Some(listener)
+    }
+    override def onDrawerClosed(view: View) = {
+      Log.i("main", "drawer closed")
+      motionEventListener.foreach(_.setForwardEvents(true))
+      super.onDrawerClosed(view)
+    }
+    override def onDrawerStateChanged(newState: Int) = {
+      if (newState != DrawerLayout.STATE_IDLE) {
+        motionEventListener.foreach(_.setForwardEvents(false))
+      }
+      val newStateName = newState match {
+        case DrawerLayout.STATE_DRAGGING => "STATE_DRAGGING"
+        case DrawerLayout.STATE_IDLE => "STATE_IDLE"
+        case DrawerLayout.STATE_SETTLING => "STATE_SETTLING"
+      }
+      Log.i("main", s"drawer state changed to ${newStateName}")
+      super.onDrawerStateChanged(newState)
+    }
   }
 
   class TextureListener(callback: (SurfaceTexture, Int, Int)=>Unit) extends TextureView.SurfaceTextureListener {
