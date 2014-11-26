@@ -49,7 +49,7 @@ pub extern "C" fn lua_nextpoint(data: &mut LuaCallbackType, points: &mut (Shader
     let (newpoints, luastate) = match state {
         Move(a, b) => ((a,b), MOVE),
         Down(a) => unsafe { ((a, mem::uninitialized()), DOWN) },
-        Up => unsafe { (mem::uninitialized(), UP) },
+        Up(a) => unsafe { ((a, mem::uninitialized()), UP) },
         NoEvent => unsafe { (mem::uninitialized(), DONE) },
     };
     *points = newpoints;

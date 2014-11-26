@@ -109,12 +109,20 @@ pub fn next_point(s: &mut MotionEventConsumer, e: &mut Events) -> (point::Shader
                 (_, PointInfo::FrameStop) => {
                     ShaderPointEvent::NoEvent
                 },
-                (_, PointInfo::Stop) => {
+                (op_opt, PointInfo::Stop) => {
+                    let op = op_opt.unwrap_or(ShaderPaintPoint {
+                        pos: Coordinate { x: 0f32, y: 0f32 },
+                        time: 0f32,
+                        size: 0f32,
+                        speed: Coordinate { x: 0f32, y: 0f32 },
+                        distance: 0f32,
+                        counter: 0f32,
+                    });
                     oldpoint.info = None;
                     oldpoint.sizeavg.clear();
                     oldpoint.speedavg.clear();
                     s.point_count -= 1;
-                    ShaderPointEvent::Up
+                    ShaderPointEvent::Up(op)
                 },
                 (_, PointInfo::Point(p)) => {
                     let old_counter = s.point_counter;
