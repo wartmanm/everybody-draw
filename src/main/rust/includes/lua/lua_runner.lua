@@ -39,8 +39,7 @@ function runmain(x, y, output)
     else -- pointer up
       loglua("got up evt")
       if type(_onup) == "function" then
-        local pointer = bit.band(0x00ff, pointstatus)
-        _onup(pointer, output)
+        _onup(pointpair[0].counter, output)
       end
     end
   end
