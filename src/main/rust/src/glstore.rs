@@ -10,9 +10,10 @@
 
 use core::prelude::*;
 use core::mem;
+use core::fmt::Show;
 use collections::vec::Vec;
 use collections::hash::Hash;
-use collections::hash::sip::SipHasher;
+use collections::hash::sip::{SipHasher, SipState};
 use std::collections::HashMap;
 use copyshader::CopyShader;
 use gltexture::{PixelFormat, Texture, BrushTexture};
@@ -22,6 +23,7 @@ use luascript::LuaScript;
 use arena::TypedArena;
 use glcommon::GLResult;
 use glcommon::{FillDefaults, MString};
+use log::logi;
 
 /// Holds GL objects that can be inited using the given keys.
 /// The list is to avoid having to pass those keys around, and serialize more easily.
@@ -29,7 +31,7 @@ use glcommon::{FillDefaults, MString};
 /// even if it needs some encouragement to do so.
 /// There ought to be a better way.
 pub struct DrawObjectList<'a, T: 'a, Init: Eq+Hash+'a> {
-    map: HashMap<&'a Init, DrawObjectIndex<T>, SipHasher>,
+    map: HashMap<HashReference<'a, Init>, DrawObjectIndex<T>, SipHasher>,
     list: Vec<&'a T>,
     arena: TypedArena<T>,
 }
@@ -111,7 +113,7 @@ impl MaybeInitFromCache<LuaInitValues> for LuaScript {
     fn get_source(&self) -> &MString { &self.source }
 }
 
-impl<'a, Unfilled, T: MaybeInitFromCache<Init> + FillDefaults<Unfilled, Init, T>, Init: Hash+Eq> DrawObjectList<'a, T, Init> {
+impl<'a, Unfilled, T: MaybeInitFromCache<Init> + FillDefaults<Unfilled, Init, T>, Init: Hash+Eq+Show> DrawObjectList<'a, T, Init> {
     pub fn new() -> DrawObjectList<'a, T, Init> {
         // the default hasher is keyed off of the task-local rng,
         // which would blow up since we don't have a task
@@ -130,13 +132,13 @@ impl<'a, Unfilled, T: MaybeInitFromCache<Init> + FillDefaults<Unfilled, Init, T>
     pub fn push_object(&mut self, init: Unfilled) -> GLResult<DrawObjectIndex<T>> {
         // Can't use map.entry() here as it consumes the key
         let filled = FillDefaults::fill_defaults(init).val;
-        let filledref: &&Init = unsafe { mem::transmute(&&filled) };
+        let filledref = HashReference { v: unsafe { mem::transmute(&filled) } };
         // see below -- these are safe, we just can't prove it
-        if self.map.contains_key(filledref) {
-            Ok(*self.map.get(filledref).unwrap())
+        if self.map.contains_key(&filledref) {
+            Ok(*self.map.get(&filledref).unwrap())
         } else {
             let inited: T = try!(MaybeInitFromCache::<Init>::maybe_init(filled));
-            let key = unsafe { mem::transmute(inited.get_source()) };
+            let key = HashReference { v: unsafe { mem::transmute(inited.get_source()) } };
             // ptr's lifetime is limited to &self's, which is fair but not very useful.
             // smart ptrs involve individual allocs but are probably better
             let ptr = self.arena.alloc(inited);
@@ -156,9 +158,32 @@ impl<'a, Unfilled, T: MaybeInitFromCache<Init> + FillDefaults<Unfilled, Init, T>
     }
 }
 
-impl<'a, Unfilled, T: InitFromCache<Init> + MaybeInitFromCache<Init> + FillDefaults<Unfilled, Init, T>, Init: Hash+Eq> DrawObjectList<'a, T, Init> {
+impl<'a, Unfilled, T: InitFromCache<Init> + MaybeInitFromCache<Init> + FillDefaults<Unfilled, Init, T>, Init: Hash+Eq+Show> DrawObjectList<'a, T, Init> {
     pub fn safe_push_object(&mut self, init: Unfilled) -> DrawObjectIndex<T> {
         self.push_object(init).unwrap()
     }
 }
+
+struct HashReference<'a, T: Hash+PartialEq+'a> {
+    v: &'a T
+}
+
+impl<'a, T: Hash+PartialEq+Show> Hash for HashReference<'a, T> {
+    fn hash(&self, state: &mut SipState) {
+        logi!("hashing '{}'", self.v);
+        self.v.hash(state);
+        logi!("got '{}'", state.result());
+    }
+}
+
+impl<'a, T: Hash+PartialEq+Show> PartialEq for HashReference<'a, T> {
+    fn eq(&self, other: &HashReference<'a, T>) -> bool {
+        let iseq = self.v.eq(other.v);
+        logi!("'{}' {} '{}'", self.v, if iseq {"=="} else {"!="}, other.v);
+        iseq
+    }
+}
+
+impl<'a, T: Hash+Eq+Show> Eq for HashReference<'a, T> { }
+
 

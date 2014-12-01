@@ -103,6 +103,7 @@ pub trait Shader {
     fn new(vertopt: MString, fragopt: MString) -> GLResult<Self>;
 }
 
+#[deriving(Show)]
 pub struct Defaults<Init, Base> {
     pub val: Init
 }
