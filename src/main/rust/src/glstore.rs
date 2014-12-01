@@ -13,7 +13,7 @@ use core::mem;
 use core::fmt::Show;
 use collections::vec::Vec;
 use collections::hash::Hash;
-use collections::hash::sip::{SipHasher, SipState};
+use collections::hash::sip::SipHasher;
 
 use std::collections::HashMap;
 use std::collections::hash_map::{Vacant, Occupied};
@@ -25,7 +25,6 @@ use luascript::LuaScript;
 use arena::TypedArena;
 use glcommon::GLResult;
 use glcommon::{FillDefaults, MString};
-use log::logi;
 
 #[cfg(test)]
 use collections::str::IntoMaybeOwned;
@@ -36,7 +35,7 @@ use collections::str::IntoMaybeOwned;
 /// even if it needs some encouragement to do so.
 /// There ought to be a better way.
 pub struct DrawObjectList<'a, T: 'a, Init: Eq+Hash+'a> {
-    map: HashMap<HashReference<'a, Init>, DrawObjectIndex<T>, SipHasher>,
+    map: HashMap<&'a Init, DrawObjectIndex<T>, SipHasher>,
     list: Vec<&'a T>,
     arena: TypedArena<T>,
 }
@@ -137,7 +136,7 @@ impl<'a, Unfilled, T: MaybeInitFromCache<Init> + FillDefaults<Unfilled, Init, T>
     pub fn push_object(&mut self, init: Unfilled) -> GLResult<DrawObjectIndex<T>> {
         // Can't use map.entry() here as it consumes the key
         let filled = FillDefaults::fill_defaults(init).val;
-        let filledref = HashReference { v: unsafe { mem::transmute(&filled) } };
+        let filledref: &'a Init = unsafe { mem::transmute(&filled) };
         // see below -- these are safe, we just can't prove it
         match self.map.entry(filledref) {
             Occupied(entry) => Ok(*entry.get()),
@@ -168,29 +167,6 @@ impl<'a, Unfilled, T: InitFromCache<Init> + MaybeInitFromCache<Init> + FillDefau
         self.push_object(init).unwrap()
     }
 }
-
-struct HashReference<'a, T: Hash+PartialEq+'a> {
-    v: &'a T
-}
-
-impl<'a, T: Hash+PartialEq+Show> Hash for HashReference<'a, T> {
-    fn hash(&self, state: &mut SipState) {
-        logi!("hashing '{}'", self.v);
-        self.v.hash(state);
-        logi!("got '{}'", state.result());
-    }
-}
-
-impl<'a, T: Hash+PartialEq+Show> PartialEq for HashReference<'a, T> {
-    fn eq(&self, other: &HashReference<'a, T>) -> bool {
-        let iseq = self.v.eq(other.v);
-        logi!("'{}' {} '{}'", self.v, if iseq {"=="} else {"!="}, other.v);
-        iseq
-    }
-}
-
-impl<'a, T: Hash+Eq+Show> Eq for HashReference<'a, T> { }
-
 
 #[test]
 fn equal_keys_match() {
