@@ -1,5 +1,5 @@
 local planets = {
-  {force = 0.08, decay = 1.0, maxspeed = 40, size = 1, color = 0xffff0000, speedx = 0, speedy = 0, x = 200, y = 200}
+  {force = 0.2, decay = 0.7, maxspeed = 50, size = 1, color = 0xffff0000, speedx = 0, speedy = 0, x = 200, y = 200}
 }
 local positions = {}
 
