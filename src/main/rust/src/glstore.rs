@@ -14,6 +14,7 @@ use core::fmt::Show;
 use collections::vec::Vec;
 use collections::hash::Hash;
 use collections::hash::sip::{SipHasher, SipState};
+
 use std::collections::HashMap;
 use std::collections::hash_map::{Vacant, Occupied};
 use copyshader::CopyShader;
@@ -25,6 +26,9 @@ use arena::TypedArena;
 use glcommon::GLResult;
 use glcommon::{FillDefaults, MString};
 use log::logi;
+
+#[cfg(test)]
+use collections::str::IntoMaybeOwned;
 
 /// Holds GL objects that can be inited using the given keys.
 /// The list is to avoid having to pass those keys around, and serialize more easily.
@@ -188,3 +192,26 @@ impl<'a, T: Hash+PartialEq+Show> PartialEq for HashReference<'a, T> {
 impl<'a, T: Hash+Eq+Show> Eq for HashReference<'a, T> { }
 
 
+#[test]
+fn equal_keys_match() {
+    let mut list: DrawObjectList<LuaScript, LuaInitValues> = DrawObjectList::new();
+    let script_1 = "function main() end".into_maybe_owned();
+    let script_2 = "function main() end".into_maybe_owned();
+    let idx_1 = list.push_object(Some(script_1)).unwrap();
+    let idx_2 = list.push_object(Some(script_2)).unwrap();
+    let (DrawObjectIndex(i1), DrawObjectIndex(i2)) = (idx_1, idx_2);
+    assert_eq!(i1, i2);
+    println!("test");
+}
+
+#[test]
+fn different_keys_differ() {
+    let mut list: DrawObjectList<LuaScript, LuaInitValues> = DrawObjectList::new();
+    let script_1 = "function main() end".into_maybe_owned();
+    let script_2 = "function main() end \n-- hello world".into_maybe_owned();
+    let idx_1 = list.push_object(Some(script_1)).unwrap();
+    let idx_2 = list.push_object(Some(script_2)).unwrap();
+    let (DrawObjectIndex(i1), DrawObjectIndex(i2)) = (idx_1, idx_2);
+    assert!(i1 != i2);
+    println!("test");
+}
