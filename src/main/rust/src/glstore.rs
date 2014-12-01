@@ -41,7 +41,7 @@ pub struct DrawObjectIndex<T>(i32);
 
 impl<T> DrawObjectIndex<T> {
     pub fn error() -> DrawObjectIndex<T> {
-        unsafe { mem::transmute(-1i) }
+        unsafe { mem::transmute(-1i32) }
     }
 }
 

@@ -48,7 +48,7 @@ pub fn append_motion_event(data: &mut Data, evt: *const AInputEvent, queue: &mut
     }
     let full_action = unsafe { AMotionEvent_getAction(evt) } as u32;
     let (action_event, action_index): (u32, u32) = (full_action & AMOTION_EVENT_ACTION_MASK, (full_action & AMOTION_EVENT_ACTION_POINTER_INDEX_MASK) >> AMOTION_EVENT_ACTION_POINTER_INDEX_SHIFT);
-    let action_id = unsafe { AMotionEvent_getPointerId(evt, action_index) };
+    let action_id = unsafe { AMotionEvent_getPointerId(evt, action_index as size_t) };
     match action_event {
         AMOTION_EVENT_ACTION_DOWN => {
             logi!("ACTION_DOWN: {}", action_id);
@@ -104,7 +104,7 @@ fn make_active(queue: &mut PointProducer, active: &mut PointerState, id: i32, ne
     }
 }
 
-fn push_historical_point(queue: &mut PointProducer, evt: *const AInputEvent, id: i32, ptr: u32, hist: u32) {
+fn push_historical_point(queue: &mut PointProducer, evt: *const AInputEvent, id: i32, ptr: size_t, hist: size_t) {
     queue.push(PointEntry { index: id, entry: PointInfo::Point(PaintPoint {
         pos: Coordinate {
              x: unsafe { AMotionEvent_getHistoricalX(evt, ptr, hist) },
@@ -115,7 +115,7 @@ fn push_historical_point(queue: &mut PointProducer, evt: *const AInputEvent, id:
     })});
 }
 
-fn push_current_point(queue: &mut PointProducer, evt: *const AInputEvent, id: i32, ptr: u32) {
+fn push_current_point(queue: &mut PointProducer, evt: *const AInputEvent, id: i32, ptr: size_t) {
     queue.push(PointEntry { index: id, entry: PointInfo::Point(PaintPoint {
         pos: Coordinate {
             x: unsafe { AMotionEvent_getX(evt, ptr) },

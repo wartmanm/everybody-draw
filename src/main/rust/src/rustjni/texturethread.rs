@@ -11,7 +11,7 @@ use rustjni::android_bitmap::AndroidBitmap;
 use drawevent::Events;
 use matrix::Matrix;
 
-use rustjni::{register_classmethods, CaseClass, get_safe_data, str_to_jstring, GLInitEvents, JNIUndoCallback, JNICallbackClosure};
+use rustjni::{register_classmethods, CaseClass, get_safe_data, str_to_jstring, GLInitEvents, JNIUndoCallback, JNICallbackClosure, jpointer};
 use jni_helpers::ToJValue;
 use jni_constants::*;
 
@@ -35,7 +35,7 @@ unsafe fn rethrow_lua_result(env: *mut JNIEnv, result: GLResult<()>) {
     }
 }
 
-unsafe extern "C" fn init_gl(env: *mut JNIEnv, _: jobject, w: jint, h: jint, callback: jobject) -> jint {
+unsafe extern "C" fn init_gl(env: *mut JNIEnv, _: jobject, w: jint, h: jint, callback: jobject) -> jpointer {
     mem::transmute(box GLInitEvents {
         glinit: GLInit::setup_graphics(w, h),
         events: Events::new(),
@@ -44,14 +44,14 @@ unsafe extern "C" fn init_gl(env: *mut JNIEnv, _: jobject, w: jint, h: jint, cal
     })
 }
 
-unsafe extern "C" fn finish_gl(env: *mut JNIEnv, _: jobject, data: jint) {
+unsafe extern "C" fn finish_gl(env: *mut JNIEnv, _: jobject, data: jpointer) {
     let mut data: Box<GLInitEvents> = mem::transmute(data);
     data.jni_undo_callback.destroy(env);
     data.glinit.destroy();
     logi!("finished deinit");
 }
 
-unsafe extern "C" fn native_draw_queued_points(env: *mut JNIEnv, _: jobject, data: i32, handler: i32, java_matrix: jfloatArray) {
+unsafe extern "C" fn native_draw_queued_points(env: *mut JNIEnv, _: jobject, data: jpointer, handler: jpointer, java_matrix: jfloatArray) {
     let data = get_safe_data(data);
     let callback = data.jni_undo_callback.create_closure(env);
     let mut matrix: Matrix = mem::uninitialized();
@@ -60,50 +60,50 @@ unsafe extern "C" fn native_draw_queued_points(env: *mut JNIEnv, _: jobject, dat
     rethrow_lua_result(env, luaerr);
 }
 
-unsafe extern "C" fn native_finish_lua_script(env: *mut JNIEnv, _: jobject, data: i32, handler: i32) {
+unsafe extern "C" fn native_finish_lua_script(env: *mut JNIEnv, _: jobject, data: jpointer, handler: jpointer) {
     let data = get_safe_data(data);
     let callback = data.jni_undo_callback.create_closure(env);
     let luaerr = data.glinit.unload_interpolator(mem::transmute(handler), &mut data.events, &callback);
     rethrow_lua_result(env, luaerr);
 }
 
-unsafe extern "C" fn native_update_gl(_: *mut JNIEnv, _: jobject, data: i32) {
+unsafe extern "C" fn native_update_gl(_: *mut JNIEnv, _: jobject, data: jpointer) {
     let data = get_safe_data(data);
     data.glinit.render_frame();
     data.events.pushframe(); // FIXME make sure a frame was actually drawn! No java exceptions, missing copy shader, etc
 }
 
-unsafe extern "C" fn set_anim_shader(_: *mut JNIEnv, _: jobject, data: jint, shader: jint) {
+unsafe extern "C" fn set_anim_shader(_: *mut JNIEnv, _: jobject, data: jpointer, shader: jint) {
     let data = get_safe_data(data);
     let shader = data.events.use_animshader(mem::transmute(shader));
     data.glinit.set_anim_shader(shader);
 }
 
-unsafe extern "C" fn set_copy_shader(_: *mut JNIEnv, _: jobject, data: jint, shader: jint) {
+unsafe extern "C" fn set_copy_shader(_: *mut JNIEnv, _: jobject, data: jpointer, shader: jint) {
     let data = get_safe_data(data);
     let shader = data.events.use_copyshader(mem::transmute(shader));
     data.glinit.set_copy_shader(shader);
 }
 
-unsafe extern "C" fn set_point_shader(_: *mut JNIEnv, _: jobject, data: jint, shader: jint) {
+unsafe extern "C" fn set_point_shader(_: *mut JNIEnv, _: jobject, data: jpointer, shader: jint) {
     let data = get_safe_data(data);
     let shader = data.events.use_pointshader(mem::transmute(shader));
     data.glinit.set_point_shader(shader);
 }
 
-unsafe extern "C" fn set_brush_texture(_: *mut JNIEnv, _: jobject, data: jint, texture: jint) {
+unsafe extern "C" fn set_brush_texture(_: *mut JNIEnv, _: jobject, data: jpointer, texture: jint) {
     let data = get_safe_data(data);
     let brush = data.events.use_brush(mem::transmute(texture));
     data.glinit.set_brush_texture(&brush.texture);
 }
 
-unsafe extern "C" fn clear_framebuffer(_: *mut JNIEnv, _: jobject, data: jint) {
+unsafe extern "C" fn clear_framebuffer(_: *mut JNIEnv, _: jobject, data: jpointer) {
     let data = get_safe_data(data);
     data.events.clear();
     data.glinit.clear_buffer();
 }
 
-pub unsafe extern "C" fn export_pixels(env: *mut JNIEnv, _: jobject, data: i32) -> jobject {
+pub unsafe extern "C" fn export_pixels(env: *mut JNIEnv, _: jobject, data: jpointer) -> jobject {
     let glinit = &mut get_safe_data(data).glinit;
     let (w, h) = glinit.get_buffer_dimensions();
     let mut bitmap = AndroidBitmap::new(env, w, h);
@@ -112,20 +112,20 @@ pub unsafe extern "C" fn export_pixels(env: *mut JNIEnv, _: jobject, data: i32) 
     bitmap.obj
 }
 
-pub unsafe extern "C" fn draw_image(env: *mut JNIEnv, _: jobject, data: i32, bitmap: jobject) {
+pub unsafe extern "C" fn draw_image(env: *mut JNIEnv, _: jobject, data: jpointer, bitmap: jobject) {
     // TODO: ensure rgba_8888 format and throw error
     let bitmap = AndroidBitmap::from_jobject(env, bitmap);
     let pixels = bitmap.as_slice();
     get_safe_data(data).glinit.draw_image(bitmap.info.width as i32, bitmap.info.height as i32, pixels);
 }
 
-unsafe extern "C" fn jni_lua_set_interpolator(_: *mut JNIEnv, _: jobject, data: jint, scriptid: jint) {
+unsafe extern "C" fn jni_lua_set_interpolator(_: *mut JNIEnv, _: jobject, data: jpointer, scriptid: jint) {
     let data = get_safe_data(data);
     let script = data.events.use_interpolator(mem::transmute(scriptid));
     data.glinit.set_interpolator(script);
 }
 
-unsafe extern "C" fn jni_add_layer(_: *mut JNIEnv, _: jobject, data: jint, copyshader: jint, pointshader: jint, pointidx: jint) {
+unsafe extern "C" fn jni_add_layer(_: *mut JNIEnv, _: jobject, data: jpointer, copyshader: jint, pointshader: jint, pointidx: jint) {
     let data = get_safe_data(data);
     let copyshader = Some(mem::transmute(copyshader));
     let pointshader = Some(mem::transmute(pointshader));
@@ -133,13 +133,13 @@ unsafe extern "C" fn jni_add_layer(_: *mut JNIEnv, _: jobject, data: jint, copys
     data.glinit.add_layer(layer);
 }
 
-unsafe extern "C" fn jni_clear_layers(_: *mut JNIEnv, _: jobject, data: jint) {
+unsafe extern "C" fn jni_clear_layers(_: *mut JNIEnv, _: jobject, data: jpointer) {
     let data = get_safe_data(data);
     data.events.clear_layers();
     data.glinit.clear_layers();
 }
 
-unsafe extern "C" fn jni_replay_begin(_: *mut JNIEnv, _: jobject, data: jint) -> jint {
+unsafe extern "C" fn jni_replay_begin(_: *mut JNIEnv, _: jobject, data: jpointer) -> jpointer {
     let data = get_safe_data(data);
     data.glinit.clear_layers();
     data.glinit.clear_buffer();
@@ -147,7 +147,7 @@ unsafe extern "C" fn jni_replay_begin(_: *mut JNIEnv, _: jobject, data: jint) ->
 }
 
 #[allow(unused)]
-unsafe extern "C" fn jni_replay_advance_frame(env: *mut JNIEnv, _: jobject, data: jint, replay: jint, java_matrix: jfloatArray) -> jboolean {
+unsafe extern "C" fn jni_replay_advance_frame(env: *mut JNIEnv, _: jobject, data: jpointer, replay: jpointer, java_matrix: jfloatArray) -> jboolean {
     let data = get_safe_data(data);
     let replay: &mut EventStream = mem::transmute(replay);
     let mut matrix: Matrix = mem::uninitialized();
@@ -158,21 +158,21 @@ unsafe extern "C" fn jni_replay_advance_frame(env: *mut JNIEnv, _: jobject, data
     if done { JNI_TRUE as jboolean } else { JNI_FALSE as jboolean }
 }
 
-unsafe extern "C" fn jni_replay_destroy(_: *mut JNIEnv, _: jobject, replay: jint) {
+unsafe extern "C" fn jni_replay_destroy(_: *mut JNIEnv, _: jobject, replay: jpointer) {
     let replay: Box<EventStream> = mem::transmute(replay);
     mem::drop(replay);
 }
 
-unsafe extern "C" fn jni_load_undo(_: *mut JNIEnv, _: jobject, data: jint, idx: jint) {
+unsafe extern "C" fn jni_load_undo(_: *mut JNIEnv, _: jobject, data: jpointer, idx: jint) {
     let data = get_safe_data(data);
     data.glinit.load_undo_frame(idx);
 }
 
-unsafe extern "C" fn jni_set_brush_color(_: *mut JNIEnv, _: jobject, data: jint, color: jint) {
+unsafe extern "C" fn jni_set_brush_color(_: *mut JNIEnv, _: jobject, data: jpointer, color: jint) {
     get_safe_data(data).glinit.set_brush_color(color);
 }
 
-unsafe extern "C" fn jni_set_brush_size(_: *mut JNIEnv, _: jobject, data: jint, size: jfloat) {
+unsafe extern "C" fn jni_set_brush_size(_: *mut JNIEnv, _: jobject, data: jpointer, size: jfloat) {
     get_safe_data(data).glinit.set_brush_size(size);
 }
 

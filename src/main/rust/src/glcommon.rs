@@ -115,21 +115,26 @@ pub trait FillDefaults<T, Init, Base> {
 macro_rules! glattrib_f32 (
     // struct elements
     ($handle:expr, $count:expr, $item:ident, $elem:ident) => ({
-        // XXX probably also unsafe
-        let firstref = unsafe { $item.unsafe_get(0) };
-        gl2::vertex_attrib_pointer_f32($handle, $count, false,
-            mem::size_of_val(firstref) as i32,
-            // XXX this actually derefences firstref and is completely unsafe
-            // is there better way to do offsetof in rust?  there ought to be
-            unsafe { mem::transmute(&firstref.$elem) });
+        unsafe {
+            // XXX probably also unsafe
+            let firstref = $item.unsafe_get(0);
+            gl2::glVertexAttribPointer($handle, $count, gl2::FLOAT, false as ::opengles::gl2::GLboolean,
+                mem::size_of_val(firstref) as i32,
+                // XXX this actually derefences firstref and is completely unsafe
+                // is there better way to do offsetof in rust?  there ought to be
+                mem::transmute(&firstref.$elem));
+        }
         check_gl_error(stringify!(vertex_attrib_pointer($elem)));
         gl2::enable_vertex_attrib_array($handle);
         check_gl_error("enable_vertex_array");
     });
     // densely-packed array
     ($handle:expr, $count:expr, $item:ident) => ({
-        let firstref = unsafe { $item.unsafe_get(0) };
-        gl2::vertex_attrib_pointer_f32($handle, $count, false, 0, unsafe { mem::transmute(firstref) });
+        unsafe {
+            let firstref =  $item.unsafe_get(0) ;
+            gl2::glVertexAttribPointer($handle, $count, gl2::FLOAT,
+                false as ::opengles::gl2::GLboolean, 0, mem::transmute(firstref));
+        }
         check_gl_error(stringify!(vertex_attrib_pointer($handle)));
         gl2::enable_vertex_attrib_array($handle);
         check_gl_error("enable_vertex_array");

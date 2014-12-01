@@ -53,8 +53,14 @@ impl ToJValue for jdouble {
     }
 }
 impl ToJValue for jobject { 
+    #[cfg(target_word_size = "32")]
     #[inline(always)]
     fn as_jvalue(&mut self) -> jvalue {
         unsafe { mem::transmute((*self, mem::uninitialized::<i32>())) }
+    }
+    #[cfg(target_word_size = "64")]
+    #[inline(always)]
+    fn as_jvalue(&mut self) -> jvalue {
+        unsafe { mem::transmute(*self) }
     }
 }

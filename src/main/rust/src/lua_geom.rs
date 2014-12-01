@@ -84,7 +84,7 @@ extern "C" fn stringreader(L: *mut lua_State, data: *mut c_void, size: *mut size
             ptr::null()
         } else {
             *done = true;
-            *size = chars.len() as u32;
+            *size = chars.len() as size_t;
             chars.as_ptr() as *const i8
         }
     }
@@ -172,7 +172,7 @@ unsafe fn get_lua() -> GLResult<*mut lua_State> {
 #[no_mangle]
 pub unsafe fn rust_raise_lua_err(L: Option<*mut lua_State>, msg: &str) -> ! {
     let L = L.unwrap_or(get_existing_lua().unwrap());
-    ::lua::raw::lua_pushlstring(L, msg.as_ptr() as *const i8, msg.len() as u32);
+    ::lua::raw::lua_pushlstring(L, msg.as_ptr() as *const i8, msg.len() as size_t);
     ::lua::raw::lua_error(L);
     panic!("luaL_error() returned, this should never happen!");
 }
