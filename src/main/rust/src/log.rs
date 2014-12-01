@@ -2,10 +2,18 @@
 
 use android::log::*;
 use core::prelude::*;
+use libc::{c_char, c_int};
 use std::c_str::ToCStr;
+use collections::str::raw::c_str_to_static_slice;
 
-pub unsafe fn raw_log(level: ::libc::c_int, msg: *const i8) {
-    __android_log_write(level, cstr!("rust"), msg);
+#[cfg(target_os = "android")]
+pub unsafe fn raw_log(level: c_int, tag: *const c_char, msg: *const c_char) {
+    __android_log_write(level, tag, msg);
+}
+
+#[cfg(not(target_os = "android"))]
+pub unsafe fn raw_log(level: c_int, tag: *const c_char, msg: *const c_char) {
+    println!("{}: {}", c_str_to_static_slice(tag), c_str_to_static_slice(msg));
 }
 
 #[cfg(target_os = "android")]

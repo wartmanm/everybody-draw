@@ -2,7 +2,7 @@ use core::prelude::*;
 use core::mem;
 use collections::vec::Vec;
 
-use android::log::{ANDROID_LOG_INFO, __android_log_write};
+use android::log::{ANDROID_LOG_INFO};
 use libc::{c_char, c_int};
 use point::ShaderPaintPoint;
 use point::ShaderPointEvent::{Move, Down, Up, NoEvent};
@@ -86,8 +86,15 @@ pub unsafe extern "C" fn lua_pushline(data: &mut LuaCallbackType, queue: i32, a:
 }
 
 #[no_mangle]
+#[cfg(target_os = "android")]
 pub unsafe extern "C" fn lua_log(message: *const c_char) {
-    __android_log_write(ANDROID_LOG_INFO as c_int, cstr!("luascript"), message);
+    ::log::raw_log(ANDROID_LOG_INFO as c_int, cstr!("luascript"), message);
+}
+
+#[no_mangle]
+#[cfg(not(target_os = "android"))]
+pub unsafe extern "C" fn lua_log(message: *const c_char) {
+    ::log::raw_log(ANDROID_LOG_INFO as c_int, cstr!("luascript"), message);
 }
 
 #[no_mangle]
