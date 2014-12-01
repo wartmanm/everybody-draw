@@ -17,7 +17,7 @@ LOCAL_PATH := $(call my-dir)
 include $(CLEAR_VARS)
 
 LOCAL_MODULE    := rustgl
-
+LOCAL_ARM_MODE := arm
 LOCAL_SRC_FILES := ../rust/target/arm-linux-androideabi/librustgl-45c2de64c06f60f1.a
 
 include $(PREBUILT_STATIC_LIBRARY)
@@ -25,6 +25,7 @@ include $(PREBUILT_STATIC_LIBRARY)
 include $(CLEAR_VARS)
 
 LOCAL_MODULE := luajit
+LOCAL_ARM_MODE := arm
 LOCAL_SRC_FILES := ../../../lib/libluajit.a
 
 include $(PREBUILT_STATIC_LIBRARY)
@@ -32,6 +33,7 @@ include $(PREBUILT_STATIC_LIBRARY)
 include $(CLEAR_VARS)
 
 LOCAL_MODULE    := gl-stuff
+LOCAL_ARM_MODE := arm
 LOCAL_SRC_FILES := hello-jni.c unwind.c lua_geom.c
 
 LOCAL_CFLAGS := -std=c99 -Wall -Wextra -Wno-unused -Werror -g -fexceptions
