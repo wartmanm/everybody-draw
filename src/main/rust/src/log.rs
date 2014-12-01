@@ -1,10 +1,9 @@
 #![macro_escape]
 
+#[allow(unused)] use core::prelude::*;
 use android::log::*;
-use core::prelude::*;
 use libc::{c_char, c_int};
-use std::c_str::ToCStr;
-use collections::str::raw::c_str_to_static_slice;
+use collections::str::from_c_str;
 
 #[cfg(target_os = "android")]
 pub unsafe fn raw_log(level: c_int, tag: *const c_char, msg: *const c_char) {
@@ -12,20 +11,19 @@ pub unsafe fn raw_log(level: c_int, tag: *const c_char, msg: *const c_char) {
 }
 
 #[cfg(not(target_os = "android"))]
-pub unsafe fn raw_log(level: c_int, tag: *const c_char, msg: *const c_char) {
-    println!("{}: {}", c_str_to_static_slice(tag), c_str_to_static_slice(msg));
+pub unsafe fn raw_log(_: c_int, tag: *const c_char, msg: *const c_char) {
+    println!("{}: {}", from_c_str(tag), from_c_str(msg));
 }
 
 #[cfg(target_os = "android")]
-pub fn log(rustmsg: &str, level: u32) {
-  let msg = rustmsg.to_c_str();
+pub fn log(msg: &str, level: u32) {
   unsafe {
-    __android_log_write(level as ::libc::c_int, cstr!("rust"), msg.as_ptr());
+    __android_log_write(level as ::libc::c_int, cstr!("rust"), msg.as_ptr() as *const c_char);
   }
 }
 
 #[cfg(not(target_os = "android"))]
-pub fn log(rustmsg: &str, level: u32) {
+pub fn log(rustmsg: &str, _: u32) {
     println!("{}", rustmsg);
 }
 
