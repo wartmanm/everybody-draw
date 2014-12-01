@@ -15,6 +15,7 @@ use collections::vec::Vec;
 use collections::hash::Hash;
 use collections::hash::sip::{SipHasher, SipState};
 use std::collections::HashMap;
+use std::collections::hash_map::{Vacant, Occupied};
 use copyshader::CopyShader;
 use gltexture::{PixelFormat, Texture, BrushTexture};
 use pointshader::PointShader;
@@ -134,21 +135,21 @@ impl<'a, Unfilled, T: MaybeInitFromCache<Init> + FillDefaults<Unfilled, Init, T>
         let filled = FillDefaults::fill_defaults(init).val;
         let filledref = HashReference { v: unsafe { mem::transmute(&filled) } };
         // see below -- these are safe, we just can't prove it
-        if self.map.contains_key(&filledref) {
-            Ok(*self.map.get(&filledref).unwrap())
-        } else {
-            let inited: T = try!(MaybeInitFromCache::<Init>::maybe_init(filled));
-            let key = HashReference { v: unsafe { mem::transmute(inited.get_source()) } };
-            // ptr's lifetime is limited to &self's, which is fair but not very useful.
-            // smart ptrs involve individual allocs but are probably better
-            let ptr = self.arena.alloc(inited);
-            unsafe {
-                self.list.push(mem::transmute(ptr));
+        match self.map.entry(filledref) {
+            Occupied(entry) => Ok(*entry.get()),
+            Vacant(entry) => {
+                let inited: T = try!(MaybeInitFromCache::<Init>::maybe_init(filled));
+                // ptr's lifetime is limited to &self's, which is fair but not very useful.
+                // smart ptrs involve individual allocs but are probably better
+                let ptr = self.arena.alloc(inited);
+                unsafe {
+                    self.list.push(mem::transmute(ptr));
+                }
+                let index = self.list.len() - 1;
+                let objindex = DrawObjectIndex(index as i32);
+                entry.set(objindex);
+                Ok(objindex)
             }
-            let index = self.list.len() - 1;
-            let objindex = DrawObjectIndex(index as i32);
-            self.map.insert(key, objindex);
-            Ok(objindex)
         }
     }
 
