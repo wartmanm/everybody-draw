@@ -4,11 +4,21 @@ use android::log::*;
 use core::prelude::*;
 use std::c_str::ToCStr;
 
+pub unsafe fn raw_log(level: ::libc::c_int, msg: *const i8) {
+    __android_log_write(level, cstr!("rust"), msg);
+}
+
+#[cfg(target_os = "android")]
 pub fn log(rustmsg: &str, level: u32) {
   let msg = rustmsg.to_c_str();
   unsafe {
     __android_log_write(level as ::libc::c_int, cstr!("rust"), msg.as_ptr());
   }
+}
+
+#[cfg(not(target_os = "android"))]
+pub fn log(rustmsg: &str, level: u32) {
+    println!("{}", rustmsg);
 }
 
 pub fn loge(rustmsg: &str) {
