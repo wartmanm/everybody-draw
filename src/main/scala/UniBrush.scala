@@ -1,20 +1,18 @@
 package com.github.wartman4404.gldraw.unibrush
 
-import java.io.{File, IOException, InputStream, ByteArrayOutputStream, ByteArrayInputStream}
+import java.io.{File, IOException, InputStream, ByteArrayOutputStream, ByteArrayInputStream, StringReader}
 import java.util.zip.{ZipEntry, ZipInputStream}
 import android.graphics.Bitmap
 import android.util.Log
+import android.util.JsonReader
 
 import scala.collection.mutable
+import scala.collection.mutable.ArraySeq
 import scala.annotation.tailrec
-
-import spray.json._
 
 import com.github.wartman4404.gldraw._
 
 import GLResultTypeDef._
-
-import scala.collection.mutable.ArraySeq
 
 case class ShaderSource(
   fragmentshader: Option[String],
@@ -27,12 +25,42 @@ case class ShaderSource(
     compiler(data, vert, frag)
   }
 }
+object ShaderSource {
+  def readFromJson(j: JsonReader) = {
+    var fragmentshader: Option[String] = None
+    var vertexshader: Option[String] = None
+    j.beginObject()
+      while (j.hasNext()) j.nextName() match {
+        case "fragmentshader" => fragmentshader = Some(j.nextString())
+        case "vertexshader" => vertexshader = Some(j.nextString())
+      }
+    j.endObject()
+    ShaderSource(fragmentshader, vertexshader)
+  }
+}
 
 case class LayerSource(
   pointshader: Option[Int],
   copyshader: Option[Int],
   pointsrc: Option[Int]
 )
+
+object LayerSource {
+  def readFromJson(j: JsonReader) = {
+    var pointshader: Option[Int] = None
+    var copyshader: Option[Int] = None
+    var pointsrc: Option[Int] = None
+    j.beginObject()
+      while (j.hasNext()) j.nextName() match {
+        case "pointshader" => pointshader = Some(j.nextInt())
+        case "copyshader" => copyshader = Some(j.nextInt())
+        case "pointsrc" => pointsrc = Some(j.nextInt())
+      }
+    j.endObject()
+    LayerSource(pointshader, copyshader, pointsrc)
+  }
+
+}
 
 case class Layer(
   pointshader: PointShader,
@@ -50,6 +78,32 @@ case class UniBrushSource (
   interpolator: Option[String],
   layers: Option[Array[LayerSource]]
 )
+object UniBrushSource extends AndroidImplicits {
+  def readFromJson(j: JsonReader) = {
+    var brushpath: Option[String] = None
+    var pointshaders: Option[Array[ShaderSource]] = None
+    var animshaders: Option[Array[ShaderSource]] = None
+    var basepointshader: Option[ShaderSource] = None
+    var baseanimshader: Option[ShaderSource] = None
+    var basecopyshader: Option[ShaderSource] = None
+    var interpolator: Option[String] = None
+    var layers: Option[Array[LayerSource]] = None
+    j.beginObject()
+      while (j.hasNext()) j.nextName() match {
+        case "brushpath" => brushpath = Some(j.nextString())
+        case "pointshaders" => pointshaders = Some(j.readArray(ShaderSource.readFromJson).toArray)
+        case "animshaders" => animshaders = Some(j.readArray(ShaderSource.readFromJson).toArray)
+        case "basepointshader" => basepointshader = Some(ShaderSource.readFromJson(j))
+        case "baseanimshader" => baseanimshader = Some(ShaderSource.readFromJson(j))
+        case "basecopyshader" => basecopyshader = Some(ShaderSource.readFromJson(j))
+        case "interpolator" => interpolator = Some(j.nextString())
+        case "layers" => layers = Some(j.readArray(LayerSource.readFromJson).toArray)
+      }
+    j.endObject()
+    UniBrushSource(brushpath, pointshaders, animshaders, basepointshader,
+      baseanimshader, basecopyshader, interpolator, layers)
+  }
+}
 
 case class UniBrush(
   brush: Option[Texture],
@@ -59,7 +113,7 @@ case class UniBrush(
   interpolator: Option[LuaScript],
   layers: Array[Layer])
 
-object UniBrush extends AutoProductFormat {
+object UniBrush {
   def logAbort[T](s: String): GLResult[T] = {
     Log.e("unibrush", s"failed to load: ${s}")
     throw new GLException(s)
@@ -107,11 +161,9 @@ object UniBrush extends AutoProductFormat {
         .toMap
       val brushjson = files.get("brush.json").getOrElse(return logAbort("unable to find brush.json"))
       Log.i("unibrush", "got brush.json")
-      compile(data, new String(brushjson).parseJson.convertTo[UniBrushSource], files)
+      val brushjsonreader = new JsonReader(new StringReader(new String(brushjson)))
+      compile(data, UniBrushSource.readFromJson(brushjsonreader), files)
     } catch {
-      case e: DeserializationException => {
-        logAbort(s"unable to parse brush.json: ${e}")
-      }
       case e: IOException => logAbort(s"Error reading unibrush ${e}")
       case e: GLException => logAbort(s"Error in unibrush files ${e}")
       case e: Exception => logAbort(s"Other exception ${e}")

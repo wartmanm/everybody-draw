@@ -5,6 +5,8 @@ import android.view._
 import android.os.Bundle
 import android.content.DialogInterface
 import java.lang.Runnable
+import scala.collection.mutable.ArrayBuffer
+import android.util.{JsonReader, JsonWriter}
 
 trait AndroidImplicits {
   //dialog
@@ -45,5 +47,20 @@ trait AndroidImplicits {
   implicit def viewGroupAsSeq(vg: ViewGroup) = new IndexedSeq[View] {
     def apply(i: Int) = vg.getChildAt(i)
     def length = vg.getChildCount()
+  }
+
+  implicit class JsonReaderHelper(j: JsonReader) {
+    def readObject[T](cb: (String) => Unit): Unit = {
+      j.beginObject()
+        while (j.hasNext()) cb(j.nextName())
+      j.endObject()
+    }
+    def readArray[T](cb: (JsonReader) => T): Seq[T] = {
+      val arr = new ArrayBuffer[T]()
+      j.beginArray()
+        while(j.hasNext()) arr += cb(j)
+      j.endArray()
+      arr
+    }
   }
 }
