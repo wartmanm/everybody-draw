@@ -72,6 +72,12 @@ impl Show for Texture {
     }
 }
 
+impl Show for BrushTexture {
+    fn fmt(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
+        write!(formatter, "brushtexture 0x{:x}, dimensions {}", self.texture.texture, self.texture.dimensions)
+    }
+}
+
 impl FillDefaults<(PixelFormat, (i32, i32), Vec<u8>), (PixelFormat, (i32, i32), Vec<u8>), BrushTexture> for BrushTexture {
     fn fill_defaults(init: (PixelFormat, (i32, i32), Vec<u8>)) -> Defaults<(PixelFormat, (i32, i32), Vec<u8>), BrushTexture> {
         Defaults { val: init }
