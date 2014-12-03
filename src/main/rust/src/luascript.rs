@@ -3,7 +3,7 @@ use core::fmt;
 use core::fmt::Show;
 use log::logi;
 use glcommon::{GLResult, FillDefaults, Defaults, MString};
-use lua_geom::{load_lua_script, destroy_lua_script, push_lua_script};
+use lua_geom::{load_lua_script, destroy_lua_script};
 use collections::str::{IntoMaybeOwned};
 
 static DEFAULT_SCRIPT: &'static str = include_str!("../includes/lua/default_interpolator.lua");

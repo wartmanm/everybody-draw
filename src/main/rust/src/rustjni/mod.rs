@@ -11,7 +11,8 @@ use collections::str::IntoMaybeOwned;
 use collections::vec::Vec;
 use collections::str::MaybeOwned;
 
-use jni::{jobject, jclass, jmethodID, jfieldID, JNIEnv, jint, jlong, jstring, jvalue, JNINativeMethod, JavaVM};
+use jni::{jobject, jclass, jmethodID, jfieldID, JNIEnv, jint, jstring, jvalue, JNINativeMethod, JavaVM};
+#[cfg(test)] use jni::jlong;
 use jni_constants::*;
 
 use log::{logi, loge};

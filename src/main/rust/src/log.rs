@@ -3,7 +3,7 @@
 #[allow(unused)] use core::prelude::*;
 use android::log::*;
 use libc::{c_char, c_int};
-use collections::str::from_c_str;
+#[cfg(test)] use collections::str::from_c_str;
 
 #[cfg(target_os = "android")]
 pub unsafe fn raw_log(level: c_int, tag: *const c_char, msg: *const c_char) {
