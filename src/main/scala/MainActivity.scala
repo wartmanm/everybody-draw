@@ -72,6 +72,10 @@ class MainActivity extends Activity with TypedActivity with AndroidImplicits {
 
   lazy val saveThread = ExecutionContext.fromExecutor(Executors.newSingleThreadExecutor())
 
+  lazy val loadedDrawFiles = Future {
+    new LoadedDrawFiles(this)
+  }(saveThread)
+
   var drawerIsOpen = false
 
   // TODO: actually clean up
@@ -152,6 +156,16 @@ class MainActivity extends Activity with TypedActivity with AndroidImplicits {
 
     super.onCreate(bundle)
     setContentView(R.layout.activity_main)
+
+    // Trigger off-thread resource enumeration.
+    // This locks resources required for layout inflation ( in
+    // Resource.loadXmlResourceParser() ), so it needs to take place after
+    // setContentView and maybe setAdapter()
+    // TODO: what placement gives the fastest startup time?
+    // TODO: consider using resources rather than assets, so no enumeration is needed
+    // TODO: consider laziness, only populating the needed views
+    // TODO: consider recycling a single gridview, they're not cheap
+    loadedDrawFiles
 
     controls.sidebar.control.setAdapter(sidebarAdapter)
     controls.sidebar.setListener((v: View, pos: Int) => {
@@ -395,24 +409,22 @@ class MainActivity extends Activity with TypedActivity with AndroidImplicits {
   def populatePickers(producer: MotionEventProducer, thread: TextureSurfaceThread, gl: GLInit) = {
     // TODO: maybe make the save thread load from disk and then hand off to the gl thread?
     // also, have it opportunistically load at least up to that point
-    val brushes = DrawFiles.loadBrushes(this).toArray
-    val anims = DrawFiles.loadAnimShaders(this).toArray
-    val paints = DrawFiles.loadPointShaders(this).toArray
-    val interpscripts = DrawFiles.loadScripts(this).toArray
-    val unibrushes = DrawFiles.loadUniBrushes(this).toArray
-    Log.i("main", s"got ${brushes.length} brushes, ${anims.length} anims, ${paints.length} paints, ${interpscripts.length} interpolation scripts")
 
-    MainActivity.this.runOnUiThread(() => {
-      // TODO: make hardcoded shaders accessible a better way
-      val interpLoader = loadInterpolatorSynchronized(thread, producer)
-      populatePicker(controls.brushpicker, brushes, loadBrush(thread), thread)
-      populatePicker(controls.animpicker, anims,  thread.setAnimShader _, thread)
-      populatePicker(controls.paintpicker, paints,  thread.setPointShader _, thread)
-      populatePicker(controls.interppicker, interpscripts,  interpLoader, thread)
-      populatePicker(controls.unipicker, unibrushes, loadUniBrush(thread, producer), thread)
-      controls.copypicker.value = thread.outputShader
-      controls.restoreState()
-    })
+    implicit val ec = saveThread
+    for (drawfiles <- loadedDrawFiles) {
+      MainActivity.this.runOnUiThread(() => {
+        // TODO: make hardcoded shaders accessible a better way
+        val interpLoader = loadInterpolatorSynchronized(thread, producer)
+        Log.i("main", s"got ${drawfiles.brushes.length} brushes, ${drawfiles.anims.length} anims, ${drawfiles.paints.length} paints, ${drawfiles.interpscripts.length} interpolation scripts")
+        populatePicker(controls.brushpicker, drawfiles.brushes, loadBrush(thread), thread)
+        populatePicker(controls.animpicker, drawfiles.anims,  thread.setAnimShader _, thread)
+        populatePicker(controls.paintpicker, drawfiles.paints,  thread.setPointShader _, thread)
+        populatePicker(controls.interppicker, drawfiles.interpscripts,  interpLoader, thread)
+        populatePicker(controls.unipicker, drawfiles.unibrushes, loadUniBrush(thread, producer), thread)
+        controls.copypicker.value = thread.outputShader
+        controls.restoreState()
+      })
+    }
   }
 
   // TODO: fewer callbacks
@@ -731,5 +743,13 @@ object MainActivity {
   abstract class NamedSidebarControl(val name: String) {
     override def toString() = name
     def onClick(pos: Int)
+  }
+
+  class LoadedDrawFiles(c: Context) {
+    val brushes = DrawFiles.loadBrushes(c)
+    val anims = DrawFiles.loadAnimShaders(c)
+    val paints = DrawFiles.loadPointShaders(c)
+    val interpscripts = DrawFiles.loadScripts(c)
+    val unibrushes = DrawFiles.loadUniBrushes(c)
   }
 }
