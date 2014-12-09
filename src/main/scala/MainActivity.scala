@@ -344,7 +344,7 @@ class MainActivity extends Activity with TypedActivity with AndroidImplicits {
     savePickersToFile()
   }
 
-  def populatePicker[T, U](picker: UnnamedPicker[T, U], arr: Array[DrawFiles.Readable[T, U]], cb: (GLInit, U)=>Unit, thread: TextureSurfaceThread) = {
+  def populatePicker[U](picker: UnnamedPicker[U], arr: Array[DrawFiles.Readable[U]], cb: (GLInit, U)=>Unit, thread: TextureSurfaceThread) = {
     val adapter = new LazyPicker(this, thread, arr)
     picker.setAdapter(adapter)
     picker.setListener((view: View, pos: Int) => {

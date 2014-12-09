@@ -6,7 +6,7 @@ import GLResultTypeDef._
 
 import DrawFiles.Readable
 
-class LazyPicker[T, U](context: Context, thread: TextureSurfaceThread, content: Array[Readable[T, U]]) extends BaseAdapter {
+class LazyPicker[U](context: Context, thread: TextureSurfaceThread, content: Array[Readable[U]]) extends BaseAdapter {
   val inflater = LayoutInflater.from(context)
   val lazified = content
   case class Holder(nameView: TextView)

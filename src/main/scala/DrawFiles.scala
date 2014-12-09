@@ -27,9 +27,9 @@ object DrawFiles {
   sealed trait ReadState[U] {
     val name: String
   }
-  class Readable[T, U](private var state: ReadState[U]) {
-    type BaseUnread = DrawFiles.BaseUnread[T, U]
-    type PartiallyRead = DrawFiles.PartiallyRead[T, U]
+  class Readable[U](private var state: ReadState[U]) {
+    type BaseUnread = DrawFiles.BaseUnread[_, U]
+    type PartiallyRead = DrawFiles.PartiallyRead[_, U]
     type FullyRead = DrawFiles.FullyRead[U]
     type FailedRead = DrawFiles.FailedRead[U]
     val name = state.name
@@ -91,7 +91,7 @@ object DrawFiles {
   abstract class BaseUnread[T, U] extends ReadState[U] {
     val name: String
     def read(): PartiallyRead[T, U]
-    def toReadable: Readable[T, U] = new Readable(this)
+    def toReadable: Readable[U] = new Readable(this)
   }
 
   class Unread[T, U](source: NamedSource, reader: PartialReader[T, U]) extends BaseUnread[T,U] {
@@ -192,30 +192,30 @@ object DrawFiles {
     override def compile(g: GLInit, source: UniBrushSource) = UniBrush(None, None, None, None, None, Array.empty)
   }
 
-  def loadBrushes(c: Context): Array[Readable[Bitmap, Texture]] = {
+  def loadBrushes(c: Context): Array[Readable[Texture]] = {
     val files = allfiles[Texture](c, "brushes")
     files.map(new Unread(_, BitmapReader).toReadable)
   }
 
   // TODO: make these safe
-  def loadPointShaders(c: Context): Array[Readable[String, PointShader]] = {
+  def loadPointShaders(c: Context): Array[Readable[PointShader]] = {
     val constructor = new ShaderReader(PointShader.apply _)
     val files = allfiles[PointShader](c, "pointshaders")
     files.map(new Unread(_, constructor).toReadable) :+ new DefaultUnread("Default Paint", constructor).toReadable
   }
 
-  def loadAnimShaders(c: Context): Array[Readable[String, CopyShader]] = {
+  def loadAnimShaders(c: Context): Array[Readable[CopyShader]] = {
     val constructor = new ShaderReader(CopyShader.apply _)
     val files = allfiles[CopyShader](c, "animshaders")
     files.map(new Unread(_, constructor).toReadable) :+ new DefaultUnread("Default Animation", constructor).toReadable
   }
 
-  def loadScripts(c: Context): Array[Readable[String, LuaScript]] = {
+  def loadScripts(c: Context): Array[Readable[LuaScript]] = {
     val files = allfiles[LuaScript](c, "interpolators")
     files.map(new Unread(_, LuaReader).toReadable) :+ new DefaultUnread("Default Interpolator", LuaReader).toReadable
   }
 
-  def loadUniBrushes(c: Context): Array[Readable[UniBrushSource, UniBrush]] = {
+  def loadUniBrushes(c: Context): Array[Readable[UniBrush]] = {
     val files = allfiles[UniBrush](c, "unibrushes")
     files.map(new Unread(_, UniBrushReader).toReadable) :+ new DefaultUnread("Nothing", DefaultUniBrush).toReadable
   }

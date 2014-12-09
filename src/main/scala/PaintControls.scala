@@ -17,7 +17,7 @@ import java.io.{StringReader, StringWriter}
 import android.util.{JsonReader, JsonWriter}
 
 class PaintControls
-  (val animpicker: UP[String, CopyShader], val brushpicker: UP[Bitmap, Texture], val paintpicker: UP[String, PointShader], val interppicker: UP[String, LuaScript], val unipicker: UP[UniBrushSource, UniBrush], val copypicker: UUP[CopyShader], val sidebar: FIP) {
+  (val animpicker: UP[CopyShader], val brushpicker: UP[Texture], val paintpicker: UP[PointShader], val interppicker: UP[LuaScript], val unipicker: UP[UniBrush], val copypicker: UUP[CopyShader], val sidebar: FIP) {
 
   val namedPickers = Map(
     "anim" -> animpicker,
@@ -65,17 +65,17 @@ class PaintControls
 }
 object PaintControls extends AndroidImplicits {
   type LAV = AdapterView[ListAdapter]
-  type UP[T, U] = UnnamedPicker[T, U]
+  type UP[U] = UnnamedPicker[U]
   type UUP[T] = UnnamedUnpicker[T]
   type FIP = FixedIndexPicker
   def apply
   (animpicker: LAV, brushpicker: LAV, paintpicker: LAV, interppicker: LAV, unipicker: LAV, sidebar: LAV) = {
     new PaintControls (
-      new UnnamedPicker[String, CopyShader](animpicker),
-      new UnnamedPicker[Bitmap, Texture](brushpicker),
-      new UnnamedPicker[String, PointShader](paintpicker),
-      new UnnamedPicker[String, LuaScript](interppicker),
-      new UnnamedPicker[UniBrushSource, UniBrush](unipicker),
+      new UnnamedPicker[CopyShader](animpicker),
+      new UnnamedPicker[Texture](brushpicker),
+      new UnnamedPicker[PointShader](paintpicker),
+      new UnnamedPicker[LuaScript](interppicker),
+      new UnnamedPicker[UniBrush](unipicker),
       new UnnamedUnpicker[CopyShader](None),
       new FixedIndexPicker(sidebar))
   }
@@ -103,8 +103,8 @@ object PaintControls extends AndroidImplicits {
     def currentValue(gl: GLInit): GLStoredResult[T]
   }
 
-  class UnnamedPicker[T, V](override val control: AdapterView[ListAdapter]) extends SavedControl with GLControl[V] with SelectedListener {
-    type LP = LazyPicker[T, V]
+  class UnnamedPicker[V](override val control: AdapterView[ListAdapter]) extends SavedControl with GLControl[V] with SelectedListener {
+    type LP = LazyPicker[V]
     type U = AdapterView[LP]
     override def currentValue(gl: GLInit): GLStoredResult[V] = {
       Log.i("picker", s"getting value at idx ${selected}: '${adapter.lazified(selected).name}'")
