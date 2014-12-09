@@ -24,8 +24,6 @@ import com.ipaulpro.afilechooser.utils.FileUtils
 
 import unibrush.{UniBrush, Layer}
 
-import resource._
-
 import com.larswerkman.holocolorpicker.{ColorPicker, ScaleBar}
 
 import scala.concurrent.ExecutionContext
@@ -319,11 +317,13 @@ class MainActivity extends Activity with TypedActivity with AndroidImplicits {
 
   private def loadFromFile() = {
     Log.i("main", "loading from file")
+    val input = new BufferedInputStream(MainActivity.this.openFileInput("screen"))
     try {
-      for (input <- managed(new BufferedInputStream(MainActivity.this.openFileInput("screen")))) {
+      DrawFiles.withCloseable(input) {
         savedBitmap = Some(DrawFiles.decodeBitmap(Bitmap.Config.ARGB_8888)(input))
         val input2 = MainActivity.this.openFileInput("status")
         controls.load(input2)
+        input2.close()
       }
     } catch {
       case e @ (_: IOException | _: GLException) => { 
@@ -335,10 +335,13 @@ class MainActivity extends Activity with TypedActivity with AndroidImplicits {
   private def saveLocalState() = {
     savedBitmap.foreach(bitmap => {
         Future {
-          for (out <- managed(new BufferedOutputStream(
-            MainActivity.this.openFileOutput("screen", Context.MODE_PRIVATE)))) {
-            saveBitmapToFile(bitmap, out)
-          }
+          val out = new BufferedOutputStream(
+            MainActivity.this.openFileOutput("screen", Context.MODE_PRIVATE))
+          try {
+            DrawFiles.withCloseable(out) {
+              saveBitmapToFile(bitmap, out)
+            }
+          } catch { case _: Exception => { } }
         }(saveThread)
       })
     savePickersToFile()
@@ -505,9 +508,15 @@ class MainActivity extends Activity with TypedActivity with AndroidImplicits {
         thread.getBitmap(b => {
             Future {
               val outfile = new File(getExternalFilesDir(null), new Date().toString() + ".png")
-              for (outstream <- managed(new BufferedOutputStream(new FileOutputStream(outfile)))) {
-                saveBitmapToFile(b, outstream)
+              try {
+
               }
+              val outstream = new BufferedOutputStream(new FileOutputStream(outfile))
+              try {
+                DrawFiles.withCloseable(outstream) {
+                  saveBitmapToFile(b, outstream)
+                }
+              } catch { case _: Exception => { } }
             }(saveThread)
           })
       })

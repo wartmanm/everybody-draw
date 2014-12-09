@@ -1,13 +1,11 @@
 package com.github.wartman4404.gldraw
 
 import android.content.Context
-import java.io.{InputStream, BufferedInputStream, FileInputStream, File}
+import java.io.{InputStream, BufferedInputStream, FileInputStream, File, Closeable}
 import java.util.zip.ZipFile
 import android.graphics.{Bitmap, BitmapFactory}
 
 import android.util.Log
-
-import resource._
 
 import unibrush.{UniBrush, UniBrushSource}
 import scala.annotation.tailrec
@@ -243,5 +241,18 @@ object DrawFiles {
 
   def readZip(zip: ZipFile, path: String) = {
     Option(zip.getEntry(path)).map(ze => readStream(zip.getInputStream(ze)))
+  }
+
+  def withCloseable[T](c: Closeable)(cb: =>T) = {
+    try {
+      cb
+    } catch {
+      case e: Exception => {
+        try {
+          c.close()
+        } catch { case _: Exception => { } }
+        throw e
+      }
+    }
   }
 }

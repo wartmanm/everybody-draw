@@ -103,7 +103,6 @@ object General {
       libraryDependencies ++= Seq(
         aarlib("com.github.iPaulPro" % "aFileChooser" % "0.1"),
         aarlib("android.support.v7" % "appcompat" % "1.0.0"),
-        "com.jsuereth" %% "scala-arm" % "1.5-SNAPSHOT",
         aarlib("com.larswerkman" % "HoloColorPicker" % "1.4")
       ),
       proguardOptions ++= Seq(
