@@ -5,10 +5,11 @@ import android.content.Context
 import android.view.View
 import android.widget.{AdapterView, Adapter, GridView, ListAdapter}
 import android.util.Log
+import android.graphics.Bitmap
 
 import java.io.{InputStream, OutputStream, OutputStreamWriter, BufferedWriter}
 
-import unibrush.UniBrush
+import unibrush.{UniBrush, UniBrushSource}
 
 import PaintControls._
 import GLResultTypeDef._
@@ -16,7 +17,7 @@ import java.io.{StringReader, StringWriter}
 import android.util.{JsonReader, JsonWriter}
 
 class PaintControls
-  (val animpicker: UP[CopyShader], val brushpicker: UP[Texture], val paintpicker: UP[PointShader], val interppicker: UP[LuaScript], val unipicker: UP[UniBrush], val copypicker: UUP[CopyShader], val sidebar: FIP) {
+  (val animpicker: UP[String, CopyShader], val brushpicker: UP[Bitmap, Texture], val paintpicker: UP[String, PointShader], val interppicker: UP[String, LuaScript], val unipicker: UP[UniBrushSource, UniBrush], val copypicker: UUP[CopyShader], val sidebar: FIP) {
 
   val namedPickers = Map(
     "anim" -> animpicker,
@@ -64,17 +65,17 @@ class PaintControls
 }
 object PaintControls extends AndroidImplicits {
   type LAV = AdapterView[ListAdapter]
-  type UP[T] = UnnamedPicker[T]
+  type UP[T, U] = UnnamedPicker[T, U]
   type UUP[T] = UnnamedUnpicker[T]
   type FIP = FixedIndexPicker
   def apply
   (animpicker: LAV, brushpicker: LAV, paintpicker: LAV, interppicker: LAV, unipicker: LAV, sidebar: LAV) = {
     new PaintControls (
-      new UnnamedPicker[CopyShader](animpicker),
-      new UnnamedPicker[Texture](brushpicker),
-      new UnnamedPicker[PointShader](paintpicker),
-      new UnnamedPicker[LuaScript](interppicker),
-      new UnnamedPicker[UniBrush](unipicker),
+      new UnnamedPicker[String, CopyShader](animpicker),
+      new UnnamedPicker[Bitmap, Texture](brushpicker),
+      new UnnamedPicker[String, PointShader](paintpicker),
+      new UnnamedPicker[String, LuaScript](interppicker),
+      new UnnamedPicker[UniBrushSource, UniBrush](unipicker),
       new UnnamedUnpicker[CopyShader](None),
       new FixedIndexPicker(sidebar))
   }
@@ -102,21 +103,22 @@ object PaintControls extends AndroidImplicits {
     def currentValue(gl: GLInit): GLStoredResult[T]
   }
 
-  class UnnamedPicker[T](override val control: AdapterView[ListAdapter]) extends SavedControl with GLControl[T] with SelectedListener {
-    type U = AdapterView[LazyPicker[T]]
-    override def currentValue(gl: GLInit): GLStoredResult[T] = {
-      Log.i("picker", s"getting value at idx ${selected}: '${adapter.lazified(selected)._1}'")
+  class UnnamedPicker[T, V](override val control: AdapterView[ListAdapter]) extends SavedControl with GLControl[V] with SelectedListener {
+    type LP = LazyPicker[T, V]
+    type U = AdapterView[LP]
+    override def currentValue(gl: GLInit): GLStoredResult[V] = {
+      Log.i("picker", s"getting value at idx ${selected}: '${adapter.lazified(selected).name}'")
       adapter.getState(selected, gl)
     }
     var selectedName = ""
-    private var adapter: LazyPicker[T] = null
-    def setAdapter(a: LazyPicker[T]) = {
+    private var adapter: LP = null
+    def setAdapter(a: LP) = {
       adapter = a
       control.setAdapter(a)
     }
     override def restoreState(): Unit = {
       Log.i("picker", "restoring unnamedpicker state")
-      selected = this.adapter.lazified.indexWhere(_._1 == selectedName) match {
+      selected = this.adapter.lazified.indexWhere(_.name == selectedName) match {
         case -1 => 0
         case  x => x
       }
@@ -124,7 +126,7 @@ object PaintControls extends AndroidImplicits {
     }
     override def updateState() = selectedName = selected match {
       case AdapterView.INVALID_POSITION => ""
-      case x => adapter.lazified(x)._1
+      case x => adapter.lazified(x).name
     }
     override def save(j: JsonWriter) = {
       j.beginObject()

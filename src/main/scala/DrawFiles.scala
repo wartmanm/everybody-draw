@@ -9,7 +9,8 @@ import android.util.Log
 
 import resource._
 
-import unibrush.UniBrush
+import unibrush.{UniBrush, UniBrushSource}
+import scala.annotation.tailrec
 import GLResultTypeDef._
 
 object DrawFiles {
@@ -23,9 +24,74 @@ object DrawFiles {
     def compile(g: GLInit, source: T): GLResult[U]
   }
 
-  abstract class BaseUnread[T, U] {
+  sealed trait ReadState[U] {
     val name: String
-    def read(): T
+  }
+  class Readable[T, U](private var state: ReadState[U]) {
+    type BaseUnread = DrawFiles.BaseUnread[T, U]
+    type PartiallyRead = DrawFiles.PartiallyRead[T, U]
+    type FullyRead = DrawFiles.FullyRead[U]
+    type FailedRead = DrawFiles.FailedRead[U]
+    val name = state.name
+    def read() = {
+      state = state match {
+        case s: BaseUnread => try {
+          s.read()
+        } catch {
+          case e: Exception => {
+            new FailedRead(s.name, e)
+          }
+        }
+        case other => other
+      }
+    }
+
+    @tailrec
+    final def compile(gl: GLInit): U = {
+      state match {
+        case s: BaseUnread => {
+          this.read()
+          this.compile(gl)
+        }
+        case s: PartiallyRead => {
+          val compiled =
+          try {
+            s.compile(gl)
+          } catch {
+            case e: Exception => {
+              state = new FailedRead(s.name, e)
+              throw e
+            }
+          }
+          state = compiled
+          compiled.content
+        }
+        case s: FullyRead => s.content
+        case s: FailedRead => throw s.error
+      }
+    }
+
+    @tailrec
+    final def compileSafe(gl: GLInit): GLStoredResult[U] = state match {
+      case s: FullyRead => Right(s.content)
+      case s: FailedRead => Left(s.error.toString())
+      case _ => {
+        try {
+          this.compile(gl)
+        } catch {
+          case e: Exception => { }
+        }
+        compileSafe(gl)
+      }
+    }
+
+    def isNotFailed = !state.isInstanceOf[FailedRead]
+  }
+
+  abstract class BaseUnread[T, U] extends ReadState[U] {
+    val name: String
+    def read(): PartiallyRead[T, U]
+    def toReadable: Readable[T, U] = new Readable(this)
   }
 
   class Unread[T, U](source: NamedSource, reader: PartialReader[T, U]) extends BaseUnread[T,U] {
@@ -44,11 +110,12 @@ object DrawFiles {
   }
   class DefaultUnread[T <: AnyRef, U](val name: String, reader: PartialReader[T, U]) extends BaseUnread[T, U] {
     def read() = {
-      new PartiallyRead(name, reader, null)
+      val content: T = null.asInstanceOf[T]
+      new PartiallyRead(name, reader, content)
     }
   }
 
-  class PartiallyRead[T, U](val name: String, reader: PartialReader[T, U], content: T) {
+  class PartiallyRead[T, U](val name: String, reader: PartialReader[T, U], val content: T) extends ReadState[U] {
     def compile(g: GLInit) = new FullyRead(name, reader.compile(g, content))
   }
   //object PartiallyRead {
@@ -57,7 +124,9 @@ object DrawFiles {
     //}
   //}
 
-  class FullyRead[U](val name: String, val content: U)
+  class FullyRead[U](val name: String, val content: U) extends ReadState[U]
+  class FailedRead[U](val name: String, val error: Exception) extends ReadState[U]
+
 
   class AssetStreamSource(c: Context, path: String) extends NamedSource {
     val filename = path
@@ -95,15 +164,15 @@ object DrawFiles {
   }
 
   object BitmapReader extends PartialReader[Bitmap, Texture] {
-    override def readSource(i: InputStream) = decodeBitmap(Bitmap.Config.ALPHA_8, i)
-    override def compile(g: GLInit, source: Texture) = Texture(g, source)
+    override def readSource(i: InputStream) = decodeBitmap(Bitmap.Config.ALPHA_8)(i)
+    override def compile(g: GLInit, source: Bitmap) = Texture(g, source)
   }
   
   class ShaderReader[T](constructor: (GLInit, String, String)=>GLResult[T]) extends PartialReader[String, T] {
     override def readSource(i: InputStream) = readStream(i)
     override def compile(g: GLInit, source: String) = {
       halfShaderPair(source) match {
-        case Some((vec, frag)) => constructor(data, vec, frag)
+        case Some((vec, frag)) => constructor(g, vec, frag)
         case None => throw new GLException("unable to load file")
       }
     }
@@ -111,51 +180,44 @@ object DrawFiles {
 
   object LuaReader extends PartialReader[String, LuaScript] {
     override def readSource(i: InputStream) = readStream(i)
-    override def compile(g: GLInit, source: String) = LuaScript(data, source)
+    override def compile(g: GLInit, source: String) = LuaScript(g, source)
   }
 
   object UniBrushReader extends PartialReader[UniBrushSource, UniBrush] {
     override def readSource(i: InputStream) = UniBrush.readFromStream(i)
-    override def compile(g: GLInit, source: UniBrushSource) = UniBrush.compileFromSource(source)
+    override def compile(g: GLInit, source: UniBrushSource) = UniBrush.compileFromSource(g, source)
   }
   object DefaultUniBrush extends PartialReader[UniBrushSource, UniBrush] {
     override def readSource(i: InputStream) = null
     override def compile(g: GLInit, source: UniBrushSource) = UniBrush(None, None, None, None, None, Array.empty)
   }
 
-  def loadShader[T](c: Context, constructor: (GLInit, InputStream)=>GLResult[T], 
-      folder: String, defaultName: String, defaultObj: Option[(GLInit)=>T]): Array[(String, (GLInit)=>GLResult[T])] = {
-        val default: Option[(String, (GLInit)=>GLResult[T])] = defaultObj.map(x => (defaultName, (data: GLInit) => x(data)))
-    val files = allfiles[T](c, folder)
-    (default.toArray ++ shaders).toArray
-  }
-
-  def loadBrushes(c: Context): Array[(String, (GLInit)=>GLResult[Texture])] = {
+  def loadBrushes(c: Context): Array[Readable[Bitmap, Texture]] = {
     val files = allfiles[Texture](c, "brushes")
-    files.map(new Unread(_, BitmapReader))
+    files.map(new Unread(_, BitmapReader).toReadable)
   }
 
   // TODO: make these safe
-  def loadPointShaders(c: Context): Seq[(String, (GLInit)=>GLResult[PointShader])] = {
+  def loadPointShaders(c: Context): Array[Readable[String, PointShader]] = {
     val constructor = new ShaderReader(PointShader.apply _)
     val files = allfiles[PointShader](c, "pointshaders")
-    files.map(new Unread(_, constructor)) +: new DefaultUnread("Default Paint", constructor)
+    files.map(new Unread(_, constructor).toReadable) :+ new DefaultUnread("Default Paint", constructor).toReadable
   }
 
-  def loadAnimShaders(c: Context): Seq[(String, (GLInit)=>GLResult[CopyShader])] = {
+  def loadAnimShaders(c: Context): Array[Readable[String, CopyShader]] = {
     val constructor = new ShaderReader(CopyShader.apply _)
     val files = allfiles[CopyShader](c, "animshaders")
-    files.map(new Unread(_, constructor)) +: new DefaultUnread("Default Animation", constructor)
+    files.map(new Unread(_, constructor).toReadable) :+ new DefaultUnread("Default Animation", constructor).toReadable
   }
 
-  def loadScripts(c: Context): Seq[(String, (GLInit)=>GLResult[LuaScript])] = {
+  def loadScripts(c: Context): Array[Readable[String, LuaScript]] = {
     val files = allfiles[LuaScript](c, "interpolators")
-    files.map(new Unread(_, LuaReader)) +: new DefaultUnread("Default Interpolator", LuaReader)
+    files.map(new Unread(_, LuaReader).toReadable) :+ new DefaultUnread("Default Interpolator", LuaReader).toReadable
   }
 
-  def loadUniBrushes(c: Context): Seq[(String, (GLInit)=>GLResult[UniBrush])] = {
+  def loadUniBrushes(c: Context): Array[Readable[UniBrushSource, UniBrush]] = {
     val files = allfiles[UniBrush](c, "unibrushes")
-    files.map(new Unread(_, UniBrushReader) +: new DefaultUnread("Nothing", DefaultUniBrush))
+    files.map(new Unread(_, UniBrushReader).toReadable) :+ new DefaultUnread("Nothing", DefaultUniBrush).toReadable
   }
 
   def halfShaderPair(shader: String) = {

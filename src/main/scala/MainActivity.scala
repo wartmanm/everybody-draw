@@ -344,7 +344,7 @@ class MainActivity extends Activity with TypedActivity with AndroidImplicits {
     savePickersToFile()
   }
 
-  def populatePicker[U, T <: (String, (GLInit)=>GLResult[U])](picker: UnnamedPicker[U], arr: Array[T], cb: (GLInit, U)=>Unit, thread: TextureSurfaceThread) = {
+  def populatePicker[T, U](picker: UnnamedPicker[T, U], arr: Array[DrawFiles.Readable[T, U]], cb: (GLInit, U)=>Unit, thread: TextureSurfaceThread) = {
     val adapter = new LazyPicker(this, thread, arr)
     picker.setAdapter(adapter)
     picker.setListener((view: View, pos: Int) => {
@@ -519,9 +519,7 @@ class MainActivity extends Activity with TypedActivity with AndroidImplicits {
       if (resultCode == Activity.RESULT_OK) {
         val path = FileUtils.getPath(this, data.getData())
         val bitmap = (try {
-          val tmp: Option[Bitmap] = DrawFiles.withFileStream(new File(path))
-          .acquireAndGet(fs => Some(DrawFiles.decodeBitmap(Bitmap.Config.ARGB_8888)(fs)))
-          tmp
+          Some(new DrawFiles.Unread(new DrawFiles.FileSource(new File(path)), DrawFiles.BitmapReader).read().content)
         } catch {
           case e: Exception => None
         })
