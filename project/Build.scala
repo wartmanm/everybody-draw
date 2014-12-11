@@ -96,6 +96,7 @@ object General {
     androidDefaults ++
     rustSettings ++
     onlyLocalResolvers ++
+    PaintResources.settings ++
     Seq (ndkJniSourcePath <<= Def.setting { baseDirectory.value / "jni" }) ++
     Seq (
       keyalias := "change-me",

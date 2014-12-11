@@ -138,16 +138,16 @@ object DrawFiles {
 
   type MaybeRead[T] = (InputStream)=>GLResult[T]
   type MaybeReader[T] = (MaybeRead[T])=>GLResult[T]
-  def allfiles[T](c: Context, path: String, constructor: PartialReader[_, T], default: DefaultUnread[_, T]): Array[Readable[T]] = {
-    val builtins = c.getAssets().list(path)
-    val userdirs = c.getExternalFilesDirs(path).filter(_ != null) // some paths may be null??
+  def allfiles[T](c: Context, builtins: PreinstalledPaintResources.Dir, constructor: PartialReader[_, T], default: DefaultUnread[_, T]): Array[Readable[T]] = {
+    val userdirs = c.getExternalFilesDirs(builtins.name).filter(_ != null) // some paths may be null??
     val userfiles = userdirs.flatMap(_.listFiles())
     var i = if (default != null) 1 else 0
-    val readers = new Array[Readable[T]](builtins.length + userfiles.length + i)
+    val builtinpaths = builtins.builtin
+    val readers = new Array[Readable[T]](builtinpaths.length + userfiles.length + i)
     readers(0) = if (default != null) default.toReadable else null
     var bi = 0
-    while (bi < builtins.length) {
-      readers(i) = new Unread(new AssetStreamSource(c, path + "/" + builtins(bi)), constructor).toReadable
+    while (bi < builtinpaths.length) {
+      readers(i) = new Unread(new AssetStreamSource(c, builtinpaths(bi)), constructor).toReadable
       bi += 1
       i += 1
     }
@@ -204,7 +204,7 @@ object DrawFiles {
   }
 
   def loadBrushes(c: Context): Array[Readable[Texture]] = {
-    val files = allfiles[Texture](c, "brushes", BitmapReader, null)
+    val files = allfiles[Texture](c, PreinstalledPaintResources.brushes, BitmapReader, null)
     files
   }
 
@@ -212,26 +212,26 @@ object DrawFiles {
   def loadPointShaders(c: Context): Array[Readable[PointShader]] = {
     val constructor = new ShaderReader(PointShader.apply _)
     val default = new DefaultUnread("Default Paint", constructor)
-    val files = allfiles[PointShader](c, "pointshaders", constructor, default)
+    val files = allfiles[PointShader](c, PreinstalledPaintResources.pointshaders, constructor, default)
     files
   }
 
   def loadAnimShaders(c: Context): Array[Readable[CopyShader]] = {
     val constructor = new ShaderReader(CopyShader.apply _)
     val default = new DefaultUnread("Default Animation", constructor)
-    val files = allfiles[CopyShader](c, "animshaders", constructor, default)
+    val files = allfiles[CopyShader](c, PreinstalledPaintResources.animshaders, constructor, default)
     files
   }
 
   def loadScripts(c: Context): Array[Readable[LuaScript]] = {
     val default = new DefaultUnread("Default Interpolator", LuaReader)
-    val files = allfiles[LuaScript](c, "interpolators", LuaReader, default)
+    val files = allfiles[LuaScript](c, PreinstalledPaintResources.interpolators, LuaReader, default)
     files
   }
 
   def loadUniBrushes(c: Context): Array[Readable[UniBrush]] = {
     val default = new DefaultUnread("Nothing", DefaultUniBrush)
-    val files = allfiles[UniBrush](c, "unibrushes", UniBrushReader, default)
+    val files = allfiles[UniBrush](c, PreinstalledPaintResources.unibrushes, UniBrushReader, default)
     files
   }
 
