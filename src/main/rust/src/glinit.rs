@@ -2,7 +2,7 @@ extern crate opengles;
 use core::prelude::*;
 use core::mem;
 use collections::vec::Vec;
-use collections::str::IntoMaybeOwned;
+use core::borrow::IntoCow;
 
 use log::{logi,loge};
 
@@ -36,6 +36,7 @@ const UNDO_BUFFERS: i32 = 5;
 
 //#[deriving(FromPrimitive)]
 #[repr(i32)]
+#[deriving(Copy)]
 #[allow(non_camel_case_types, dead_code)]
 pub enum AndroidBitmapFormat {
     ANDROID_BITMAP_FORMAT_NONE      = 0,
@@ -230,7 +231,7 @@ impl<'a> GLInit<'a> {
         // The only purpose of the shader copy is to flip the image from gl coords to bitmap coords.
         // it might be better to finagle the output copy matrix so the rest of the targets
         // can stay in bitmap coords?  Or have a dedicated target for this.
-        let saveshader = ::glstore::init_from_defaults((None, Some(include_str!("../includes/shaders/noalpha_copy.fsh").into_maybe_owned()))).unwrap();
+        let saveshader = ::glstore::init_from_defaults((None, Some(include_str!("../includes/shaders/noalpha_copy.fsh").into_cow()))).unwrap();
         let newtarget = TextureTarget::new(x, y, PixelFormat::RGB);
         let matrix = [1f32,  0f32,  0f32,  0f32,
                       0f32, -1f32,  0f32,  0f32,
@@ -300,7 +301,7 @@ impl<'a> GLInit<'a> {
             0 => self.targetdata.get_current_texturetarget().framebuffer,
             _ => match self.paintstate.layers.as_slice().get((layer - 1) as uint) {
                 Some(layer) => layer.target.framebuffer,
-                None => return Err(format!("tried to erase layer {} of {}", layer - 1, self.paintstate.layers.len()).into_maybe_owned()),
+                None => return Err(format!("tried to erase layer {} of {}", layer - 1, self.paintstate.layers.len()).into_cow()),
             },
         };
         gl2::bind_framebuffer(gl2::FRAMEBUFFER, target);
@@ -467,7 +468,7 @@ impl gltexture::ToPixelFormat for AndroidBitmapFormat {
         match *self {
             AndroidBitmapFormat::ANDROID_BITMAP_FORMAT_RGBA_8888 => Ok(PixelFormat::RGBA),
             AndroidBitmapFormat::ANDROID_BITMAP_FORMAT_A_8 => Ok(PixelFormat::ALPHA),
-            _ => Err("Unsupported texture format!".into_maybe_owned()),
+            _ => Err("Unsupported texture format!".into_cow()),
         }
     }
 }

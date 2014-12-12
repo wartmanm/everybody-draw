@@ -169,6 +169,7 @@ pub mod event_stream {
     use core::prelude::*;
     use drawevent::{Events, handle_event};
 
+    #[deriving(Copy)]
     pub enum EventState {
         Done,
         Frame,

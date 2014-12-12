@@ -7,7 +7,7 @@ use core::any::{Any, AnyRefExt};
 use core::fmt::Show;
 use core::iter;
 use libc::{c_void, c_char};
-use collections::str::IntoMaybeOwned;
+use core::borrow::IntoCow;
 use collections::vec::Vec;
 use collections::str::MaybeOwned;
 
@@ -113,7 +113,7 @@ unsafe fn get_string(env: *mut JNIEnv, string: jstring) -> Option<String> {
 
 unsafe fn get_mstring(env: *mut JNIEnv, string: jstring) -> Option<MString> {
     match get_string(env, string) {
-        Some(s) => Some(s.into_maybe_owned()),
+        Some(s) => Some(s.into_cow()),
         None => None,
     }
 }

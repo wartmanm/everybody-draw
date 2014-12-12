@@ -1,7 +1,7 @@
 use core::prelude::*;
 use core::{mem, fmt};
 use core::fmt::Show;
-use collections::str::IntoMaybeOwned;
+use core::borrow::IntoCow;
 
 use log::{logi};
 
@@ -62,7 +62,7 @@ impl Shader for PointShader {
             }
             _ => {
                 gl2::delete_program(program);
-                Err("point shader missing vPosition or textureMatrix attribute".into_maybe_owned())
+                Err("point shader missing vPosition or textureMatrix attribute".into_cow())
             }
         }
     }
@@ -136,8 +136,8 @@ impl Show for PointShader {
 impl FillDefaults<(Option<MString>, Option<MString>), (MString, MString), PointShader> for PointShader {
     fn fill_defaults(init: (Option<MString>, Option<MString>)) -> Defaults<(MString, MString), PointShader> {
         let (vertopt, fragopt) = init;
-        let vert = vertopt.unwrap_or_else(|| { logi("point shader: using default vertex shader"); DEFAULT_VERTEX_SHADER.into_maybe_owned()});
-        let frag = fragopt.unwrap_or_else(|| { logi("point shader: using default fragment shader"); DEFAULT_FRAGMENT_SHADER.into_maybe_owned()});
+        let vert = vertopt.unwrap_or_else(|| { logi("point shader: using default vertex shader"); DEFAULT_VERTEX_SHADER.into_cow()});
+        let frag = fragopt.unwrap_or_else(|| { logi("point shader: using default fragment shader"); DEFAULT_FRAGMENT_SHADER.into_cow()});
         Defaults { val: (vert, frag) }
     }
 }

@@ -2,8 +2,9 @@
 use core::prelude::*;
 use core::{mem, ptr, raw};
 use core::str;
-use collections::str::{StrAllocating, IntoMaybeOwned};
+use core::borrow::IntoCow;
 use collections::string::String;
+use collections::str::StrAllocating;
 use libc::{c_char, c_void, size_t};
 
 use lua::lib::raw::*;
@@ -56,6 +57,7 @@ enum SandboxMode {
     Unsandboxed,
 }
 
+#[allow(raw_pointer_deriving)]
 #[deriving(Copy)]
 enum LuaValue {
     #[allow(dead_code)]
@@ -155,7 +157,7 @@ unsafe fn init_lua() -> GLResult<*mut lua_State> {
         assert_eq!(stacksize, lua_gettop(L));
         Ok(L)
     } else {
-        let err = format!("ffi init script failed to load: {}\nThis should never happen!", err_to_str(L)).into_maybe_owned();
+        let err = format!("ffi init script failed to load: {}\nThis should never happen!", err_to_str(L)).into_cow();
         lua_close(L);
         log_err(err)
     }
@@ -187,7 +189,7 @@ pub unsafe fn get_existing_lua() -> Option<*mut lua_State> {
 pub unsafe fn get_existing_lua_or_err() -> GLResult<*mut lua_State> {
     match get_existing_lua() {
         Some(lua) => Ok(lua),
-        None => Err("couldn't get lua state!".into_maybe_owned()),
+        None => Err("couldn't get lua state!".into_cow()),
     }
 }
 
@@ -207,7 +209,7 @@ unsafe fn save_ondone(L: *mut lua_State, key: i32, sandbox: LuaValue) -> GLResul
                 if !lua_isfunction(L, -1) {
                     safe_pop!(L, 3);
                     assert_eq!(stacksize, lua_gettop(L));
-                    return log_err("ondone not defined.\nThis should never happen!".into_maybe_owned());
+                    return log_err("ondone not defined.\nThis should never happen!".into_cow());
                 }
                 logi!("saving ondone method to 0x{:x} in gldraw_lua_stopfns", key);
                 lua_rawseti(L, -2, key);
@@ -237,14 +239,14 @@ unsafe fn load_lua_script_internal(L: *mut lua_State, script: &str) -> GLResult<
     let key = {
         let sandbox_idx = IndexValue(lua_gettop(L));
         if !runstring(L, LUA_INTERPOLATOR_DEFAULTS, cstr!("interpolator defaults"), Sandboxed(sandbox_idx)) {
-            let err = format!("default loader failed to load: {}\nThis should never happen!", err_to_str(L)).into_maybe_owned();
+            let err = format!("default loader failed to load: {}\nThis should never happen!", err_to_str(L)).into_cow();
             safe_pop!(L, 1);
             assert_eq!(stacksize, lua_gettop(L));
             return log_err(err);
         }
 
         if !runstring(L, script, cstr!("interpolator script"), Sandboxed(sandbox_idx)) {
-            let err = format!("script failed to load: {}", err_to_str(L)).into_maybe_owned();
+            let err = format!("script failed to load: {}", err_to_str(L)).into_cow();
             safe_pop!(L, 1);
             assert_eq!(stacksize, lua_gettop(L));
             return log_err(err);
@@ -255,7 +257,7 @@ unsafe fn load_lua_script_internal(L: *mut lua_State, script: &str) -> GLResult<
                 if !lua_isfunction(L, -1) {
                     safe_pop!(L, 3);
                     assert_eq!(stacksize, lua_gettop(L));
-                    return log_err("no main function defined :(".into_maybe_owned());
+                    return log_err("no main function defined :(".into_cow());
                 }
                 luaJIT_setmode(L, 0, LUAJIT_MODE_ENGINE as i32|LUAJIT_MODE_ON as i32);
                 safe_pop!(L, 1);
@@ -267,7 +269,7 @@ unsafe fn load_lua_script_internal(L: *mut lua_State, script: &str) -> GLResult<
 
         // FIXME compile runner once
         if !runstring(L, LUA_RUNNER, cstr!("built-in lua_runner script"), Unsandboxed) {
-            let err = format!("lua runner failed to load: {}\n This should never happen!", err_to_str(L)).into_maybe_owned();
+            let err = format!("lua runner failed to load: {}\n This should never happen!", err_to_str(L)).into_cow();
             safe_pop!(L, 1);
             assert_eq!(stacksize, lua_gettop(L));
             return log_err(err);
@@ -278,7 +280,7 @@ unsafe fn load_lua_script_internal(L: *mut lua_State, script: &str) -> GLResult<
             if !lua_isfunction(L, -1) {
                 safe_pop!(L, 2);
                 assert_eq!(stacksize, lua_gettop(L));
-                return log_err("runmain not defined.\nThis should never happen!".into_maybe_owned());
+                return log_err("runmain not defined.\nThis should never happen!".into_cow());
             }
             luaJIT_setmode(L, 0, LUAJIT_MODE_ENGINE as i32|LUAJIT_MODE_ON as i32);
 
@@ -315,7 +317,7 @@ pub unsafe fn finish_lua_script<T: LuaCallback>(output: &mut T, script: &::luasc
         let result = match lua_pcall(L, 1, 0, 0) {
             0 => Ok(()),
             _ => {
-                log_err(format!("ondone() script failed to run: {}", err_to_str(L)).into_maybe_owned())
+                log_err(format!("ondone() script failed to run: {}", err_to_str(L)).into_cow())
             }
         };
         safe_pop!(L, 1);
@@ -360,7 +362,7 @@ pub unsafe fn do_interpolate_lua<T: LuaCallback>(script: &::luascript::LuaScript
 
     let result = match lua_pcall(L, 3, 0, 0) {
         0 => Ok(()),
-        _ => log_err(format!("script failed to run: {}", err_to_str(L)).into_maybe_owned()),
+        _ => log_err(format!("script failed to run: {}", err_to_str(L)).into_cow()),
     };
     assert_eq!(stacksize, lua_gettop(L));
     result
