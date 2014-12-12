@@ -24,6 +24,8 @@ use paintlayer::PaintLayer;
 use glcommon::{GLResult, MString};
 use drawevent::event_stream::EventState;
 
+// can't use Copy, wtf
+#[deriving(Clone)]
 enum DrawEvent {
     UseAnimShader(DrawObjectIndex<CopyShader>),
     UseCopyShader(DrawObjectIndex<CopyShader>),
@@ -62,12 +64,12 @@ impl<'a> Events<'a> {
     }
 
     pub fn use_copyshader(&mut self, idx: DrawObjectIndex<CopyShader>) -> &'a CopyShader {
-        self.eventlist.push(DrawEvent::UseCopyShader(idx));
+        self.eventlist.push(DrawEvent::UseCopyShader(idx.clone()));
         self.copyshaders.get_object(idx)
     }
 
     pub fn use_animshader(&mut self, idx: DrawObjectIndex<CopyShader>) -> &'a CopyShader {
-        self.eventlist.push(DrawEvent::UseAnimShader(idx));
+        self.eventlist.push(DrawEvent::UseAnimShader(idx.clone()));
         self.copyshaders.get_object(idx)
     }
 
@@ -76,7 +78,7 @@ impl<'a> Events<'a> {
         self.pointshaders.push_object(initargs)
     }
     pub fn use_pointshader(&mut self, idx: DrawObjectIndex<PointShader>) -> &'a PointShader {
-        self.eventlist.push(DrawEvent::UsePointShader(idx));
+        self.eventlist.push(DrawEvent::UsePointShader(idx.clone()));
         self.pointshaders.get_object(idx)
     }
     pub fn load_brush(&mut self, w: i32, h: i32, pixels: &[u8], format: PixelFormat) -> DrawObjectIndex<BrushTexture> {
@@ -85,7 +87,7 @@ impl<'a> Events<'a> {
         self.textures.safe_push_object(init)
     }
     pub fn use_brush(&mut self, idx: DrawObjectIndex<BrushTexture>) -> &'a BrushTexture {
-        self.eventlist.push(DrawEvent::UseBrush(idx));
+        self.eventlist.push(DrawEvent::UseBrush(idx.clone()));
         self.textures.get_object(idx)
     }
     pub fn load_interpolator(&mut self, script: Option<MString>) -> GLResult<DrawObjectIndex<LuaScript>> {
@@ -94,14 +96,14 @@ impl<'a> Events<'a> {
     }
 
     pub fn use_interpolator(&mut self, idx: DrawObjectIndex<LuaScript>) -> &'a LuaScript {
-        self.eventlist.push(DrawEvent::UseInterpolator(idx));
+        self.eventlist.push(DrawEvent::UseInterpolator(idx.clone()));
         self.luascripts.get_object(idx)
     }
 
     pub fn add_layer(&mut self, dimensions: (i32, i32)
                      , copyshader: Option<DrawObjectIndex<CopyShader>>, pointshader: Option<DrawObjectIndex<PointShader>>
                      , pointidx: i32) -> PaintLayer<'a> {
-        self.eventlist.push(DrawEvent::AddLayer(copyshader, pointshader, pointidx));
+        self.eventlist.push(DrawEvent::AddLayer(copyshader.clone(), pointshader.clone(), pointidx));
         let copyshader = match copyshader { Some(x) => Some(self.copyshaders.get_object(x)), None => None };
         let pointshader = match pointshader { Some(x) => Some(self.pointshaders.get_object(x)), None => None };
         PaintLayer::new(dimensions, copyshader, pointshader, pointidx)
@@ -142,13 +144,13 @@ pub fn handle_event<'a>(gl: &mut ::glinit::GLInit<'a>, events: &mut Events<'a>, 
 
     // FIXME do this without exposing Events or GLInit internal details
     match events.get_event(eventidx as uint) {
-        Some(&event) => match event {
+        Some(event) => match event.clone() {
             DrawEvent::UseAnimShader(idx) => gl.set_anim_shader(events.copyshaders.get_object(idx)),
             DrawEvent::UseCopyShader(idx) => gl.set_copy_shader(events.copyshaders.get_object(idx)),
             DrawEvent::UsePointShader(idx) => gl.set_point_shader(events.pointshaders.get_object(idx)),
             DrawEvent::UseBrush(idx) => gl.set_brush_texture(&events.textures.get_object(idx).texture),
             DrawEvent::UseInterpolator(idx) => gl.set_interpolator(events.luascripts.get_object(idx)),
-            DrawEvent::Point(p) => queue.push(p),
+            DrawEvent::Point(p) => queue.send(p),
             DrawEvent::AddLayer(copyshader, pointshader, pointidx) => {
                 let copyshader = match copyshader { Some(x) => Some(events.copyshaders.get_object(x)), None => None };
                 let pointshader = match pointshader { Some(x) => Some(events.pointshaders.get_object(x)), None => None };

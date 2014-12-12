@@ -54,6 +54,7 @@ struct GLInitEvents<'a> {
     owning_thread: pid_t,
 }
 
+#[deriving(Copy)]
 pub struct JNIUndoCallback {
     callback_obj: jobject,
     callback_method: jmethodID,
@@ -95,7 +96,7 @@ impl CaseClass {
     pub unsafe fn construct(&self, env: *mut JNIEnv, arg: &mut [jvalue]) -> jobject {
         ((**env).NewObjectA)(env, self.class, self.constructor, arg.as_mut_ptr())
     }
-    pub unsafe fn destroy(self, env: *mut JNIEnv) {
+    pub unsafe fn destroy(&mut self, env: *mut JNIEnv) {
         ((**env).DeleteGlobalRef)(env, self.class);
     }
 }
@@ -158,7 +159,7 @@ unsafe fn get_jpointer(env: *mut JNIEnv, obj: jobject, field: jfieldID) -> jpoin
     //((**env).SetLongField)(env, obj, field)
 //}
 
-fn on_unwind(msg: &Any + Send, file: &'static str, line: uint) {
+fn on_unwind(msg: &(Any + Send), file: &'static str, line: uint) {
     use core::fmt::FormatWriter;
     // as far as I know there's no way to identify traits that can be cast to Show at runtime
     if let Some(s) = msg.downcast_ref::<&Show>() {

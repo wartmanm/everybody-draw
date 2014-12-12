@@ -50,11 +50,13 @@ macro_rules! safe_pop {
 
 type ReaderState<'a> = (&'a str, bool);
 
+#[deriving(Copy)]
 enum SandboxMode {
     Sandboxed(LuaValue),
     Unsandboxed,
 }
 
+#[deriving(Copy)]
 enum LuaValue {
     #[allow(dead_code)]
     RegistryValue(*mut c_void),

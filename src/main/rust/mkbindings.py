@@ -23,6 +23,7 @@ prelude_lints = [
     'non_camel_case_types',
     'non_snake_case',
     'non_upper_case_globals',
+    'missing_copy_implementations',
 ]
 
 builtins_name = 'bindgen_builtins'

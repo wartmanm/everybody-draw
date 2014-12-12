@@ -33,7 +33,7 @@ pub fn pause(data: &mut Data, queue: &mut PointProducer) {
     // pro: straightforward, con: extra 4 bytes on every pointentry
     // could fold index into pointinfo, or have a magic index like -1 to indicate framestop
     // maybe this entire approach isn't such a good one after all?
-    queue.push(PointEntry { index: 0, entry: PointInfo::FrameStop })
+    queue.send(PointEntry { index: 0, entry: PointInfo::FrameStop })
 }
 
 pub fn append_motion_event(data: &mut Data, evt: *const AInputEvent, queue: &mut PointProducer) -> () {
@@ -100,12 +100,12 @@ fn make_active(queue: &mut PointProducer, active: &mut PointerState, id: i32, ne
     let updated = active.get(&(id as uint)).unwrap_or(&activestate::INACTIVE).push(newstate);
     active.insert(id as uint, updated);
     if updated == activestate::STOPPING {
-        queue.push(PointEntry { index: id, entry: PointInfo::Stop });
+        queue.send(PointEntry { index: id, entry: PointInfo::Stop });
     }
 }
 
 fn push_historical_point(queue: &mut PointProducer, evt: *const AInputEvent, id: i32, ptr: size_t, hist: size_t) {
-    queue.push(PointEntry { index: id, entry: PointInfo::Point(PaintPoint {
+    queue.send(PointEntry { index: id, entry: PointInfo::Point(PaintPoint {
         pos: Coordinate {
              x: unsafe { AMotionEvent_getHistoricalX(evt, ptr, hist) },
              y: unsafe { AMotionEvent_getHistoricalY(evt, ptr, hist) },
@@ -116,7 +116,7 @@ fn push_historical_point(queue: &mut PointProducer, evt: *const AInputEvent, id:
 }
 
 fn push_current_point(queue: &mut PointProducer, evt: *const AInputEvent, id: i32, ptr: size_t) {
-    queue.push(PointEntry { index: id, entry: PointInfo::Point(PaintPoint {
+    queue.send(PointEntry { index: id, entry: PointInfo::Point(PaintPoint {
         pos: Coordinate {
             x: unsafe { AMotionEvent_getX(evt, ptr) },
             y: unsafe { AMotionEvent_getY(evt, ptr) },
@@ -129,7 +129,7 @@ fn push_current_point(queue: &mut PointProducer, evt: *const AInputEvent, id: i3
 fn push_stops(queue: &mut PointProducer, active: &mut PointerState) {
     for (idx, active) in active.iter_mut() {
         if *active == activestate::STOPPING {
-            queue.push(PointEntry { index: idx as i32, entry: PointInfo::Stop });
+            queue.send(PointEntry { index: idx as i32, entry: PointInfo::Stop });
         }
     }
 }

@@ -11,7 +11,7 @@ use log::logi;
 
 use collections::vec::Vec;
 
-#[deriving(PartialEq, Eq, Hash, Show)]
+#[deriving(PartialEq, Eq, Hash, Show, Copy)]
 pub enum PixelFormat {
     RGBA = gl2::RGBA as int,
     RGB = gl2::RGB as int,

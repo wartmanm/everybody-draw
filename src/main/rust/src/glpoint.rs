@@ -5,7 +5,7 @@ use collections::vec::Vec;
 use collections::vec_map::VecMap;
 use alloc::boxed::Box;
 
-use std::sync::spsc_queue;
+use std::comm;
 
 use log::logi;
 use motionevent;
@@ -38,7 +38,7 @@ pub struct MotionEventProducer {
 }
 
 pub fn create_motion_event_handler() -> (MotionEventConsumer, MotionEventProducer) {
-    let (consumer, producer) = spsc_queue::queue::<PointEntry>(0);
+    let (producer, consumer) = comm::channel::<PointEntry>();
     let handler = MotionEventConsumer {
         consumer: consumer,
         current_points: VecMap::new(),
@@ -77,8 +77,8 @@ fn manhattan_distance(a: Coordinate, b: Coordinate) -> f32 {
 pub fn next_point(s: &mut MotionEventConsumer, e: &mut Events) -> (point::ShaderPointEvent, u8) {
     let ref mut queue = s.consumer;
     let ref mut current_points = s.current_points;
-    match queue.pop() {
-        Some(point) => {
+    match queue.try_recv() {
+        Ok(point) => {
             e.pushpoint(point);
             let idx = point.index;
             let newpoint = point.entry;
@@ -142,7 +142,7 @@ pub fn next_point(s: &mut MotionEventConsumer, e: &mut Events) -> (point::Shader
             };
             (pointevent, idx as u8)
         },
-        None => {
+        Err(_) => {
             (ShaderPointEvent::NoEvent, 0u8)
         }
     }
