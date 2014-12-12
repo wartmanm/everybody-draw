@@ -12,7 +12,7 @@ use collections::vec::Vec;
 use collections::str::MaybeOwned;
 
 use jni::{jobject, jclass, jmethodID, jfieldID, JNIEnv, jint, jstring, jvalue, JNINativeMethod, JavaVM};
-#[cfg(test)] use jni::jlong;
+#[cfg(target_word_size = "64")] use jni::jlong;
 use jni_constants::*;
 
 use log::{logi, loge};
