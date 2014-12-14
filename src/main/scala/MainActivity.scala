@@ -74,7 +74,7 @@ class MainActivity extends Activity with TypedActivity with AndroidImplicits {
   lazy val saveThread = ExecutionContext.fromExecutor(Executors.newSingleThreadExecutor())
 
   lazy val loadedDrawFiles = Future {
-    new LoadedDrawFiles(this)
+    new LoadedDrawFiles(this, true)
   }(saveThread)
 
   var drawerIsOpen = false
@@ -435,9 +435,23 @@ class MainActivity extends Activity with TypedActivity with AndroidImplicits {
       case Failure(err) => {
         val msg = "Something went wrong while loading your custom paint files:\n" + err;
         Log.e("main", msg)
+        err.printStackTrace()
         MainActivity.this.runOnUiThread(() => {
           Toast.makeText(MainActivity.this, msg, Toast.LENGTH_LONG).show()
         })
+        Future { new LoadedDrawFiles(MainActivity.this, false) }.onComplete {
+          case Success(drawfiles) => {
+            populatePickersWithFiles(drawfiles)
+          }
+          case Failure(err) => {
+            val msg = "Something went wrong while loading the default paint files.  This should never happen!\n" + err;
+            Log.e("main", msg)
+            err.printStackTrace()
+            MainActivity.this.runOnUiThread(() => {
+              Toast.makeText(MainActivity.this, msg, Toast.LENGTH_LONG).show()
+            })
+          }
+        }
       }
     }
   }
@@ -758,13 +772,5 @@ object MainActivity {
   abstract class NamedSidebarControl(val name: String) {
     override def toString() = name
     def onClick(pos: Int)
-  }
-
-  class LoadedDrawFiles(c: Context) {
-    val brushes = DrawFiles.loadBrushes(c)
-    val anims = DrawFiles.loadAnimShaders(c)
-    val paints = DrawFiles.loadPointShaders(c)
-    val interpscripts = DrawFiles.loadScripts(c)
-    val unibrushes = DrawFiles.loadUniBrushes(c)
   }
 }
