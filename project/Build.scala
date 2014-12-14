@@ -12,9 +12,9 @@ object General {
   )
 
 
-  lazy val compileRust = taskKey[sbt.inc.Analysis]("Compiles native sources.")
+  lazy val rustCompile = taskKey[sbt.inc.Analysis]("Compiles native sources.")
 
-  lazy val cleanRust = taskKey[Unit]("Deletes files generated from native sources.")
+  lazy val rustClean = taskKey[Unit]("Deletes files generated from native sources.")
 
   lazy val rustDir = settingKey[File]("Rust source directory")
 
@@ -55,15 +55,12 @@ object General {
   }
 
   lazy val rustSettings = Seq(
-    compileRust <<= compileRustTask,
-    cleanRust <<= cleanRustTask,
+    rustCompile <<= compileRustTask,
+    rustClean <<= cleanRustTask,
     rustDir <<= Def.setting { (sourceDirectory in Compile).value / "rust" },
-    (ndkBuild in Compile) <<= (ndkBuild in Compile) dependsOn compileRust,
-    (ndkBuild in Preload) <<= (ndkBuild in Preload) dependsOn compileRust,
-    clean := {
-      val _ = cleanRustTask.value
-      clean.value
-    }
+    (ndkBuild in Compile) <<= (ndkBuild in Compile) dependsOn rustCompile,
+    (ndkBuild in Preload) <<= (ndkBuild in Preload) dependsOn rustCompile,
+    clean <<= clean dependsOn cleanRustTask
   )
 
   lazy val debugSettings = Seq (
