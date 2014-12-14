@@ -139,11 +139,16 @@ object DrawFiles {
 
   def externalfiles(c: Context, path: String): Array[File] = {
     val userdirs = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.KITKAT) {
-      c.getExternalFilesDirs(path).filter(_ != null) // some paths may be null??
+      c.getExternalFilesDirs(path)
     } else {
       Array(c.getExternalFilesDir(path))
     }
-    userdirs.flatMap(_.listFiles())
+    val result = userdirs.flatMap (subpath => {
+      val files = if (subpath != null) subpath.listFiles() else null // some paths may be null??
+      val result: Array[File] = if (files != null) files else Array()
+      result
+    })
+    result
   }
 
   type MaybeRead[T] = (InputStream)=>GLResult[T]
