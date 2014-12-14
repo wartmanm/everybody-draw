@@ -4,6 +4,7 @@ import android.content.Context
 import java.io.{InputStream, BufferedInputStream, FileInputStream, File, Closeable}
 import java.util.zip.ZipFile
 import android.graphics.{Bitmap, BitmapFactory}
+import android.os.Build
 
 import android.util.Log
 
@@ -136,11 +137,19 @@ object DrawFiles {
     def read() = new BufferedInputStream(new FileInputStream(file))
   }
 
+  def externalfiles(c: Context, path: String): Array[File] = {
+    val userdirs = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.KITKAT) {
+      c.getExternalFilesDirs(path).filter(_ != null) // some paths may be null??
+    } else {
+      Array(c.getExternalFilesDir(path))
+    }
+    userdirs.flatMap(_.listFiles())
+  }
+
   type MaybeRead[T] = (InputStream)=>GLResult[T]
   type MaybeReader[T] = (MaybeRead[T])=>GLResult[T]
   def allfiles[T](c: Context, builtins: PreinstalledPaintResources.Dir, constructor: PartialReader[_, T], default: DefaultUnread[_, T]): Array[Readable[T]] = {
-    val userdirs = c.getExternalFilesDirs(builtins.name).filter(_ != null) // some paths may be null??
-    val userfiles = userdirs.flatMap(_.listFiles())
+    val userfiles = externalfiles(c, builtins.name)
     var i = if (default != null) 1 else 0
     val builtinpaths = builtins.builtin
     val readers = new Array[Readable[T]](builtinpaths.length + userfiles.length + i)

@@ -13,7 +13,7 @@ import android.support.v4.widget.DrawerLayout
 
 import java.io.{BufferedInputStream}
 import java.io.{OutputStream, FileOutputStream, BufferedOutputStream}
-import java.io.{File, IOException}
+import java.io.{File, IOException, FileNotFoundException}
 import java.util.Date
 
 import android.util.Log
@@ -331,8 +331,8 @@ class MainActivity extends Activity with TypedActivity with AndroidImplicits {
 
   private def loadFromFile() = {
     Log.i("main", "loading from file")
-    val input = new BufferedInputStream(MainActivity.this.openFileInput("screen"))
     try {
+      val input = new BufferedInputStream(MainActivity.this.openFileInput("screen"))
       DrawFiles.withCloseable(input) {
         savedBitmap = Some(DrawFiles.decodeBitmap(Bitmap.Config.ARGB_8888)(input))
         val input2 = MainActivity.this.openFileInput("status")
@@ -340,6 +340,7 @@ class MainActivity extends Activity with TypedActivity with AndroidImplicits {
         input2.close()
       }
     } catch {
+      case e: FileNotFoundException => { }
       case e @ (_: IOException | _: GLException) => { 
         Log.i("main", "loading from file failed: %s".format(e))
       }
