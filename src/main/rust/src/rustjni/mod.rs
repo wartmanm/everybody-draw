@@ -203,6 +203,12 @@ fn on_unwind(msg: &(Any + Send), file: &'static str, line: uint) {
             }
         }
     }
+    // Unwinding always fails, but not before messing up android's crash report backtrace.
+    // So, commit suicide before that can happen.
+    unsafe {
+        let null: *mut u16 = ptr::null_mut();
+        *null = 0xdead;
+    }
 }
 
 #[allow(non_snake_case, unused_variables)]
