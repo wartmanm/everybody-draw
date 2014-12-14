@@ -28,6 +28,7 @@ import com.larswerkman.holocolorpicker.{ColorPicker, ScaleBar}
 
 import scala.concurrent.ExecutionContext
 import scala.concurrent.Future
+import scala.util.{Success,Failure}
 import java.util.concurrent.Executors
 
 import PaintControls.UnnamedPicker
@@ -411,8 +412,7 @@ class MainActivity extends Activity with TypedActivity with AndroidImplicits {
     // TODO: maybe make the save thread load from disk and then hand off to the gl thread?
     // also, have it opportunistically load at least up to that point
 
-    implicit val ec = saveThread
-    for (drawfiles <- loadedDrawFiles) {
+    def populatePickersWithFiles(drawfiles: LoadedDrawFiles) = {
       MainActivity.this.runOnUiThread(() => {
         // TODO: make hardcoded shaders accessible a better way
         val interpLoader = loadInterpolatorSynchronized(thread, producer)
@@ -425,6 +425,20 @@ class MainActivity extends Activity with TypedActivity with AndroidImplicits {
         controls.copypicker.value = thread.outputShader
         controls.restoreState()
       })
+    }
+
+    implicit val executionContext = saveThread
+    loadedDrawFiles.onComplete {
+      case Success(drawfiles) => {
+        populatePickersWithFiles(drawfiles)
+      }
+      case Failure(err) => {
+        val msg = "Something went wrong while loading your custom paint files:\n" + err;
+        Log.e("main", msg)
+        MainActivity.this.runOnUiThread(() => {
+          Toast.makeText(MainActivity.this, msg, Toast.LENGTH_LONG).show()
+        })
+      }
     }
   }
 
