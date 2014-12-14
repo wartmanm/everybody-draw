@@ -15,8 +15,6 @@ use jni::{jobject, jclass, jmethodID, jfieldID, JNIEnv, jint, jstring, jvalue, J
 #[cfg(target_word_size = "64")] use jni::jlong;
 use jni_constants::*;
 
-use log::{logi, loge};
-
 use glinit::GLInit;
 use drawevent::Events;
 use glcommon::MString;
@@ -198,7 +196,7 @@ fn on_unwind(msg: &(Any + Send), file: &'static str, line: uint) {
                         let _ = write!(&mut writer, "{} ", byte);
                     }
                 }
-                loge!(::core::str::from_utf8_unchecked(line.as_slice().init()));
+                loge!("{}", ::core::str::from_utf8_unchecked(line.as_slice().init()));
                 line.clear();
             }
         }

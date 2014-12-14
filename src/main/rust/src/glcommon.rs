@@ -2,7 +2,6 @@
 use core::prelude::*;
 use opengles::gl2;
 use opengles::gl2::{GLuint, GLint};
-use log::{logi, loge};
 use core::borrow::{Cow, IntoCow};
 use collections::string::String;
 

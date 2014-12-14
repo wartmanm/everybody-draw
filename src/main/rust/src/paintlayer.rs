@@ -1,7 +1,5 @@
 use core::prelude::*;
 
-use log::logi;
-
 use opengles::gl2;
 use opengles::gl2::GLuint;
 

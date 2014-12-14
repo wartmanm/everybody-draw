@@ -14,7 +14,6 @@ use luajit::*;
 use luajit_constants::*;
 
 use glcommon::{GLResult, MString};
-use log::{logi, loge};
 
 use lua_callbacks::LuaCallback;
 
@@ -340,7 +339,7 @@ pub unsafe fn destroy_lua_script(key: i32) {
 }
 
 fn log_err<T>(message: MString) -> GLResult<T> {
-    loge(message.as_slice());
+    loge!("{}", message.as_slice());
     Err(message)
 }
 

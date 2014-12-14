@@ -7,7 +7,6 @@ use alloc::boxed::Box;
 
 use std::comm;
 
-use log::logi;
 use motionevent;
 use motionevent::append_motion_event;
 use android::input::AInputEvent;
@@ -49,7 +48,7 @@ pub fn create_motion_event_handler() -> (MotionEventConsumer, MotionEventProduce
         producer: producer,
         pointer_data: motionevent::Data::new(),
     };
-    logi("created motion event pair");
+    logi!("created motion event pair");
     (handler, producer)
 }
 

@@ -2,7 +2,6 @@ use core::prelude::*;
 
 use collections::vec_map::VecMap;
 
-use log::logi;
 use android::input::*;
 
 use point::{PaintPoint, Coordinate, PointEntry, PointProducer, PointInfo};
@@ -43,7 +42,7 @@ pub fn append_motion_event(data: &mut Data, evt: *const AInputEvent, queue: &mut
     }
 
     match unsafe { AInputEvent_getType(evt) } as u32 {
-        AINPUT_EVENT_TYPE_KEY => { logi("got key event??"); return; },
+        AINPUT_EVENT_TYPE_KEY => { logi!("got key event??"); return; },
         _ => { }
     }
     let full_action = unsafe { AMotionEvent_getAction(evt) } as u32;

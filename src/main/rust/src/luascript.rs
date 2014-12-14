@@ -1,7 +1,6 @@
 use core::prelude::*;
 use core::fmt;
 use core::fmt::Show;
-use log::logi;
 use glcommon::{GLResult, FillDefaults, Defaults, MString};
 use lua_geom::{load_lua_script, destroy_lua_script};
 use core::borrow::IntoCow;

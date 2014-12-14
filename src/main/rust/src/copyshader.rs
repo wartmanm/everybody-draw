@@ -6,8 +6,6 @@ use core::borrow::IntoCow;
 use opengles::gl2;
 use opengles::gl2::{GLint, GLuint, GLfloat};
 
-use log::logi;
-
 use glcommon;
 use glcommon::{check_gl_error, get_shader_handle, get_uniform_handle_option, Shader, GLResult, FillDefaults, Defaults, MString};
 use gltexture::{Texture};
@@ -105,8 +103,8 @@ impl Show for CopyShader {
 impl FillDefaults<(Option<MString>, Option<MString>), (MString, MString), CopyShader> for CopyShader {
     fn fill_defaults(init: (Option<MString>, Option<MString>)) -> Defaults<(MString, MString), CopyShader> {
         let (vertopt, fragopt) = init;
-        let vert = vertopt.unwrap_or_else(|| { logi("point shader: using default vertex shader"); DEFAULT_VERTEX_SHADER.into_cow()});
-        let frag = fragopt.unwrap_or_else(|| { logi("point shader: using default fragment shader"); DEFAULT_FRAGMENT_SHADER.into_cow()});
+        let vert = vertopt.unwrap_or_else(|| { logi!("point shader: using default vertex shader"); DEFAULT_VERTEX_SHADER.into_cow()});
+        let frag = fragopt.unwrap_or_else(|| { logi!("point shader: using default fragment shader"); DEFAULT_FRAGMENT_SHADER.into_cow()});
         Defaults { val: (vert, frag) }
     }
 }

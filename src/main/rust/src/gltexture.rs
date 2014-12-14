@@ -7,8 +7,6 @@ use opengles::gl2::GLuint;
 
 use glcommon::{check_gl_error, GLResult, FillDefaults, Defaults};
 
-use log::logi;
-
 use collections::vec::Vec;
 
 #[deriving(PartialEq, Eq, Hash, Show, Copy)]

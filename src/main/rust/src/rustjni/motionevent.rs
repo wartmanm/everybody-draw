@@ -3,8 +3,6 @@ use core::mem;
 use jni::{jobject, jclass, jfieldID, JNIEnv, JNINativeMethod};
 use android::input::AInputEvent;
 
-use log::logi;
-
 use glpoint;
 use rustjni::{register_classmethods, jpointer, get_jpointer};
 
