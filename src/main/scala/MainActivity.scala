@@ -73,10 +73,7 @@ class MainActivity extends Activity with TypedActivity with AndroidImplicits {
 
   lazy val saveThread = ExecutionContext.fromExecutor(Executors.newSingleThreadExecutor())
 
-  lazy val loadedDrawFiles = Future {
-    new LoadedDrawFiles(this, true)
-  }(saveThread)
-
+  var loadedDrawFiles: Future[LoadedDrawFiles] = null
   var drawerIsOpen = false
 
   // TODO: actually clean up
@@ -160,14 +157,11 @@ class MainActivity extends Activity with TypedActivity with AndroidImplicits {
     handlers = Some(MotionEventHandlerPair.init(contentframe))
 
     // Trigger off-thread resource enumeration.
-    // This locks resources required for layout inflation ( in
-    // Resource.loadXmlResourceParser() ), so it needs to take place after
-    // setContentView and maybe setAdapter()
     // TODO: what placement gives the fastest startup time?
     // TODO: consider using resources rather than assets, so no enumeration is needed
     // TODO: consider laziness, only populating the needed views
     // TODO: consider recycling a single gridview, they're not cheap
-    loadedDrawFiles
+    loadDrawFiles()
 
     controls.sidebar.control.setAdapter(sidebarAdapter)
     controls.sidebar.setListener((v: View, pos: Int) => {
@@ -244,6 +238,7 @@ class MainActivity extends Activity with TypedActivity with AndroidImplicits {
   override def onStart() = {
     Log.i("main", "onStart")
     super.onStart()
+    loadDrawFiles()
     handlers.foreach(h => {
         content.setSurfaceTextureListener(new TextureListener(createTextureThread(h) _))
         contentframe.addView(content)
@@ -287,6 +282,7 @@ class MainActivity extends Activity with TypedActivity with AndroidImplicits {
     contentframe.removeAllViews()
     saveLocalState()
     finishEGLCleanup()
+    loadedDrawFiles = null
     // TODO: is this necessary?
     textureThread.foreach(_.join())
     textureThread = None
@@ -643,6 +639,15 @@ class MainActivity extends Activity with TypedActivity with AndroidImplicits {
        })
     })
   }
+
+  def loadDrawFiles() {
+    if (loadedDrawFiles == null) {
+      loadedDrawFiles = Future {
+        new LoadedDrawFiles(this, true)
+      }(saveThread)
+    }
+  }
+
 
   class SidebarAdapter() extends BaseAdapter {
     import SidebarAdapter._
