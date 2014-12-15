@@ -117,7 +117,7 @@ object PaintControls extends AndroidImplicits {
       control.setAdapter(a)
     }
     override def restoreState(): Unit = {
-      Log.i("picker", "restoring unnamedpicker state")
+      Log.i("picker", s"restoring unnamedpicker state to '${selectedName}'")
       selected = this.adapter.lazified.indexWhere(_.name == selectedName) match {
         case -1 => 0
         case  x => x

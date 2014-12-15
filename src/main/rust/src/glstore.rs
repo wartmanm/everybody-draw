@@ -26,8 +26,7 @@ use arena::TypedArena;
 use glcommon::GLResult;
 use glcommon::{FillDefaults, MString};
 
-#[cfg(test)]
-use collections::str::IntoMaybeOwned;
+use core::borrow::IntoCow;
 
 /// Holds GL objects that can be inited using the given keys.
 /// The list is to avoid having to pass those keys around, and serialize more easily.
@@ -169,6 +168,14 @@ impl<'a, Unfilled, T: MaybeInitFromCache<Init> + FillDefaults<Unfilled, Init, T>
         let DrawObjectIndex(idx) = i;
         self.list[idx as uint]
     }
+
+    pub fn maybe_get_object(&self, i: DrawObjectIndex<T>) -> GLResult<&'a T> {
+        let DrawObjectIndex(idx) = i;
+        match self.list.get(idx as uint) {
+            Some(x) => Ok(*x),
+            None => Err(format!("tried to get glstore index {} of {}", idx, self.list.len()).into_cow()),
+        }
+    }
 }
 
 impl<'a, Unfilled, T: InitFromCache<Init> + MaybeInitFromCache<Init> + FillDefaults<Unfilled, Init, T>, Init: Hash+Eq+Show> DrawObjectList<'a, T, Init> {
@@ -180,8 +187,8 @@ impl<'a, Unfilled, T: InitFromCache<Init> + MaybeInitFromCache<Init> + FillDefau
 #[test]
 fn equal_keys_match() {
     let mut list: DrawObjectList<LuaScript, LuaInitValues> = DrawObjectList::new();
-    let script_1 = "function main() end".into_maybe_owned();
-    let script_2 = "function main() end".into_maybe_owned();
+    let script_1 = "function main() end".into_cow();
+    let script_2 = "function main() end".into_cow();
     let idx_1 = list.push_object(Some(script_1)).unwrap();
     let idx_2 = list.push_object(Some(script_2)).unwrap();
     let (DrawObjectIndex(i1), DrawObjectIndex(i2)) = (idx_1, idx_2);
@@ -192,8 +199,8 @@ fn equal_keys_match() {
 #[test]
 fn different_keys_differ() {
     let mut list: DrawObjectList<LuaScript, LuaInitValues> = DrawObjectList::new();
-    let script_1 = "function main() end".into_maybe_owned();
-    let script_2 = "function main() end \n-- hello world".into_maybe_owned();
+    let script_1 = "function main() end".into_cow();
+    let script_2 = "function main() end \n-- hello world".into_cow();
     let idx_1 = list.push_object(Some(script_1)).unwrap();
     let idx_2 = list.push_object(Some(script_2)).unwrap();
     let (DrawObjectIndex(i1), DrawObjectIndex(i2)) = (idx_1, idx_2);
