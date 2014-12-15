@@ -179,14 +179,14 @@ pub mod event_stream {
 
     pub struct EventStream {
         position: i32,
-        producer: ::glpoint::MotionEventProducer,
         pub consumer: ::glpoint::MotionEventConsumer,
+        producer: ::glpoint::MotionEventProducer,
     }
 
     impl EventStream {
 
         pub fn new() -> EventStream {
-            let (consumer, producer) = ::glpoint::create_motion_event_handler();
+            let (consumer, producer) = ::glpoint::create_motion_event_handler(0);
             EventStream {
                 position: 0,
                 producer: producer,

@@ -6,18 +6,21 @@ use android::input::*;
 
 use point::{PaintPoint, Coordinate, PointEntry, PointProducer, PointInfo};
 use activestate;
+use activestate::ActiveState;
 
 static AMOTION_EVENT_ACTION_POINTER_INDEX_SHIFT: uint = 8;
 
 // TODO: consider eliminating entirely and putting faith in ACTION_POINTER_UP/DOWN
-type PointerState = VecMap<activestate::ActiveState>;
+type PointerState = VecMap<ActiveState>;
+
 pub struct Data {
     pointer_states: PointerState,
+    left_edge: i32,
 }
 
 impl Data {
-    pub fn new() -> Data {
-        Data { pointer_states: VecMap::new() }
+    pub fn new(left_edge: i32) -> Data {
+        Data { pointer_states: VecMap::new(), left_edge: left_edge }
     }
 }
 
@@ -52,6 +55,7 @@ pub fn append_motion_event(data: &mut Data, evt: *const AInputEvent, queue: &mut
         AMOTION_EVENT_ACTION_DOWN => {
             logi!("ACTION_DOWN: {}", action_id);
             push_stops(queue, active); // in case it's not paired with an action_up
+            push_disabled(active, data.left_edge, evt);
             push_moves(queue, active, evt);
         }
         AMOTION_EVENT_ACTION_UP => {
@@ -81,16 +85,25 @@ pub fn append_motion_event(data: &mut Data, evt: *const AInputEvent, queue: &mut
     }
 }
 
+fn push_disabled(active: &mut PointerState, left_edge: i32, evt: *const AInputEvent) {
+    if !is_valid_start_point(evt, left_edge) {
+        let id = unsafe { AMotionEvent_getPointerId(evt, 0) };
+        active.insert(id as uint, activestate::DISABLED);
+    }
+}
+
 fn push_moves(queue: &mut PointProducer, active: &mut PointerState, evt: *const AInputEvent) {
     let ptrcount = unsafe { AMotionEvent_getPointerCount(evt) };
     let historycount = unsafe { AMotionEvent_getHistorySize(evt) };
     for ptr in range(0, ptrcount) {
         let id = unsafe { AMotionEvent_getPointerId(evt, ptr) };
-        for hist in range(0, historycount) {
-            push_historical_point(queue, evt, id, ptr, hist);
+        if active.get(&(id as uint)) != Some(&activestate::DISABLED) {
+            for hist in range(0, historycount) {
+                push_historical_point(queue, evt, id, ptr, hist);
+            }
+            push_current_point(queue, evt, id, ptr);
+            make_active(queue, active, id, true);
         }
-        push_current_point(queue, evt, id, ptr);
-        make_active(queue, active, id, true);
     }
     push_stops(queue, active);
 }
@@ -131,5 +144,9 @@ fn push_stops(queue: &mut PointProducer, active: &mut PointerState) {
             queue.send(PointEntry { index: idx as i32, entry: PointInfo::Stop });
         }
     }
+}
+
+pub fn is_valid_start_point(ptr: *const AInputEvent, left_edge: i32) -> bool {
+    unsafe { AMotionEvent_getY(ptr, 0) as i32 >= left_edge }
 }
 

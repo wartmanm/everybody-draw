@@ -153,10 +153,11 @@ class MainActivity extends Activity with TypedActivity with AndroidImplicits {
   override def onCreate(bundle: Bundle) {
     Log.i("main", "oncreate")
     System.loadLibrary("gl-stuff")
-    handlers = Some(MotionEventHandlerPair.init())
 
     super.onCreate(bundle)
     setContentView(R.layout.activity_main)
+
+    handlers = Some(MotionEventHandlerPair.init(contentframe))
 
     // Trigger off-thread resource enumeration.
     // This locks resources required for layout inflation ( in
