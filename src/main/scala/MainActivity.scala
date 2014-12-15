@@ -306,6 +306,7 @@ class MainActivity extends Activity with TypedActivity with AndroidImplicits {
     try {
       if (!bitmap.isRecycled()) {
         bitmap.compress(Bitmap.CompressFormat.PNG, 90, out)
+        out.flush()
       } else {
         Log.i("main", "tried to save recycled bitmap!")
       }
