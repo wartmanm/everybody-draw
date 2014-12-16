@@ -16,11 +16,12 @@ type PointerState = VecMap<ActiveState>;
 pub struct Data {
     pointer_states: PointerState,
     left_edge: i32,
+    attend_points: bool,
 }
 
 impl Data {
     pub fn new(left_edge: i32) -> Data {
-        Data { pointer_states: VecMap::new(), left_edge: left_edge }
+        Data { pointer_states: VecMap::new(), left_edge: left_edge, attend_points: true }
     }
 }
 
@@ -51,44 +52,42 @@ pub fn append_motion_event(data: &mut Data, evt: *const AInputEvent, queue: &mut
     let full_action = unsafe { AMotionEvent_getAction(evt) } as u32;
     let (action_event, action_index): (u32, u32) = (full_action & AMOTION_EVENT_ACTION_MASK, (full_action & AMOTION_EVENT_ACTION_POINTER_INDEX_MASK) >> AMOTION_EVENT_ACTION_POINTER_INDEX_SHIFT);
     let action_id = unsafe { AMotionEvent_getPointerId(evt, action_index as size_t) };
-    match action_event {
-        AMOTION_EVENT_ACTION_DOWN => {
+    match (data.attend_points, action_event) {
+        (_, AMOTION_EVENT_ACTION_DOWN) => {
             logi!("ACTION_DOWN: {}", action_id);
             push_stops(queue, active); // in case it's not paired with an action_up
-            push_disabled(active, data.left_edge, evt);
-            push_moves(queue, active, evt);
+            data.attend_points = is_valid_start_point(evt, data.left_edge);
+            if data.attend_points {
+                push_moves(queue, active, evt);
+            }
         }
-        AMOTION_EVENT_ACTION_UP => {
+        (_, AMOTION_EVENT_ACTION_UP) => {
             logi!("ACTION_UP: {}", action_id);
+            data.attend_points = true;
             push_stops(queue, active);
         }
-        AMOTION_EVENT_ACTION_CANCEL => {
+        (_, AMOTION_EVENT_ACTION_CANCEL) => {
             logi!("ACTION_CANCEL: {}", action_id);
+            data.attend_points = true;
             push_stops(queue, active);
         }
-        AMOTION_EVENT_ACTION_POINTER_UP => {
+        (true, AMOTION_EVENT_ACTION_POINTER_UP) => {
             logi!("ACTION_POINTER_UP: {}", action_id);
             make_active(queue, active, action_id, false);
             push_moves(queue, active, evt);
         }
-        AMOTION_EVENT_ACTION_POINTER_DOWN => {
+        (true, AMOTION_EVENT_ACTION_POINTER_DOWN) => {
             logi!("ACTION_POINTER_DOWN: {}", action_id);
             make_active(queue, active, action_id, false); // in case it's not paired with an action_pointer_up
             push_moves(queue, active, evt);
         }
-        AMOTION_EVENT_ACTION_MOVE => {
+        (true, AMOTION_EVENT_ACTION_MOVE) => {
             push_moves(queue, active, evt);
         },
-        unknown => {
+        (true, unknown) => {
             logi!("unknown action event: {}", unknown);
         }
-    }
-}
-
-fn push_disabled(active: &mut PointerState, left_edge: i32, evt: *const AInputEvent) {
-    if !is_valid_start_point(evt, left_edge) {
-        let id = unsafe { AMotionEvent_getPointerId(evt, 0) };
-        active.insert(id as uint, activestate::DISABLED);
+        (false, _) => { }
     }
 }
 
@@ -97,13 +96,11 @@ fn push_moves(queue: &mut PointProducer, active: &mut PointerState, evt: *const 
     let historycount = unsafe { AMotionEvent_getHistorySize(evt) };
     for ptr in range(0, ptrcount) {
         let id = unsafe { AMotionEvent_getPointerId(evt, ptr) };
-        if active.get(&(id as uint)) != Some(&activestate::DISABLED) {
-            for hist in range(0, historycount) {
-                push_historical_point(queue, evt, id, ptr, hist);
-            }
-            push_current_point(queue, evt, id, ptr);
-            make_active(queue, active, id, true);
+        for hist in range(0, historycount) {
+            push_historical_point(queue, evt, id, ptr, hist);
         }
+        push_current_point(queue, evt, id, ptr);
+        make_active(queue, active, id, true);
     }
     push_stops(queue, active);
 }
@@ -147,6 +144,7 @@ fn push_stops(queue: &mut PointProducer, active: &mut PointerState) {
 }
 
 pub fn is_valid_start_point(ptr: *const AInputEvent, left_edge: i32) -> bool {
-    unsafe { AMotionEvent_getY(ptr, 0) as i32 >= left_edge }
+    let result = unsafe { AMotionEvent_getX(ptr, 0) as i32 >= left_edge };
+    result
 }
 

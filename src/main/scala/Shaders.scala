@@ -1,7 +1,7 @@
 package com.github.wartman4404.gldraw
 import android.graphics.Bitmap
 import android.os.Message
-import android.view.{MotionEvent, View}
+import android.view.MotionEvent
 
 class CopyShader private (private val nativePtr: Int) extends AnyVal
 class PointShader private (private val nativePtr: Int) extends AnyVal
@@ -101,7 +101,7 @@ case class MotionEventHandlerPair(
   val producer: MotionEventProducer)
 
 object MotionEventHandlerPair {
-  @native def init(v: View): MotionEventHandlerPair
+  @native def init(width: Int, height: Int): MotionEventHandlerPair
   @native def destroy(m: MotionEventHandlerPair): Unit
 }
 

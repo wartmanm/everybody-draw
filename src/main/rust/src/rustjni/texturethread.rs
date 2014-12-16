@@ -98,7 +98,7 @@ unsafe extern "C" fn set_brush_texture(env: *mut JNIEnv, _: jobject, data: jpoin
     data.glinit.set_brush_texture(&brush.texture);
 }
 
-unsafe extern "C" fn clear_framebuffer(env: *mut JNIEnv, _: jobject, data: jpointer) {
+unsafe extern "C" fn clear_framebuffer(_: *mut JNIEnv, _: jobject, data: jpointer) {
     let data = get_safe_data(data);
     data.events.clear();
     data.glinit.clear_buffer();

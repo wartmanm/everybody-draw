@@ -2,13 +2,11 @@
 
 const NEWMASK: u8 = 0x01;
 const OLDMASK: u8 = 0x02;
-const DISABLEDMASK: u8 = 0x80;
 
 pub const STARTING: ActiveState = ActiveState(NEWMASK);
 pub const STOPPING: ActiveState  = ActiveState(OLDMASK);
 pub const CONTINUING: ActiveState  = ActiveState(NEWMASK | OLDMASK);
 pub const INACTIVE: ActiveState = ActiveState(0);
-pub const DISABLED: ActiveState = ActiveState(DISABLEDMASK);
 #[deriving(Eq, PartialEq, Copy)]
 pub struct ActiveState(u8);
 
@@ -16,10 +14,7 @@ impl ActiveState {
     #[inline]
     pub fn push(self, newstate: bool) -> ActiveState {
         let ActiveState(state) = self;
-        match state & DISABLEDMASK {
-            DISABLEDMASK => DISABLED,
-            _ => ActiveState(((state << 1) & OLDMASK) | newstate as u8)
-        }
+        ActiveState(((state << 1) & OLDMASK) | newstate as u8)
     }
     //#[inline]
     //pub fn is_active(self) -> bool {
