@@ -1,0 +1,84 @@
+<?xml version="1.0" encoding="utf-8"?>
+<RelativeLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/sidebar_parent"
+    android:layout_width="240dp"
+    android:layout_height="match_parent"
+    android:layout_gravity="start"
+    android:background="#eee" >
+
+    <Button
+        android:id="@+id/load_button"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_alignParentBottom="true"
+        android:text="Load" />
+
+    <Button
+        android:id="@+id/save_button"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_above="@id/load_button"
+        android:text="Save" />
+
+    <Button
+        android:id="@+id/clear_button"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_above="@id/save_button"
+        android:layout_marginBottom="15dp"
+        android:text="Clear" />
+
+    <com.larswerkman.holocolorpicker.ScaleBar
+        android:id="@+id/brush_colorpicker_scalebar"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_above="@id/clear_button" />
+
+    <com.larswerkman.holocolorpicker.SVBar
+        android:id="@+id/brush_colorpicker_svbar"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_above="@id/brush_colorpicker_scalebar" />
+
+    <com.larswerkman.holocolorpicker.ColorPicker
+        android:id="@+id/brush_colorpicker_main"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_above="@id/brush_colorpicker_svbar" />
+
+    <LinearLayout
+        android:id="@+id/undo_redo_layout"
+        style="?android:attr/buttonBarStyle"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_above="@id/brush_colorpicker_main" >
+
+        <Button
+            android:id="@+id/undo_button"
+            style="?android:attr/buttonBarButtonStyle"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:text="&lt;" />
+
+        <Button
+            android:id="@+id/redo_button"
+            style="?android:attr/buttonBarButtonStyle"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:text=">" />
+    </LinearLayout>
+
+    <ListView
+        android:id="@+id/control_drawer"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_above="@id/undo_redo_layout"
+        android:layout_alignParentTop="true"
+        android:background="#eee"
+        android:choiceMode="singleChoice"
+        android:divider="@android:color/transparent"
+        android:dividerHeight="0dp" />
+
+</RelativeLayout>
