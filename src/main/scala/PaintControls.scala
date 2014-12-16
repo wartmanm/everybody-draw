@@ -35,10 +35,11 @@ class PaintControls
     val writer = new StringWriter()
     val j = new JsonWriter(writer)
     j.beginObject()
-    for ((k, v) <- namedPickers) {
-      j.name(k)
-      v.save(j)
-    }
+      for ((k, v) <- namedPickers) {
+        j.name(k)
+        v.save(j)
+      }
+    j.endObject()
     writer.close()
     writer.toString()
   }
