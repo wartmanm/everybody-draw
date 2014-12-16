@@ -339,12 +339,15 @@ class MainActivity extends Activity with TypedActivity with AndroidImplicits {
   private def loadFromFile() = {
     Log.i("main", "loading from file")
     try {
-      val input = new BufferedInputStream(MainActivity.this.openFileInput("screen"))
-      DrawFiles.withCloseable(input) {
-        savedBitmap = Some(DrawFiles.decodeBitmap(Bitmap.Config.ARGB_8888)(input))
-        val input2 = MainActivity.this.openFileInput("status")
-        controls.load(input2)
-        input2.close()
+      // TODO: don't do this on the main thread
+      StateSaveLock.synchronized {
+        val input = new BufferedInputStream(MainActivity.this.openFileInput("screen"))
+        DrawFiles.withCloseable(input) {
+          savedBitmap = Some(DrawFiles.decodeBitmap(Bitmap.Config.ARGB_8888)(input))
+          val input2 = MainActivity.this.openFileInput("status")
+          controls.load(input2)
+          input2.close()
+        }
       }
     } catch {
       case e: FileNotFoundException => { }
@@ -357,13 +360,17 @@ class MainActivity extends Activity with TypedActivity with AndroidImplicits {
   private def saveLocalState() = {
     savedBitmap.foreach(bitmap => {
         Future {
-          val out = new BufferedOutputStream(
-            MainActivity.this.openFileOutput("screen", Context.MODE_PRIVATE))
-          try {
-            DrawFiles.withCloseable(out) {
-              saveBitmapToFile(bitmap, out)
-            }
-          } catch { case _: Exception => { } }
+          StateSaveLock.synchronized {
+            val out = new BufferedOutputStream(
+              MainActivity.this.openFileOutput("screen", Context.MODE_PRIVATE))
+            try {
+              DrawFiles.withCloseable(out) {
+                saveBitmapToFile(bitmap, out)
+              }
+            } catch { case e: Exception => {
+              Log.i("main", "failed to save screen bitmap: " + e)
+            } }
+          }
         }(saveThread)
       })
     savePickersToFile()
@@ -803,4 +810,6 @@ object MainActivity {
     override def toString() = name
     def onClick(pos: Int)
   }
+
+  val StateSaveLock = new Object()
 }
