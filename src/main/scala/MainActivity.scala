@@ -590,21 +590,29 @@ class MainActivity extends Activity with TypedActivity with AndroidImplicits {
        def getSource[T,U](gl: GLInit, control: GLControl[T], cb: (GLInit, T)=>U, default: U) = {
          control.currentValue(gl).right.toOption.map(cb(gl, _)).getOrElse(default)
        }
-       val animdebug = getSource(gl, controls.animpicker, CopyShader.getSource, ("", ""))
-       val copydebug = getSource(gl, controls.copypicker, CopyShader.getSource, ("", ""))
-       val paintdebug = getSource(gl, controls.paintpicker, PointShader.getSource, ("", ""))
-       val interpdebug = getSource(gl, controls.interppicker, LuaScript.getSource, "")
+       def shaderSource(name: String, src: (String, String)) = {
+         SyntaxHighlightListAdapter.ShaderSource(name, src._1, src._2)
+       }
+       def luaSource(name: String, src: String) = {
+         SyntaxHighlightListAdapter.LuaSource(name, src)
+       }
 
-       val strs = Array(
-         animdebug._1 + "\n\n" + animdebug._2,
-         copydebug._1 + "\n\n" + copydebug._2,
-         paintdebug._1 + "\n\n" + paintdebug._2,
-         interpdebug)
+       val animsrc = getSource(gl, controls.animpicker, CopyShader.getSource, ("", ""))
+       val copysrc = getSource(gl, controls.copypicker, CopyShader.getSource, ("", ""))
+       val paintsrc = getSource(gl, controls.paintpicker, PointShader.getSource, ("", ""))
+       val interpsrc = getSource(gl, controls.interppicker, LuaScript.getSource, "")
+
+       val animdebug = shaderSource("Base animation shader", animsrc)
+       val copydebug = shaderSource("Copy shader", copysrc)
+       val paintdebug = shaderSource("Base paint shader", paintsrc)
+       val interpdebug = luaSource("Base interpolator", interpsrc)
+
        MainActivity.this.runOnUiThread(() => {
-         val text = new TextView(this)
-         text.setText(strs.mkString("-------"))
+         val list = new ListView(this)
+         list.setAdapter(new SyntaxHighlightListAdapter(this,
+           Array(animdebug, copydebug, paintdebug, interpdebug)))
          new AlertDialog.Builder(this)
-         .setView(text)
+         .setView(list)
          .setTitle("debug")
          .setPositiveButton("Done", () => {})
          .show()
