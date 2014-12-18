@@ -15,55 +15,45 @@
             android:layout_width="match_parent"
             android:layout_height="match_parent" />
 
-        <ViewFlipper
-            android:id="@+id/controlflipper"
+        <LinearLayout
+            android:id="@+id/controlholder"
             android:layout_width="match_parent"
-            android:layout_height="160dp"
+            android:layout_height="wrap_content"
             android:layout_alignParentBottom="true"
             android:background="#fff" >
 
-            <GridView
+            <Spinner
                 android:id="@+id/brushpicker"
-                android:layout_width="match_parent"
-                android:layout_height="match_parent"
-                android:choiceMode="singleChoice"
-                android:columnWidth="120dp"
-                android:numColumns="auto_fit" />
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1" />
 
-            <GridView
+            <Spinner
                 android:id="@+id/animpicker"
-                android:layout_width="match_parent"
-                android:layout_height="match_parent"
-                android:choiceMode="singleChoice"
-                android:columnWidth="120dp"
-                android:numColumns="auto_fit" />
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1" />
 
-            <GridView
+            <Spinner
                 android:id="@+id/paintpicker"
-                android:layout_width="match_parent"
-                android:layout_height="match_parent"
-                android:choiceMode="singleChoice"
-                android:columnWidth="120dp"
-                android:numColumns="auto_fit" />
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1" />
 
-            <GridView
+            <Spinner
                 android:id="@+id/interppicker"
-                android:layout_width="match_parent"
-                android:layout_height="match_parent"
-                android:choiceMode="singleChoice"
-                android:columnWidth="120dp"
-                android:numColumns="auto_fit" />
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1" />
 
-            <GridView
+            <Spinner
                 android:id="@+id/unipicker"
-                android:layout_width="match_parent"
-                android:layout_height="match_parent"
-                android:choiceMode="singleChoice"
-                android:columnWidth="120dp"
-                android:numColumns="auto_fit" />
-        </ViewFlipper>
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1" />
+        </LinearLayout>
     </RelativeLayout>
 
-    <include layout="@layout/sidebar"/>
+    <include layout="@layout/sidebar" />
 
 </android.support.v4.widget.DrawerLayout>

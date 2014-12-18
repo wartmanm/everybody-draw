@@ -50,13 +50,10 @@ class MainActivity extends Activity with TypedActivity with AndroidImplicits {
     animpicker = findView(TR.animpicker),
     paintpicker = findView(TR.paintpicker),
     interppicker = findView(TR.interppicker),
-    unipicker = findView(TR.unipicker),
-    sidebar = controldrawer
+    unipicker = findView(TR.unipicker)
   )
 
   lazy val drawerParent = findView(TR.drawer_parent)
-  lazy val controlflipper = findView(TR.controlflipper)
-  lazy val controldrawer = findView(TR.control_drawer)
   lazy val sidebar = findView(TR.sidebar_parent)
   lazy val drawerToggle = new MotionEventDrawerToggle(
       this, drawerParent, R.string.sidebar_open, R.string.sidebar_close)
@@ -67,6 +64,7 @@ class MainActivity extends Activity with TypedActivity with AndroidImplicits {
   lazy val loadButton = findView(TR.load_button)
   lazy val saveButton = findView(TR.save_button)
   lazy val colorPicker = findView(TR.brush_colorpicker_main)
+  lazy val controlholder = findView(TR.controlholder)
 
   var textureThread: Option[TextureSurfaceThread] = None
 
@@ -170,14 +168,6 @@ class MainActivity extends Activity with TypedActivity with AndroidImplicits {
     // TODO: consider laziness, only populating the needed views
     // TODO: consider recycling a single gridview, they're not cheap
     loadDrawFiles()
-
-    controls.sidebar.control.setAdapter(sidebarAdapter)
-    controls.sidebar.setListener((v: View, pos: Int) => {
-
-      if (pos >= 0 && pos < sidebarAdapter.sidebarControls.length) {
-        sidebarAdapter.sidebarControls(pos).onClick(pos)
-      }
-    })
     
     updateUndoButtons()
     undoButton.setOnClickListener(() => moveUndo(-1))
@@ -386,7 +376,7 @@ class MainActivity extends Activity with TypedActivity with AndroidImplicits {
         case Left(errmsg) => {
           MainActivity.this.runOnUiThread(() => {
             Toast.makeText(MainActivity.this, "unable to load item!\n" + errmsg, Toast.LENGTH_LONG).show()
-            picker.control.performItemClick(null, 0, 0)
+            picker.control.setSelection(0)
             adapter.notifyDataSetChanged()
             ()
           })
@@ -603,7 +593,7 @@ class MainActivity extends Activity with TypedActivity with AndroidImplicits {
       val prefix = (
         e match {
           case _: LuaException => {
-            controls.interppicker.control.performItemClick(null, 0, 0)
+            controls.interppicker.control.setSelection(0)
             "An error occurred in the interpolator:\n" 
           }
           case _ => "An error occurred:\n" 
@@ -619,12 +609,11 @@ class MainActivity extends Activity with TypedActivity with AndroidImplicits {
   }
   
   def showControl(pos: Int) = {
-    controlflipper.setVisibility(View.VISIBLE)
-    controlflipper.setDisplayedChild(pos)
+    controlholder.setVisibility(View.VISIBLE)
     drawerParent.closeDrawer(sidebar)
   }
   def hideControls() = {
-    controlflipper.setVisibility(View.INVISIBLE)
+    controlholder.setVisibility(View.INVISIBLE)
     drawerParent.closeDrawer(sidebar)
   }
 
@@ -718,7 +707,6 @@ class MainActivity extends Activity with TypedActivity with AndroidImplicits {
   }
   object SidebarAdapter {
     trait SidebarEntry {
-      def onClick(pos: Int): Unit
       def updateForUnibrush(u: UniBrush): Unit
       def enabled: Boolean
       def name: String
@@ -730,12 +718,10 @@ class MainActivity extends Activity with TypedActivity with AndroidImplicits {
         picker.enabled = getUnibrushValue(u).isEmpty
         Log.i("main", s"${if (enabled) "enabling" else "disabling"} control ${name} for unibrush (was: ${if (oldstate) "enabled" else "disabled"})")
       }
-      override def onClick(pos: Int) = showControl(pos)
     }
     class SidebarEntryHider(val name: String) extends SidebarEntry {
       override def enabled = true
       override def updateForUnibrush(u: UniBrush) = { }
-      override def onClick(pos: Int) = hideControls()
     }
   }
 }
