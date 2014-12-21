@@ -18,12 +18,19 @@ class LazyPicker[U](context: Context, thread: TextureSurfaceThread, content: Arr
   override def getItem(pos: Int) = lazified(pos)
   override def getItemViewType(position: Int) = 0
   override def getItemId(position: Int) = position
-  override def getView(position: Int, convertView: View, parent: ViewGroup): View = {
+  override def getView(position: Int, convertView: View, parent: ViewGroup) = {
+    getResourceView(position, convertView, parent, android.R.layout.simple_spinner_item)
+  }
+  override def getDropDownView(position: Int, convertView: View, parent: ViewGroup) = {
+    getResourceView(position, convertView, parent, android.R.layout.simple_spinner_dropdown_item)
+  }
+
+  private def getResourceView(position: Int, convertView: View, parent: ViewGroup, resource: Int): View = {
     var view = convertView
     var holder: Holder = null.asInstanceOf[Holder]
     val item = lazified(position)
     if (view == null) {
-      view = inflater.inflate(android.R.layout.simple_dropdown_item_1line, parent, false)
+      view = inflater.inflate(resource, parent, false)
       val text = view.findViewById(android.R.id.text1).asInstanceOf[TextView]
       holder = Holder(text)
       view.setTag(holder)
