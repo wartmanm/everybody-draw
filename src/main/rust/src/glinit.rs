@@ -354,7 +354,7 @@ impl<'a> GLInit<'a> {
     }
 
     pub fn push_undo_frame(&mut self) -> i32 {
-        let source = self.targetdata.get_current_texturesource(); // they should be identical at this point
+        let source = self.targetdata.get_current_texturetarget(); // should be identical when called from within lua callback
         if let Some(copy_shader) = self.paintstate.copyshader {
             self.paintstate.undo_targets.push_new_buffer(source, copy_shader);
         }
