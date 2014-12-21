@@ -68,6 +68,7 @@
                     android:layout_height="match_parent"
                     android:layout_weight="1"
                     android:scaleType="centerInside"
+                    android:contentDescription="@strings/button_undo"
                     android:src="@drawable/undo_button" />
 
                 <ImageView
@@ -77,6 +78,7 @@
                     android:layout_height="match_parent"
                     android:layout_weight="1"
                     android:scaleType="centerInside"
+                    android:contentDescription="@strings/button_redo"
                     android:src="@drawable/redo_button" />
             </LinearLayout>
         </LinearLayout>

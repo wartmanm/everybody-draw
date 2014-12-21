@@ -11,14 +11,14 @@
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:layout_alignParentBottom="true"
-        android:text="Load" />
+        android:text="@strings/button_load" />
 
     <Button
         android:id="@+id/save_button"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:layout_above="@id/load_button"
-        android:text="Save" />
+        android:text="@string/button_save" />
 
     <Button
         android:id="@+id/clear_button"
@@ -26,7 +26,7 @@
         android:layout_height="wrap_content"
         android:layout_above="@id/save_button"
         android:layout_marginBottom="15dp"
-        android:text="Clear" />
+        android:text="@string/button_clear" />
 
     <com.larswerkman.holocolorpicker.ScaleBar
         android:id="@+id/brush_colorpicker_scalebar"
