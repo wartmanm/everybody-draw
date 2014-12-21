@@ -3,15 +3,15 @@ local planets = {
 }
 local positions = {}
 
-function ondown(a, output)
+function ondown(a)
   positions[a.counter] = {x = a.x, y = a.y}
   loglua("ondown " .. a.counter)
-  default_ondown(a, output)
+  default_ondown(a)
 end
-function onup(a, output)
-  default_onup(a, output)
+function onup(a)
+  default_onup(a)
 end
-function onframe(x, y, points)
+function onframe(x, y)
   local planetpoint = ShaderPaintPoint(0, 0, 0, 0, 0, 0, 0, 0)
   local oldplanetpoint = ShaderPaintPoint(0, 0, 0, 0, 0, 0, 0, 0) 
   --loglua("frame")
@@ -43,19 +43,19 @@ function onframe(x, y, points)
     planetpoint.y = planet.y
     planetpoint.size = planet.size
 
-    pushline(points, 0, oldplanetpoint, planetpoint)
+    pushline(0, oldplanetpoint, planetpoint)
   end
   positions = {}
 end
 
 ondone = default_ondone
 
-function main(a, b, x, y, points)
+function onmove(a, b)
   if positions[b.counter] == nil then
     positions[b.counter] = {x = b.x, y = b.y}
   else
     positions[b.counter].x = b.x
     positions[b.counter].y = b.y
   end
-  pushline(points, 0, a, b)
+  pushline(0, a, b)
 end

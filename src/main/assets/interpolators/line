@@ -1,5 +1,5 @@
-function main(a, b, x, y, points)
-  pushline(points, 0, a, b)
+function main(a, b)
+  pushline(0, a, b)
 end
 
 

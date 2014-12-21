@@ -215,23 +215,23 @@ function think(neko, mickey, mWidth, mHeight)
   return neko.x, neko.y, imgIndex
 end
 
-function onframe(x, y, points)
+function onframe()
   local nekoX, nekoY, imgIndex = think(mNeko, mMickey, x, y)
   local imgX = imgIndex % 4
   local imgY = math.floor(imgIndex / 4)
   local nekopoint = ShaderPaintPoint(nekoX, nekoY, 0, 0, imgX / 4, imgY / 9, 0, 0)
   local mickeypoint = ShaderPaintPoint(mMickey.x, mMickey.y, 0, 0, 3/4, 8/9, 0, 0)
   --loglua("neko is at " .. mNeko.x .. ", " .. mNeko.y .. "; state: " .. mStateNames[mNeko.mState])
-  clearlayer(points, 1)
-  pushpoint(points, 1, mickeypoint)
-  pushpoint(points, 1, nekopoint)
+  clearlayer(1)
+  pushpoint(1, mickeypoint)
+  pushpoint(1, nekopoint)
 end
 
-function main(a, b, x, y, points)
+function onmove(a, b)
   mMickey.x = a.x
   mMickey.y = a.y
 end
 
-function onup(pointer, output)
+function onup(pointer)
   -- don't copy neko down
 end

@@ -2,8 +2,8 @@ local positions = {}
 local bycounter = {}
 local active = 0
 local total = 0
-function ondown(a, output)
-  default_ondown(a, output)
+function ondown(a)
+  default_ondown(a)
   postable = {x = a.x, y = a.y, size=2, counter=a.counter, active = true}
   for i = 1,#positions + 1 do
     if positions[i] == nil or positions[i].active == false then
@@ -20,8 +20,8 @@ function ondown(a, output)
   end
   loglua("active: " .. active .. ", total: " .. total)
 end
-function onup(a, output)
-  default_onup(a, output)
+function onup(a)
+  default_onup(a)
   loglua("got lifted pointer " .. a)
   local pos = bycounter[a]
   if pos ~= nil then
@@ -53,21 +53,21 @@ end
 
 ondone = default_ondone
 
-function main(a, b, x, y, points)
+function onmove(a, b)
   local position = bycounter[b.counter]
   if position ~= nil then
     position.x = b.x
     position.y = b.y
   end
 end
-function onframe(x, y, points)
-  default_onframe(x, y, points)
+function onframe()
+  default_onframe()
   if active < 4 then return end
-  clearlayer(points, 1)
+  clearlayer(1)
   local outpoints = ShaderPaintPointArray(4)
   outpoints[0] = positions[1]
   outpoints[1] = positions[2]
   outpoints[2] = positions[3]
   outpoints[3] = positions[4]
-  pushcubicbezier(points, 1, outpoints)
+  pushcubicbezier(1, outpoints)
 end

@@ -335,7 +335,7 @@ impl LuaInterpolatorState {
             }
 
             sandbox_idx.push_self(L); {
-                lua_getfield(L, -1, cstr!("main")); {
+                lua_getfield(L, -1, cstr!("onmove")); {
                     if !lua_isfunction(L, -1) {
                         safe_pop!(L, 3);
                         assert_eq!(stacksize, lua_gettop(L));

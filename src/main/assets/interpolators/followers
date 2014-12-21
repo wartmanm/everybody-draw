@@ -1,7 +1,7 @@
 local followersets = {}
 local backlogcounter = {}
 
-function ondown(a, output)
+function ondown(a)
   local newset = {}
   local x = a.x
   local y = a.y
@@ -10,16 +10,16 @@ function ondown(a, output)
   end
   followersets[a.counter] = newset
   backlogcounter[a.counter] = 0
-  default_ondown(a, output)
+  default_ondown(a)
 end
-function onup(a, output)
+function onup(a)
   followersets[a] = nil
-  default_onup(a, output)
+  default_onup(a)
 end
 onframe = default_onframe
 ondone = default_ondone
 
-function main(a, b, screenx, screeny, points)
+function onmove(a, b)
   local counter = a.counter
   local olddist = backlogcounter[counter]
   if b.distance > olddist then
@@ -41,7 +41,7 @@ function main(a, b, screenx, screeny, points)
       b.y = y + disty / i
       set[i].x = b.x
       set[i].y = b.y
-      pushline(points, 0, a, b)
+      pushline(0, a, b)
     end
   end
 end
