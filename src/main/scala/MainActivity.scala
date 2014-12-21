@@ -87,6 +87,8 @@ class MainActivity extends Activity with TypedActivity with AndroidImplicits {
 
   var undoCount: Int = 0
   var undoPos: Int = 0
+  var undoListener: Option[MainUndoListener] = None
+
 
   class MainUndoListener() extends UndoCallback() {
     override def undoBufferChanged(newSize: Int): Unit = {
@@ -121,15 +123,18 @@ class MainActivity extends Activity with TypedActivity with AndroidImplicits {
     Log.i("main", "got handler")
     textureThread = Some(thread)
     val undoCallback = new MainUndoListener()
-    thread.beginGL(x, y, onTextureCreated(thread, producer) _, undoCallback)
+    this.undoListener = Some(undoCallback)
+    thread.beginGL(x, y, onTextureCreated(thread, producer, undoCallback) _, undoCallback)
     //thread.startFrames() // FIXME is this needed?
     Log.i("main", "sent begin_gl message")
     ()
   })
 
   // runs on gl thread
-  def onTextureCreated(thread: TextureSurfaceThread, producer: MotionEventProducer)(gl: GLInit) = {
+  def onTextureCreated(thread: TextureSurfaceThread, producer: MotionEventProducer, undoCallback: MainUndoListener)(gl: GLInit) = {
     thread.initScreen(gl, savedBitmap)
+    val undoframes = thread.pushUndoFrame(gl)
+    undoCallback.undoBufferChanged(undoframes)
 
     savedBitmap = None
     thread.startFrames(gl)
@@ -175,7 +180,7 @@ class MainActivity extends Activity with TypedActivity with AndroidImplicits {
 
     saveButton.setOnClickListener(saveFile _)
     loadButton.setOnClickListener(loadFile _)
-    clearButton.setOnClickListener(() => textureThread.foreach(_.clearScreen()))
+    clearButton.setOnClickListener(() => this.clearScreen())
 
     colorPicker.addSVBar(findView(TR.brush_colorpicker_svbar))
     val scaleBar = findView(TR.brush_colorpicker_scalebar)
@@ -225,7 +230,7 @@ class MainActivity extends Activity with TypedActivity with AndroidImplicits {
       case R.id.menu_save => saveFile()
       case R.id.menu_load => loadFile()
       case R.id.menu_replay => startReplay()
-      case R.id.menu_clear => textureThread.foreach(_.clearScreen())
+      case R.id.menu_clear => this.clearScreen()
       case R.id.menu_credits => Toast.makeText(this, "Soon.", Toast.LENGTH_LONG).show()
       case R.id.menu_debug => showDebugMessagebox()
       case _ => return super.onOptionsItemSelected(item)
@@ -549,7 +554,7 @@ class MainActivity extends Activity with TypedActivity with AndroidImplicits {
 
   def saveFile() = {
     textureThread.foreach(thread => {
-        thread.getBitmap(b => {
+        thread.getBitmap((gl, b) => {
             Future {
               val outfile = new File(getExternalFilesDir(null), new Date().toString() + ".png")
               try {
@@ -580,7 +585,12 @@ class MainActivity extends Activity with TypedActivity with AndroidImplicits {
         Log.i("main", s"got bitmap ${bitmap}")
         for (b <- bitmap; thread <- textureThread) {
           Log.i("main", "drawing bitmap...")
-          thread.drawBitmap(b)
+          thread.withGL(gl => {
+            thread.drawBitmap(gl, b)
+            thread.clearUndoFrames(gl)
+            val frames = thread.pushUndoFrame(gl)
+            undoListener.foreach(_.undoBufferChanged(frames))
+          })
         }
       }
     }
@@ -659,6 +669,16 @@ class MainActivity extends Activity with TypedActivity with AndroidImplicits {
       loadedDrawFiles = Future {
         new LoadedDrawFiles(this, true)
       }(saveThread)
+    }
+  }
+
+  def clearScreen() {
+    for (thread <- textureThread) {
+      thread.withGL(gl => {
+        thread.clearScreen(gl)
+        val undo = thread.pushUndoFrame(gl)
+        undoListener.foreach(_.undoBufferChanged(undo))
+      })
     }
   }
 

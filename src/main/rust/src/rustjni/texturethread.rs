@@ -169,6 +169,16 @@ unsafe extern "C" fn jni_load_undo(_: *mut JNIEnv, _: jobject, data: jpointer, i
     data.glinit.load_undo_frame(idx);
 }
 
+unsafe extern "C" fn jni_push_undo_frame(_: *mut JNIEnv, _: jobject, data: jpointer) -> jint {
+    let data = get_safe_data(data);
+    data.glinit.push_undo_frame()
+}
+
+unsafe extern "C" fn jni_clear_undo_frames(_: *mut JNIEnv, _: jobject, data: jpointer) {
+    let data = get_safe_data(data);
+    data.glinit.clear_undo_frames();
+}
+
 unsafe extern "C" fn jni_set_brush_color(_: *mut JNIEnv, _: jobject, data: jpointer, color: jint) {
     get_safe_data(data).glinit.set_brush_color(color);
 }
@@ -194,16 +204,18 @@ pub unsafe fn init(env: *mut JNIEnv) {
         native_method!("nativeDrawQueuedPoints", "(II[F)V", native_draw_queued_points),
         native_method!("nativeFinishLuaScript", "(II)V", native_finish_lua_script),
         native_method!("nativeClearFramebuffer", "(I)V", clear_framebuffer),
-        native_method!("drawImage", "(ILandroid/graphics/Bitmap;)V", draw_image),
+        native_method!("nativeDrawImage", "(ILandroid/graphics/Bitmap;)V", draw_image),
         native_method!("nativeSetAnimShader", "(II)Z", set_anim_shader),
         native_method!("nativeSetCopyShader", "(II)Z", set_copy_shader),
         native_method!("nativeSetPointShader", "(II)Z", set_point_shader),
         native_method!("nativeSetBrushTexture", "(II)V", set_brush_texture),
-        native_method!("exportPixels", "(I)Landroid/graphics/Bitmap;", export_pixels),
+        native_method!("nativeExportPixels", "(I)Landroid/graphics/Bitmap;", export_pixels),
         native_method!("nativeSetInterpolator", "(II)V", jni_lua_set_interpolator),
         native_method!("nativeAddLayer", "(IIII)V", jni_add_layer),
         native_method!("nativeClearLayers", "(I)V", jni_clear_layers),
         native_method!("nativeLoadUndo", "(II)V", jni_load_undo),
+        native_method!("nativePushUndoFrame", "(I)I", jni_push_undo_frame),
+        native_method!("nativeClearUndoFrames", "(I)V", jni_clear_undo_frames),
         native_method!("nativeSetBrushColor", "(II)V", jni_set_brush_color),
         native_method!("nativeSetBrushSize", "(IF)V", jni_set_brush_size),
     ];

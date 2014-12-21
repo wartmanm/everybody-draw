@@ -26,16 +26,18 @@ extends Thread with Handler.Callback with AndroidImplicits {
   @native protected def nativeDrawQueuedPoints(data: GLInit, handler: MotionEventHandler, transformMatrix: Array[Float]): Unit
   @native protected def nativeFinishLuaScript(data: GLInit, handler: MotionEventHandler): Unit
   @native protected def nativeClearFramebuffer(data: GLInit): Unit
-  @native protected def drawImage(data: GLInit, bitmap: Bitmap): Unit
+  @native protected def nativeDrawImage(data: GLInit, bitmap: Bitmap): Unit
   @native protected def nativeSetAnimShader(data: GLInit, shader: CopyShader): Boolean
   @native protected def nativeSetCopyShader(data: GLInit, shader: CopyShader): Boolean
   @native protected def nativeSetPointShader(data: GLInit, shader: PointShader): Boolean
   @native protected def nativeSetBrushTexture(data: GLInit, t: TexturePtr): Unit
-  @native protected def exportPixels(data: GLInit): Bitmap
+  @native protected def nativeExportPixels(data: GLInit): Bitmap
   @native protected def nativeSetInterpolator(data: GLInit, script: LuaScript): Unit
   @native protected def nativeAddLayer(data: GLInit, copyshader: CopyShader, pointshader: PointShader, pointidx: Int): Unit
   @native protected def nativeClearLayers(data: GLInit): Unit
   @native protected def nativeLoadUndo(data: GLInit, pos: Int): Unit
+  @native protected def nativePushUndoFrame(data: GLInit): Int
+  @native protected def nativeClearUndoFrames(data: GLInit): Unit
   //@native protected def nativeSetBrushProperties(props: BrushProperties): Unit
   @native protected def nativeSetBrushColor(data: GLInit, color: Int): Unit
   @native protected def nativeSetBrushSize(data: GLInit, size: Float): Unit
@@ -133,21 +135,23 @@ extends Thread with Handler.Callback with AndroidImplicits {
     Log.i("tst", "initing output shader")
     Log.i("tst", s"drawing bitmap: ${bitmap}")
     for (b <- bitmap) {
-      drawImage(gl, b)
+      nativeDrawImage(gl, b)
       b.recycle()
     }
   }
 
-  def clearScreen() = withGL(nativeClearFramebuffer _)
+  def clearScreen(gl: GLInit) = {
+    nativeClearFramebuffer(gl)
+  }
 
   // callback runs on gl thread
-  def getBitmap(cb: (Bitmap)=>Any) = withGL(gl => cb(exportPixels(gl)))
+  def getBitmap(cb: (GLInit, Bitmap)=>Any) = withGL(gl => cb(gl, nativeExportPixels(gl)))
 
   def getBitmapSynchronized() = {
     var bitmap: Bitmap = null
     val notify = new Object()
     notify.synchronized {
-      getBitmap(x => {
+      getBitmap((gl, x) => {
           bitmap = x
           notify.synchronized { notify.notify() }
         })
@@ -160,7 +164,9 @@ extends Thread with Handler.Callback with AndroidImplicits {
     handler.obtainMessage(MSG_END_GL).sendToTarget()
   }
 
-  def drawBitmap(bitmap: Bitmap) = withGL(drawImage(_, bitmap))
+  def drawBitmap(gl: GLInit, bitmap: Bitmap) = {
+    nativeDrawImage(gl, bitmap)
+  }
 
   // private
   private def initOutputShader(g: GLInit) = {
@@ -211,6 +217,8 @@ extends Thread with Handler.Callback with AndroidImplicits {
   }
 
   def loadUndo(gl: GLInit, pos: Int) = nativeLoadUndo(gl, pos)
+  def pushUndoFrame(gl: GLInit): Int = nativePushUndoFrame(gl)
+  def clearUndoFrames(gl: GLInit) = nativeClearUndoFrames(gl)
 
   // only set values, could maybe run on main thread
   def setAnimShader(gl: GLInit, shader: CopyShader) = nativeSetAnimShader(gl, shader)
