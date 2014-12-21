@@ -47,7 +47,12 @@ class PaintControls
     val reader = new JsonReader(new StringReader(s))
     reader.beginObject()
     while (reader.hasNext()) {
-      namedPickers(reader.nextName()).load(reader)
+      val name = reader.nextName()
+      if (namedPickers.contains(name)) {
+        namedPickers(name).load(reader)
+      } else {
+        reader.skipValue()
+      }
     }
     reader.endObject()
     reader.close()
