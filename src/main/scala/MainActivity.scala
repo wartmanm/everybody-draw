@@ -686,16 +686,21 @@ class MainActivity extends Activity with TypedActivity with AndroidImplicits {
   class SidebarAdapter() extends BaseAdapter {
     import SidebarAdapter._
     val inflater = LayoutInflater.from(MainActivity.this)
+
+    // these aren't actually used atm, so don't lock resources to get them
+    //private val names = MainActivity.this.getResources().getStringArray(R.array.sidebar_titles)
+    private val names = Array("Brush Texture", "Animation", "Paint", "Interpolator", "Unibrushes", "Hide Controls", "Overlay")
+
     // must match order of viewflipper children
     val sidebarControls = Array (
-      new SidebarEntryPicker("Brush Texture", controls.brushpicker, (u: UniBrush) => u.brush),
-      new SidebarEntryPicker("Animation", controls.animpicker, (u: UniBrush) => u.baseanimshader),
-      new SidebarEntryPicker("Paint", controls.paintpicker, (u: UniBrush) => u.basepointshader),
-      new SidebarEntryPicker("Interpolator", controls.interppicker, (u: UniBrush) => u.interpolator),
-      new SidebarEntryPicker("Unibrushes", controls.unipicker, (u: UniBrush) => None),
-      new SidebarEntryHider("Hide Controls")
+      new SidebarEntryPicker(names(0), controls.brushpicker, (u: UniBrush) => u.brush),
+      new SidebarEntryPicker(names(1), controls.animpicker, (u: UniBrush) => u.baseanimshader),
+      new SidebarEntryPicker(names(2), controls.paintpicker, (u: UniBrush) => u.basepointshader),
+      new SidebarEntryPicker(names(3), controls.interppicker, (u: UniBrush) => u.interpolator),
+      new SidebarEntryPicker(names(4), controls.unipicker, (u: UniBrush) => None),
+      new SidebarEntryHider(names(5))
     )
-    val copyShaderControl = new SidebarEntryPicker("Overlay", controls.copypicker, (u: UniBrush) => u.basecopyshader)
+    val copyShaderControl = new SidebarEntryPicker(names(6), controls.copypicker, (u: UniBrush) => u.basecopyshader)
     override def areAllItemsEnabled = false
     override def isEnabled(pos: Int) = sidebarControls(pos).enabled
     override def getCount = sidebarControls.length

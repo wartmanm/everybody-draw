@@ -11,4 +11,17 @@
     <string name="button_undo">Undo</string>
     <string name="button_redo">Redo</string>
 
+    <string-array name="sidebar_titles">
+        <item>Brush Texture</item>
+        <item>Animation</item>
+        <item>Paint</item>
+        <item>Interpolator</item>
+        <item>Unibrushes</item>
+        <item>Hide Controls</item>
+        <item>Overlay</item>
+    </string-array>
+        <string name="button_credits">Credits</string>
+        <string name="button_debug">Debug</string>
+        <string name="button_replay">Replay</string>
+
 </resources>

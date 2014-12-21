@@ -4,22 +4,22 @@
 
     <item
         android:id="@+id/menu_save"
-        android:title="Save"/>
+        android:title="@string/button_save"/>
     <item
         android:id="@+id/menu_load"
-        android:title="Load"/>
+        android:title="@string/button_load"/>
     <item
         android:id="@+id/menu_replay"
-        android:title="Replay"/>
+        android:title="@string/button_replay"/>
     <item
         android:id="@+id/menu_clear"
-        android:title="Clear"/>
+        android:title="@string/button_clear"/>
 	  <item
 		  android:id="@+id/menu_debug"
-		  android:title="Debug"/>
+		  android:title="@string/button_debug"/>
 	  <item
 		  android:id="@+id/menu_credits"
-		  android:title="Credits"/>
+		  android:title="@string/button_credits"/>
     <item
         android:id="@+id/action_settings"
         android:orderInCategory="100"
