@@ -126,7 +126,9 @@ pub unsafe fn create_lua<'a>(w: i32, h: i32) -> GLResult<&'a LuaInterpolatorStat
     assert!(STATIC_LUA.is_none(), "tried to create a lua state when one already existed!");
     let lua = try!(LuaInterpolatorState::init_lua(w, h));
     STATIC_LUA = Some(lua);
-    Ok(STATIC_LUA.as_ref().unwrap())
+    let luaref = STATIC_LUA.as_mut().unwrap();
+    luaref.push_output_global();
+    Ok(&*luaref)
 }
 
 //unsafe fn get_lua<T: LuaCallback>() -> GLResult<*mut lua_State> {
@@ -252,9 +254,6 @@ impl LuaInterpolatorState {
                 dimensions: (w, h),
                 output: 0 as *mut c_void,
             };
-
-            lua_pushlightuserdata(L, &mut state.output as *mut *mut c_void as *mut c_void);
-            lua_setglobal(L, cstr!("output"));
             
             assert_eq!(stacksize, lua_gettop(L));
             Ok(state)
@@ -440,5 +439,10 @@ impl LuaInterpolatorState {
         };
         assert_eq!(stacksize, lua_gettop(L));
         result
+    }
+    pub unsafe fn push_output_global(&mut self) {
+        let L = self.L;
+        lua_pushlightuserdata(L, &mut self.output as *mut *mut c_void as *mut c_void);
+        lua_setglobal(L, cstr!("output"));
     }
 }
