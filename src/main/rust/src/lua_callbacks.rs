@@ -39,6 +39,9 @@ impl<'a, 'b, 'c, 'd> LuaCallbackType<'a, 'b, 'c, 'd> {
             undo_callback: undo_callback,
         }
     }
+    pub fn get_dimensions(&self) -> (i32, i32) {
+        self.glinit.dimensions
+    }
 }
 
 #[no_mangle]

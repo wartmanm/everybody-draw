@@ -377,9 +377,8 @@ impl<'a> GLInit<'a> {
             (Some(point_shader), Some(copy_shader), Some(brush)) => {
                 let interp_error = match self.paintstate.interpolator {
                     Some(interpolator) => unsafe {
-                        let dimensions = self.dimensions;
                         let mut callback = LuaCallbackType::new(self, events, handler, undo_callback);
-                        do_interpolate_lua(interpolator, dimensions, &mut callback)
+                        do_interpolate_lua(interpolator, &mut callback)
                     },
                     None => Ok(())
                 };

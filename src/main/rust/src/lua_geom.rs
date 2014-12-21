@@ -153,6 +153,7 @@ unsafe fn init_lua() -> GLResult<*mut lua_State> {
         GLDRAW_LUA_STOPFNS = luaL_ref(L, LUA_REGISTRYINDEX);
 
         LUA_ORIGINAL_PANICFN = lua_atpanic(L, panic_wrapper) as *mut c_void;
+        
         assert_eq!(stacksize, lua_gettop(L));
         Ok(L)
     } else {
@@ -236,7 +237,15 @@ unsafe fn load_lua_script_internal(L: *mut lua_State, script: &str) -> GLResult<
 
     create_sandbox(L);
     let key = {
-        let sandbox_idx = IndexValue(lua_gettop(L));
+        let sandbox_stackpos = lua_gettop(L);
+        let sandbox_idx = IndexValue(sandbox_stackpos);
+
+        let (width, height) = dimensions;
+        lua_pushinteger(L, width);
+        lua_setfield(L, sandbox_stackpos, cstr!("width"));
+        lua_pushinteger(L, height);
+        lua_setfield(L, sandbox_stackpos, cstr!("height"));
+
         if !runstring(L, LUA_INTERPOLATOR_DEFAULTS, cstr!("interpolator defaults"), Sandboxed(sandbox_idx)) {
             let err = format!("default loader failed to load: {}\nThis should never happen!", err_to_str(L)).into_cow();
             safe_pop!(L, 1);
@@ -266,7 +275,7 @@ unsafe fn load_lua_script_internal(L: *mut lua_State, script: &str) -> GLResult<
             lua_setglobal(L, cstr!("callbacks"));
         }
 
-        // FIXME compile runner once
+        // TODO consider compiling runner once
         if !runstring(L, LUA_RUNNER, cstr!("built-in lua_runner script"), Unsandboxed) {
             let err = format!("lua runner failed to load: {}\n This should never happen!", err_to_str(L)).into_cow();
             safe_pop!(L, 1);
@@ -311,9 +320,8 @@ pub unsafe fn finish_lua_script<T: LuaCallback>(output: &mut T, script: &::luasc
         // stack is stopfns
         lua_rawgeti(L, -1, script.get_key());
         // stack is stopfns -- stopfn
-        lua_pushlightuserdata(L, output as *mut T as *mut c_void);
         logi!("calling lua ondone()");
-        let result = match lua_pcall(L, 1, 0, 0) {
+        let result = match lua_pcall(L, 0, 0, 0) {
             0 => Ok(()),
             _ => {
                 log_err(format!("ondone() script failed to run: {}", err_to_str(L)).into_cow())
@@ -349,17 +357,15 @@ pub unsafe fn push_lua_script(key: i32) {
     lua_pushlightuserdata(L, key as *mut c_void);
 }
 
-pub unsafe fn do_interpolate_lua<T: LuaCallback>(script: &::luascript::LuaScript, dimensions: (i32, i32), output: &mut T) -> GLResult<()> {
+pub unsafe fn do_interpolate_lua<T: LuaCallback>(script: &::luascript::LuaScript, callback: &mut T) -> GLResult<()> {
     let L = try!(get_existing_lua_or_err());
     let stacksize = lua_gettop(L);
     lua_rawgeti(L, LUA_REGISTRYINDEX, script.get_key());
 
-    let (x, y) = dimensions;
-    lua_pushnumber(L, x as f64);
-    lua_pushnumber(L, y as f64);
-    lua_pushlightuserdata(L, output as *mut T as *mut c_void);
+    lua_pushlightuserdata(L, callback as *mut T as *mut c_void);
+    lua_setglobal(L, cstr!("output"));
 
-    let result = match lua_pcall(L, 3, 0, 0) {
+    let result = match lua_pcall(L, 0, 0, 0) {
         0 => Ok(()),
         _ => log_err(format!("script failed to run: {}", err_to_str(L)).into_cow()),
     };

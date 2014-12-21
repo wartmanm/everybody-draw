@@ -9,13 +9,13 @@ static DEFAULT_SCRIPT: &'static str = include_str!("../includes/lua/default_inte
 
 pub struct LuaScript {
     pub registry_id: i32,
-    pub source: MString,
+    pub source: (MString, (i32, i32)),
 }
 
 impl LuaScript {
-    pub fn new(source: MString) -> GLResult<LuaScript> {
-        let registry_id = unsafe { try!(load_lua_script(source.as_slice())) };
-        let script = LuaScript { registry_id: registry_id, source: source };
+    pub fn new(source: MString, dimensions: (i32, i32)) -> GLResult<LuaScript> {
+        let registry_id = unsafe { try!(load_lua_script(source.as_slice(), dimensions)) };
+        let script = LuaScript { registry_id: registry_id, source: (source, dimensions) };
         logi!("created {}", script);
         Ok(script)
     }
@@ -41,9 +41,10 @@ impl Show for LuaScript {
     }
 }
 
-impl FillDefaults<Option<MString>, MString, LuaScript> for LuaScript {
-    fn fill_defaults(init: Option<MString>) -> Defaults<MString, LuaScript> {
-        Defaults { val: init.unwrap_or_else(|| DEFAULT_SCRIPT.into_cow()) }
+impl FillDefaults<(Option<MString>, (i32, i32)), (MString, (i32, i32)), LuaScript> for LuaScript {
+    fn fill_defaults(init: (Option<MString>, (i32, i32))) -> Defaults<(MString, (i32, i32)), LuaScript> {
+        let (script, dimensions) = init;
+        Defaults { val: (script.unwrap_or_else(|| DEFAULT_SCRIPT.into_cow()), dimensions) }
     }
 }
 
