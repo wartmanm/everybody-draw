@@ -593,7 +593,8 @@ class MainActivity extends Activity with TypedActivity with AndroidImplicits {
       val prefix = (
         e match {
           case _: LuaException => {
-            controls.interppicker.control.setSelection(0)
+            val picker = if (controls.interppicker.enabled) controls.interppicker else controls.unipicker
+            picker.control.setSelection(0)
             "An error occurred in the interpolator:\n" 
           }
           case _ => "An error occurred:\n" 
