@@ -8,21 +8,21 @@ function ondown(a)
   for i = 1,#positions + 1 do
     if positions[i] == nil or positions[i].active == false then
       positions[i] = postable
-      loglua("added " .. a.counter .. " as point " .. i)
+      print("added " .. a.counter .. " as point " .. i)
       bycounter[a.counter] = postable
       if i <= 4 then
         active = active + 1
       end
       total = total + 1
-      loglua("active: " .. active .. ", total: " .. total)
+      print("active: " .. active .. ", total: " .. total)
       return
     end
   end
-  loglua("active: " .. active .. ", total: " .. total)
+  print("active: " .. active .. ", total: " .. total)
 end
 function onup(a)
   default_onup(a)
-  loglua("got lifted pointer " .. a)
+  print("got lifted pointer " .. a)
   local pos = bycounter[a]
   if pos ~= nil then
     bycounter[a] = nil -- counters are unique, so no point keeping it
@@ -33,22 +33,22 @@ function onup(a)
     if total > 4 then
       if idx <= 4 then
         positions[idx] = positions[5]
-        loglua("replaced pointer " .. idx .. " with 5")
+        print("replaced pointer " .. idx .. " with 5")
         table.remove(positions, 5)
       else
-        loglua("removed pointer " .. idx)
+        print("removed pointer " .. idx)
         table.remove(positions, idx)
       end
     elseif idx <= 4 then
-      loglua("removed pointer " .. idx .. " with no replacement")
+      print("removed pointer " .. idx .. " with no replacement")
       pos.active = false
       active = active - 1
     end
     total = total - 1
   else
-    loglua("no match!")
+    print("no match!")
   end
-  loglua("active: " .. active .. ", total: " .. total)
+  print("active: " .. active .. ", total: " .. total)
 end
 
 ondone = default_ondone

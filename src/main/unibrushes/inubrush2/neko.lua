@@ -111,7 +111,7 @@ function direction(neko, mMoveDeltaX, mMoveDeltaY)
 end
 
 function setState(neko, state)
-  loglua("setting state to " .. mStateNames[state])
+  print("setting state to " .. mStateNames[state])
   neko.mTickCount = 0
   neko.mStateCount = 0
   neko.mState = state
@@ -221,7 +221,7 @@ function onframe()
   local imgY = math.floor(imgIndex / 4)
   local nekopoint = ShaderPaintPoint(nekoX, nekoY, 0, 0, imgX / 4, imgY / 9, 0, 0)
   local mickeypoint = ShaderPaintPoint(mMickey.x, mMickey.y, 0, 0, 3/4, 8/9, 0, 0)
-  --loglua("neko is at " .. mNeko.x .. ", " .. mNeko.y .. "; state: " .. mStateNames[mNeko.mState])
+  --print("neko is at " .. mNeko.x .. ", " .. mNeko.y .. "; state: " .. mStateNames[mNeko.mState])
   clearlayer(1)
   pushpoint(1, mickeypoint)
   pushpoint(1, nekopoint)

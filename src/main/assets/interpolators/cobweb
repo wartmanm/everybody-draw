@@ -3,14 +3,14 @@ local backlogy = {}
 local backlogpos = {}
 local backlogcounter = {}
 function ondown(a)
-  loglua("in ondown")
+  print("in ondown")
   local counter = a.counter
-  loglua(string.format("got counter: %d", counter))
+  print(string.format("got counter: %d", counter))
   backlogx[counter] = {[0] = a.x}
   backlogy[counter] = {[0] = a.y}
   backlogpos[counter] = 0
   backlogcounter[counter] = 0
-  loglua("done ondown")
+  print("done ondown")
   default_ondown(a)
 end
 onup = default_onup

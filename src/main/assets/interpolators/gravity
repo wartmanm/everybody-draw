@@ -5,7 +5,7 @@ local positions = {}
 
 function ondown(a)
   positions[a.counter] = {x = a.x, y = a.y}
-  loglua("ondown " .. a.counter)
+  print("ondown " .. a.counter)
   default_ondown(a)
 end
 function onup(a)
@@ -14,10 +14,10 @@ end
 function onframe(x, y)
   local planetpoint = ShaderPaintPoint(0, 0, 0, 0, 0, 0, 0, 0)
   local oldplanetpoint = ShaderPaintPoint(0, 0, 0, 0, 0, 0, 0, 0) 
-  --loglua("frame")
+  --print("frame")
   for i,planet in ipairs(planets) do
     for i2,pos in pairs(positions) do
-      --loglua("adding in " .. pos.x .. "," .. pos.y)
+      --print("adding in " .. pos.x .. "," .. pos.y)
       local distx = pos.x - planet.x
       local disty = pos.y - planet.y
       local force = math.pow(distx * distx, disty * disty, 0.25)
