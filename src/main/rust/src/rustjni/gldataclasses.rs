@@ -50,7 +50,7 @@ unsafe extern "C" fn compile_pointshader(env: *mut JNIEnv, _: jobject, data: jpo
 unsafe extern "C" fn jni_lua_compile_script(env: *mut JNIEnv, _: jobject, data: jpointer, script: jstring) -> jint {
     let scriptstr = get_mstring(env, script);
     let data = get_safe_data(data);
-    glresult_or_exception(env, data.events.load_interpolator(scriptstr, data.glinit.dimensions))
+    glresult_or_exception(env, data.events.load_interpolator(scriptstr))
 }
 
 unsafe extern "C" fn create_texture(env: *mut JNIEnv, _: jobject, data: jpointer, bitmap: jobject) -> jint {

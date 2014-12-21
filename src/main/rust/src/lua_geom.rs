@@ -26,13 +26,15 @@ static LUA_FFI_SCRIPT: &'static str = include_str!("../includes/lua/ffi_loader.l
 static LUA_RUNNER: &'static str = include_str!("../includes/lua/lua_runner.lua");
 static LUA_INTERPOLATOR_DEFAULTS: &'static str = include_str!("../includes/lua/init_defaults.lua");
 
-static mut STATIC_LUA: Option<*mut LuaInterpolatorState> = None;
+static mut STATIC_LUA: Option<LuaInterpolatorState> = None;
 
-struct LuaInterpolatorState {
+pub struct LuaInterpolatorState {
     L: *mut lua_State,
     original_panicfn: lua_CFunction,
     create_sandbox_ref: RegistryRef,
     stopfns: RegistryRef,
+    output: *mut c_void,
+    dimensions: (i32, i32),
 }
 
 macro_rules! assert_stacksize {
@@ -77,12 +79,12 @@ struct RegistryRef {
 
 impl RegistryRef {
     #[inline(always)]
-    pub fn new(L: *mut lua_State) {
+    pub unsafe fn new(L: *mut lua_State) -> RegistryRef {
         let idx = luaL_ref(L, LUA_REGISTRYINDEX);
         RegistryRef { idx: idx }
     }
     #[inline(always)]
-    pub fn push(&self, L: *mut lua_State) {
+    pub unsafe fn push(&self, L: *mut lua_State) {
         lua_rawgeti(L, LUA_REGISTRYINDEX, self.idx);
     }
     #[inline(always)]
@@ -120,16 +122,23 @@ extern "C" fn stringreader(L: *mut lua_State, data: *mut c_void, size: *mut size
     }
 }
 
-unsafe fn get_lua<T: LuaCallback>(callback: T) -> GLResult<*mut lua_State> {
-    match STATIC_LUA {
-        Some(x) => Ok(x),
-        None => {
-            let lua = try!(LuaInterpolatorState::init_lua());
-            STATIC_LUA = Some(lua);
-            lua
-        }
-    }
+pub unsafe fn create_lua<'a>(w: i32, h: i32) -> GLResult<&'a LuaInterpolatorState> {
+    assert!(STATIC_LUA.is_none(), "tried to create a lua state when one already existed!");
+    let lua = try!(LuaInterpolatorState::init_lua(w, h));
+    STATIC_LUA = Some(lua);
+    Ok(STATIC_LUA.as_ref().unwrap())
 }
+
+//unsafe fn get_lua<T: LuaCallback>() -> GLResult<*mut lua_State> {
+    //match STATIC_LUA {
+        //Some(x) => Ok(x),
+        //None => {
+            //let lua = try!(LuaInterpolatorState::init_lua());
+            //STATIC_LUA = Some(lua);
+            //lua
+        //}
+    //}
+//}
 
 #[no_mangle]
 unsafe extern "C" fn panic_wrapper(L: *mut lua_State) -> i32 {
@@ -144,18 +153,18 @@ unsafe extern "C" fn panic_wrapper(L: *mut lua_State) -> i32 {
 
 #[no_mangle]
 pub unsafe fn rust_raise_lua_err(L: Option<*mut lua_State>, msg: &str) -> ! {
-    let L = L.unwrap_or(get_existing_lua().unwrap());
+    let L = L.unwrap_or_else(|| get_existing_lua().unwrap().L);
     ::lua::raw::lua_pushlstring(L, msg.as_ptr() as *const i8, msg.len() as size_t);
     ::lua::raw::lua_error(L);
     panic!("luaL_error() returned, this should never happen!");
 }
 
 #[inline(always)]
-pub unsafe fn get_existing_lua() -> Option<*mut lua_State> {
-    STATIC_LUA
+pub unsafe fn get_existing_lua<'a>() -> Option<&'a mut LuaInterpolatorState> {
+    STATIC_LUA.as_mut()
 }
 
-pub unsafe fn get_existing_lua_or_err() -> GLResult<*mut lua_State> {
+pub unsafe fn get_existing_lua_or_err<'a>() -> GLResult<&'a mut LuaInterpolatorState> {
     match get_existing_lua() {
         Some(lua) => Ok(lua),
         None => Err("couldn't get lua state!".into_cow()),
@@ -163,8 +172,8 @@ pub unsafe fn get_existing_lua_or_err() -> GLResult<*mut lua_State> {
 }
 
 pub unsafe fn load_lua_script(script: &str) -> GLResult<i32> {
-    let state = try!(get_lua());
-    state.load_lua_script(script);
+    let state = try!(get_existing_lua_or_err());
+    state.load_lua_script(script)
 }
 
 fn log_err<T>(message: MString) -> GLResult<T> {
@@ -219,15 +228,14 @@ unsafe fn err_to_str(L: *mut lua_State) -> String {
 }
 
 impl LuaInterpolatorState {
-
-    unsafe fn init_lua<T: LuaCallback>(callback: T) -> GLResult<LuaInterpolatorState<T>> {
+    unsafe fn init_lua(w: i32, h: i32) -> GLResult<LuaInterpolatorState> {
         let L = luaL_newstate();
         let stacksize = lua_gettop(L);
         luaL_openlibs(L);
 
         luaJIT_setmode(L, 0, LUAJIT_MODE_ENGINE as i32|LUAJIT_MODE_ON as i32);
 
-        if runstring(LUA_FFI_SCRIPT, cstr!("built-in ffi init script"), Unsandboxed) {
+        if runstring(L, LUA_FFI_SCRIPT, cstr!("built-in ffi init script"), Unsandboxed) {
             logi!("ffi init script loaded");
             lua_getglobal(L, cstr!("create_sandbox"));
             let create_sandbox = RegistryRef::new(L);
@@ -236,12 +244,17 @@ impl LuaInterpolatorState {
             let stopfns = RegistryRef::new(L);
 
             let original_panicfn = lua_atpanic(L, panic_wrapper);
-            let state = LuaInterpolatorState {
+            let mut state = LuaInterpolatorState {
                 L: L,
                 original_panicfn: original_panicfn,
                 create_sandbox_ref: create_sandbox,
                 stopfns: stopfns,
+                dimensions: (w, h),
+                output: 0 as *mut c_void,
             };
+
+            lua_pushlightuserdata(L, &mut state.output as *mut *mut c_void as *mut c_void);
+            lua_setglobal(L, cstr!("output"));
             
             assert_eq!(stacksize, lua_gettop(L));
             Ok(state)
@@ -376,6 +389,7 @@ impl LuaInterpolatorState {
     pub unsafe fn finish_lua_script<T: LuaCallback>(&mut self, output: &mut T, script: &::luascript::LuaScript) -> GLResult<()> {
         let L = self.L;
         let stacksize = lua_gettop(L);
+        self.output = output as *mut T as *mut c_void;
         self.stopfns.push(L);
         let result = {
             // stack is stopfns
@@ -413,13 +427,12 @@ impl LuaInterpolatorState {
         lua_pushlightuserdata(L, key as *mut c_void);
     }
 
-    pub unsafe fn do_interpolate_lua<T: LuaCallback>(&mut self, script: &::luascript::LuaScript, callback: &mut T) -> GLResult<()> {
+    pub unsafe fn do_interpolate_lua<T: LuaCallback>(&mut self, script: &::luascript::LuaScript, output: &mut T) -> GLResult<()> {
         let L = self.L;
         let stacksize = lua_gettop(L);
-        lua_rawgeti(L, LUA_REGISTRYINDEX, script.get_key());
+        self.output = output as *mut T as *mut c_void;
 
-        lua_pushlightuserdata(L, callback as *mut T as *mut c_void);
-        lua_setglobal(L, cstr!("output"));
+        lua_rawgeti(L, LUA_REGISTRYINDEX, script.get_key());
 
         let result = match lua_pcall(L, 0, 0, 0) {
             0 => Ok(()),

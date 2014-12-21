@@ -35,11 +35,16 @@ unsafe fn rethrow_lua_result(env: *mut JNIEnv, result: GLResult<()>) {
 }
 
 unsafe extern "C" fn init_gl(env: *mut JNIEnv, _: jobject, w: jint, h: jint, callback: jobject) -> jpointer {
+    let glinit = GLInit::setup_graphics(w, h);
+    let events = Events::new();
+    let jni_undo_callback = JNIUndoCallback::new(env, callback);
+    let lua = ::lua_geom::create_lua(w, h);
     mem::transmute(box GLInitEvents {
-        glinit: GLInit::setup_graphics(w, h),
-        events: Events::new(),
-        jni_undo_callback: JNIUndoCallback::new(env, callback),
+        glinit: glinit,
+        events: events,
+        jni_undo_callback: jni_undo_callback,
         owning_thread: ::rustjni::gettid(),
+        /* lua: lua */
     })
 }
 

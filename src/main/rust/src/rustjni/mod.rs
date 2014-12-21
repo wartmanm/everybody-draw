@@ -20,6 +20,9 @@ use drawevent::Events;
 use glcommon::MString;
 use libc::types::os::arch::posix88::pid_t;
 
+use lua_callbacks::LuaCallbackType;
+use lua_geom::LuaInterpolatorState;
+
 use rustrt;
 
 extern "C" {
@@ -50,6 +53,7 @@ struct GLInitEvents<'a> {
     events: Events<'a>,
     jni_undo_callback: JNIUndoCallback,
     owning_thread: pid_t,
+    //lua: LuaInterpolatorState<LuaCallbackType>,
 }
 
 #[deriving(Copy)]
