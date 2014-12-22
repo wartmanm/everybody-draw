@@ -50,6 +50,8 @@ unsafe extern "C" fn compile_pointshader(env: *mut JNIEnv, _: jobject, data: jpo
 unsafe extern "C" fn jni_lua_compile_script(env: *mut JNIEnv, _: jobject, data: jpointer, script: jstring) -> jint {
     let scriptstr = get_mstring(env, script);
     let data = get_safe_data(data);
+    // FIXME: this will retrieve a script from cache if there is one already
+    // this may not be whatwe want, since the old one may have state already
     glresult_or_exception(env, data.events.load_interpolator(scriptstr))
 }
 
