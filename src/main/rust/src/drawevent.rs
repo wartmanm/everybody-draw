@@ -9,7 +9,6 @@
 // TODO: remove all this duplication
 
 use core::prelude::*;
-use collections::slice::CloneSliceAllocPrelude;
 use collections::vec::Vec;
 use point::PointEntry;
 use glstore::{DrawObjectIndex, DrawObjectList};
@@ -23,6 +22,7 @@ use luascript::LuaScript;
 use paintlayer::PaintLayer;
 use glcommon::{GLResult, MString};
 use drawevent::event_stream::EventState;
+use collections::slice::CloneSliceExt;
 
 // can't use Copy, wtf
 #[deriving(Clone)]

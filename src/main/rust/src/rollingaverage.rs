@@ -40,4 +40,4 @@ macro_rules! rolling_average_count (
             }
         }
     )
-)
+);

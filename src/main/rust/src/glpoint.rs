@@ -15,7 +15,7 @@ use point;
 use point::{ShaderPaintPoint, Coordinate, PointEntry, PointConsumer, PointProducer, PointInfo, ShaderPointEvent};
 use drawevent::Events;
 
-rolling_average_count!(RollingAverage16, 16)
+rolling_average_count!(RollingAverage16, 16);
 
 /// lifetime storage for a pointer's past state
 struct PointStorage {

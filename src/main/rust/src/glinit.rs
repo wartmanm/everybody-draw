@@ -303,7 +303,7 @@ impl<'a> GLInit<'a> {
         Ok(())
     }
 
-    pub fn setup_graphics<'a>(w: i32, h: i32) -> GLInit<'a> {
+    pub fn setup_graphics(w: i32, h: i32) -> GLInit<'a> {
         print_gl_string("Version", gl2::VERSION);
         print_gl_string("Vendor", gl2::VENDOR);
         print_gl_string("Renderer", gl2::RENDERER);

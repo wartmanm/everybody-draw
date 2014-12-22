@@ -12,7 +12,6 @@ extern crate alloc;
 extern crate std;
 extern crate arena;
 extern crate lua;
-extern crate rustrt;
 
 pub mod bindgen_builtins;
 pub mod android;

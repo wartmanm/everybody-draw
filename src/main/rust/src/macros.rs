@@ -4,24 +4,24 @@ macro_rules!  format (
     ($($arg:tt)*) => (
         format_args!(::std::fmt::format, $($arg)*)
     )
-)
+);
 
 macro_rules! write(
     ($dst:expr, $($arg:tt)*) => ({
         let dst = &mut *$dst;
         format_args!(|args| { dst.write_fmt(args) }, $($arg)*)
     })
-)
+);
 
 macro_rules! println(
     ($($arg:tt)*) => (format_args!(::std::io::stdio::println_args, $($arg)*))
-)
+);
 
 macro_rules! cstr(
     ($str:expr) => (
         concat!($str, "\0").as_ptr() as *const ::libc::c_char
     )
-)
+);
 
 macro_rules! panic(
     () => ({
@@ -62,15 +62,15 @@ macro_rules! panic(
             ::android::log::ANDROID_LOG_FATAL);
         format_args!(_run_fmt, $fmt, $($arg)*)
     });
-)
+);
 
 macro_rules! try(
     ($e:expr) => (match $e { Ok(e) => e, Err(e) => return Err(e) })
-)
+);
 
 macro_rules! try_opt(
     ($e:expr) => (match $e { Some(e) => e, None => return None })
-)
+);
 
 macro_rules! assert(
     ($cond:expr) => (
@@ -83,11 +83,11 @@ macro_rules! assert(
             panic!($($arg),+)
         }
     );
-)
+);
 
 macro_rules! debug_assert(
     ($($arg:tt)*) => (if cfg!(not(ndebug)) { assert!($($arg)*); })
-)
+);
 
 macro_rules! assert_eq(
     ($given:expr , $expected:expr) => ({
@@ -102,4 +102,4 @@ macro_rules! assert_eq(
             }
         }
     })
-)
+);

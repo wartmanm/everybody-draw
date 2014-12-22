@@ -12,8 +12,8 @@ use core::prelude::*;
 use core::mem;
 use core::fmt::Show;
 use collections::vec::Vec;
-use collections::hash::Hash;
-use collections::hash::sip::SipHasher;
+use std::hash::Hash;
+use std::hash::sip::SipHasher;
 
 use std::collections::HashMap;
 use std::collections::hash_map::{Vacant, Occupied};

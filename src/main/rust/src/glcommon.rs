@@ -139,7 +139,7 @@ macro_rules! glattrib_f32 (
         gl2::enable_vertex_attrib_array($handle);
         check_gl_error("enable_vertex_array");
     });
-)
+);
 
 macro_rules! gl_bindtexture (
     ($texunit:expr, $kind:expr, $texture:expr, $handle:expr) => ({
@@ -150,4 +150,4 @@ macro_rules! gl_bindtexture (
         gl2::uniform_1i($handle, $texunit);
         check_gl_error(stringify!(uniform1i($texture)));
     });
-)
+);

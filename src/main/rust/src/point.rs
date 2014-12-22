@@ -65,25 +65,25 @@ pub type PointProducer = comm::Sender<PointEntry>;
 
 impl Add<Coordinate, Coordinate> for Coordinate {
     #[inline(always)]
-    fn add(&self, rhs: &Coordinate) -> Coordinate {
+    fn add(self, rhs: Coordinate) -> Coordinate {
         Coordinate { x: self.x + rhs.x, y: self.y + rhs.y }
     }
 }
 impl Sub<Coordinate, Coordinate> for Coordinate {
     #[inline(always)]
-    fn sub(&self, rhs: &Coordinate) -> Coordinate {
+    fn sub(self, rhs: Coordinate) -> Coordinate {
         Coordinate { x: self.x - rhs.x, y: self.y - rhs.y }
     }
 }
 impl Div<f32, Coordinate> for Coordinate {
     #[inline(always)]
-    fn div(&self, rhs: &f32) -> Coordinate {
-        Coordinate { x: self.x / *rhs, y: self.y / *rhs }
+    fn div(self, rhs: f32) -> Coordinate {
+        Coordinate { x: self.x / rhs, y: self.y / rhs }
     }
 }
 impl Mul<f32, Coordinate> for Coordinate {
     #[inline(always)]
-    fn mul(&self, rhs: &f32) -> Coordinate {
-        Coordinate { x: self.x * *rhs, y: self.y * *rhs }
+    fn mul(self, rhs: f32) -> Coordinate {
+        Coordinate { x: self.x * rhs, y: self.y * rhs }
     }
 }

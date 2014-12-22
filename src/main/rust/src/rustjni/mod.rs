@@ -23,7 +23,7 @@ use libc::types::os::arch::posix88::pid_t;
 use lua_callbacks::LuaCallbackType;
 use lua_geom::LuaInterpolatorState;
 
-use rustrt;
+use std;
 
 extern "C" {
     pub fn gettid() -> pid_t;
@@ -236,7 +236,7 @@ pub unsafe extern "C" fn JNI_OnLoad(vm: *mut JavaVM, reserved: *mut c_void) -> j
     GL_EXCEPTION = CaseClass::new(env, cstr!("com/github/wartman4404/gldraw/GLException"), cstr!("(Ljava/lang/String;)V"));
 
     //rustrt::init(1, ["rustjni".as_ptr()].as_ptr());
-    rustrt::unwind::register(on_unwind);
+    std::rt::unwind::register(on_unwind);
 
     logi!("finished jni_onload");
     JNI_VERSION_1_2

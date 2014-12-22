@@ -48,7 +48,7 @@ pub macro_rules! logi(
     ($fmt:expr) => (
         ::log::raw_logi(concat!($fmt, "\0").as_ptr() as *const ::libc::c_char);
     )
-)
+);
 
 pub macro_rules! loge(
     ($fmt:expr, $($arg:expr),+) => (
@@ -57,4 +57,4 @@ pub macro_rules! loge(
     ($fmt:expr) => (
         ::log::raw_loge(concat!($fmt, "\0").as_ptr() as *const ::libc::c_char);
     )
-)
+);
