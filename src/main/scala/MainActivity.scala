@@ -553,15 +553,14 @@ class MainActivity extends Activity with TypedActivity with AndroidImplicits {
   }
 
   def saveFile() = {
+    val name = new Date().toString() + ".png"
+    Toast.makeText(this, "Saving as \"%s\"...".format(name), Toast.LENGTH_LONG).show()
     textureThread.foreach(thread => {
         thread.getBitmap((gl, b) => {
             Future {
-              val outfile = new File(getExternalFilesDir(null), new Date().toString() + ".png")
+              val outfile = new File(getExternalFilesDir(null), name)
               try {
-
-              }
-              val outstream = new BufferedOutputStream(new FileOutputStream(outfile))
-              try {
+                val outstream = new BufferedOutputStream(new FileOutputStream(outfile))
                 DrawFiles.withCloseable(outstream) {
                   saveBitmapToFile(b, outstream)
                 }
