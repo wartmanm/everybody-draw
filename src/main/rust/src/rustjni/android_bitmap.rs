@@ -1,11 +1,18 @@
 use core::prelude::*;
 use core::raw;
 use core::{ptr, mem};
+use core::borrow::IntoCow;
 use libc::c_void;
 use jni::{jobject, jclass, jmethodID, JNIEnv};
 use jni_constants::{JNI_TRUE, JNI_FALSE};
 use android::bitmap::{AndroidBitmap_getInfo, AndroidBitmap_lockPixels, AndroidBitmap_unlockPixels, AndroidBitmapInfo};
-use android::bitmap::{ANDROID_BITMAP_FORMAT_RGBA_8888, ANDROID_BITMAP_FORMAT_A_8};
+use android::bitmap::{Enum_AndroidBitmapFormat, ANDROID_BITMAP_FORMAT_NONE, ANDROID_BITMAP_FORMAT_RGBA_8888, ANDROID_BITMAP_FORMAT_RGB_565, ANDROID_BITMAP_FORMAT_RGBA_4444, ANDROID_BITMAP_FORMAT_A_8};
+use gltexture;
+use gltexture::PixelFormat;
+use glcommon::GLResult;
+use core::fmt;
+use core::fmt::Show;
+
 static mut BITMAP_CLASS: jclass = 0 as jclass;
 static mut CONFIG_ARGB_8888: jobject = 0 as jobject;
 static mut CREATE_BITMAP: jmethodID = 0 as jmethodID;
@@ -16,6 +23,36 @@ pub struct AndroidBitmap {
     pub obj: jobject,
     pixels: *mut u8,
     pub info: AndroidBitmapInfo,
+}
+
+#[repr(i32)]
+#[deriving(Copy)]
+#[allow(non_camel_case_types, dead_code)]
+pub struct AndroidBitmapFormat {
+    value: i32,
+}
+
+impl Show for AndroidBitmapFormat {
+    fn fmt(&self, fmt: &mut fmt::Formatter) -> fmt::Result {
+        match self.value as u32 {
+            ANDROID_BITMAP_FORMAT_NONE      => write!(fmt, "ANDROID_BITMAP_FORMAT_NONE"),
+            ANDROID_BITMAP_FORMAT_RGBA_8888 => write!(fmt, "ANDROID_BITMAP_FORMAT_RGBA_8888"),
+            ANDROID_BITMAP_FORMAT_RGB_565   => write!(fmt, "ANDROID_BITMAP_FORMAT_RGB_565"),
+            ANDROID_BITMAP_FORMAT_RGBA_4444 => write!(fmt, "ANDROID_BITMAP_FORMAT_RGBA_4444"),
+            ANDROID_BITMAP_FORMAT_A_8       => write!(fmt, "ANDROID_BITMAP_FORMAT_A_8"),
+            other                           => write!(fmt, "Unknown bitmap format: {}", other),
+        }
+    }
+}
+
+impl gltexture::ToPixelFormat for AndroidBitmapFormat {
+    fn to_pixelformat(&self) -> GLResult<PixelFormat> {
+        match self.value as u32 {
+            ANDROID_BITMAP_FORMAT_RGBA_8888 => Ok(PixelFormat::RGBA),
+            ANDROID_BITMAP_FORMAT_A_8 => Ok(PixelFormat::ALPHA),
+            _ => Err(format!("Unsupported texture format: {}!", self).into_cow()),
+        }
+    }
 }
 
 impl AndroidBitmap {
@@ -33,23 +70,28 @@ impl AndroidBitmap {
         logi!("created bitmap");
         AndroidBitmap::from_jobject(env, bitmap)
     }
-
-    unsafe fn as_slice_unsafe(&self) -> &mut [u8] {
+    
+    unsafe fn as_slice_unsafe(&self) -> GLResult<&mut [u8]> {
         let pixelsize = match self.info.format as u32 {
             ANDROID_BITMAP_FORMAT_RGBA_8888 => 4,
             ANDROID_BITMAP_FORMAT_A_8 => 1,
-            x => panic!("bitmap format {} not implemented!", x),
+            other => {
+                return Err(format!("bitmap format {} not implemented!", other).into_cow());
+            },
         };
         let pixelvec = raw::Slice { data: self.pixels as *const u8, len: (self.info.width * self.info.height * pixelsize) as uint };
-        mem::transmute(pixelvec)
+        Ok(mem::transmute(pixelvec))
     }
 
-    pub unsafe fn as_mut_slice(&mut self) -> &mut [u8] {
+    pub unsafe fn as_mut_slice(&mut self) -> GLResult<&mut [u8]> {
         self.as_slice_unsafe()
     }
 
-    pub unsafe fn as_slice(&self) -> &[u8] {
-        self.as_slice_unsafe()
+    pub unsafe fn as_slice(&self) -> GLResult<&[u8]> {
+        match self.as_slice_unsafe() {
+            Ok(ok) => Ok(&*ok),
+            Err(err) => Err(err),
+        }
     }
 
     pub unsafe fn set_premultiplied(&mut self, premultiplied: bool) -> bool {
@@ -60,6 +102,11 @@ impl AndroidBitmap {
         } else {
             false
         }
+    }
+
+    #[inline(always)]
+    pub fn get_format(&self) -> AndroidBitmapFormat {
+        AndroidBitmapFormat { value: self.info.format }
     }
 }
 

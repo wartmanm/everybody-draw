@@ -48,6 +48,9 @@ struct CaseClass {
     class: jclass,
 }
 
+static mut GL_EXCEPTION: CaseClass = CaseClass { constructor: 0 as jmethodID, class: 0 as jclass };
+
+
 struct GLInitEvents<'a> {
     glinit: GLInit<'a>,
     events: Events<'a>,
@@ -230,6 +233,8 @@ pub unsafe extern "C" fn JNI_OnLoad(vm: *mut JavaVM, reserved: *mut c_void) -> j
     gldataclasses::init(env);
     motionevent::init(env);
 
+    GL_EXCEPTION = CaseClass::new(env, cstr!("com/github/wartman4404/gldraw/GLException"), cstr!("(Ljava/lang/String;)V"));
+
     //rustrt::init(1, ["rustjni".as_ptr()].as_ptr());
     rustrt::unwind::register(on_unwind);
 
@@ -251,4 +256,5 @@ pub unsafe extern "C" fn JNI_OnUnload(vm: *mut JavaVM, reserved: *mut c_void) {
     android_bitmap::destroy(env);
     gldataclasses::destroy(env);
     motionevent::destroy(env);
+    GL_EXCEPTION.destroy(env);
 }

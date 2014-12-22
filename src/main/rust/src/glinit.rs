@@ -33,17 +33,6 @@ static DRAW_INDEXES: [GLubyte, ..6] = [
 const UNDO_BUFFERS: i32 = 5;
 
 //#[deriving(FromPrimitive)]
-#[repr(i32)]
-#[deriving(Copy)]
-#[allow(non_camel_case_types, dead_code)]
-pub enum AndroidBitmapFormat {
-    ANDROID_BITMAP_FORMAT_NONE      = 0,
-    ANDROID_BITMAP_FORMAT_RGBA_8888 = 1,
-    ANDROID_BITMAP_FORMAT_RGB_565   = 4,
-    ANDROID_BITMAP_FORMAT_RGBA_4444 = 7,
-    ANDROID_BITMAP_FORMAT_A_8       = 8,
-}
-
 
 /// struct for storage of data that stays on rust side
 /// should probably be given a meaningful name like PaintContext, but w/e
@@ -467,16 +456,6 @@ impl<'a> GLInit<'a> {
 
     pub unsafe fn destroy(&mut self) {
         gl2::finish();
-    }
-}
-
-impl gltexture::ToPixelFormat for AndroidBitmapFormat {
-    fn to_pixelformat(&self) -> GLResult<PixelFormat> {
-        match *self {
-            AndroidBitmapFormat::ANDROID_BITMAP_FORMAT_RGBA_8888 => Ok(PixelFormat::RGBA),
-            AndroidBitmapFormat::ANDROID_BITMAP_FORMAT_A_8 => Ok(PixelFormat::ALPHA),
-            _ => Err("Unsupported texture format!".into_cow()),
-        }
     }
 }
 

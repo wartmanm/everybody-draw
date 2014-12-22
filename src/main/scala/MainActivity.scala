@@ -132,7 +132,18 @@ class MainActivity extends Activity with TypedActivity with AndroidImplicits {
 
   // runs on gl thread
   def onTextureCreated(thread: TextureSurfaceThread, producer: MotionEventProducer, undoCallback: MainUndoListener)(gl: GLInit) = {
-    thread.initScreen(gl, savedBitmap)
+    try {
+      thread.initScreen(gl, savedBitmap)
+    } catch {
+      case e: GLException => {
+        val message = "got exception while loading saved bitmap, this should never happen!\n" + e
+        Log.i("main", message)
+        this.runOnUiThread(() => {
+          Toast.makeText(MainActivity.this, message, Toast.LENGTH_LONG).show()
+        })
+      }
+    }
+
     val undoframes = thread.pushUndoFrame(gl)
     undoCallback.undoBufferChanged(undoframes)
 
@@ -580,16 +591,31 @@ class MainActivity extends Activity with TypedActivity with AndroidImplicits {
           val unread = new DrawFiles.Unread(DrawFiles.FileSource, DrawFiles.BitmapReader)
           Some(unread.read(path).content)
         } catch {
-          case e: Exception => None
+          case e: Exception => {
+            Toast.makeText(MainActivity.this, s"Unable to load image ${path}: ${e.getMessage()}", Toast.LENGTH_LONG).show()
+            None
+          }
         })
         Log.i("main", s"got bitmap ${bitmap}")
         for (b <- bitmap; thread <- textureThread) {
           Log.i("main", "drawing bitmap...")
           thread.withGL(gl => {
-            thread.drawBitmap(gl, b)
-            thread.clearUndoFrames(gl)
-            val frames = thread.pushUndoFrame(gl)
-            undoListener.foreach(_.undoBufferChanged(frames))
+            val success = try {
+              thread.drawBitmap(gl, b)
+              true
+            } catch {
+              case e: GLException => {
+                runOnUiThread(() => {
+                  Toast.makeText(MainActivity.this, s"Unable to load image ${path}: ${e.getMessage()}", Toast.LENGTH_LONG).show()
+                })
+                false
+              }
+            }
+            if (success) {
+              thread.clearUndoFrames(gl)
+              val frames = thread.pushUndoFrame(gl)
+              undoListener.foreach(_.undoBufferChanged(frames))
+            }
           })
         }
       }

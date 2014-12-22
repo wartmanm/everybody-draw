@@ -10,7 +10,7 @@ use rustjni::android_bitmap::AndroidBitmap;
 use drawevent::Events;
 use matrix::Matrix;
 
-use rustjni::{register_classmethods, CaseClass, get_safe_data, str_to_jstring, GLInitEvents, JNIUndoCallback, JNICallbackClosure, jpointer};
+use rustjni::{register_classmethods, CaseClass, get_safe_data, str_to_jstring, GLInitEvents, JNIUndoCallback, JNICallbackClosure, jpointer, GL_EXCEPTION};
 use jni_helpers::ToJValue;
 use jni_constants::*;
 
@@ -113,16 +113,38 @@ pub unsafe extern "C" fn export_pixels(env: *mut JNIEnv, _: jobject, data: jpoin
     let glinit = &mut get_safe_data(data).glinit;
     let (w, h) = glinit.get_buffer_dimensions();
     let mut bitmap = AndroidBitmap::new(env, w, h);
-    glinit.get_pixels(bitmap.as_mut_slice());
+    glinit.get_pixels(bitmap.as_mut_slice().unwrap());
     bitmap.set_premultiplied(true);
     bitmap.obj
 }
 
 pub unsafe extern "C" fn draw_image(env: *mut JNIEnv, _: jobject, data: jpointer, bitmap: jobject) {
-    // TODO: ensure rgba_8888 format and throw error
     let bitmap = AndroidBitmap::from_jobject(env, bitmap);
-    let pixels = bitmap.as_slice();
-    get_safe_data(data).glinit.draw_image(bitmap.info.width as i32, bitmap.info.height as i32, pixels);
+
+    // This is really dumb.
+    // AndroidBitmap_unlockPixels can't be called with a pending exception.
+    // So, bitmap has to be dropped before we can throw.  But it can't be dropped in either arm
+    // because bitmap.as_slice() is technically still borrowing it even though
+    //  - nothing uses it past that point
+    //  - the match arm consumes it
+    //  - Err(_) doesn't even use the bitmap's lifetime anywhere
+    //  In conclusion, blargh.
+    let mut exception: Option<jobject> = None;
+    let exception = match bitmap.as_slice() {
+        Ok(pixels) => {
+            let data = get_safe_data(data);
+            data.glinit.draw_image(bitmap.info.width as i32, bitmap.info.height as i32, pixels);
+            return;
+        },
+        Err(err) => {
+            // this must be done manually, as AndroidBitmap_unlockPixels cannot be called with a
+            // pending exception
+            let errmsg = str_to_jstring(env, format!("{}", err).as_slice()).as_jvalue();
+            GL_EXCEPTION.construct(env, [errmsg].as_mut_slice())
+        }
+    };
+    mem::drop(bitmap);
+    ((**env).Throw)(env, exception);
 }
 
 unsafe extern "C" fn jni_lua_set_interpolator(env: *mut JNIEnv, _: jobject, data: jpointer, scriptid: jint) {
