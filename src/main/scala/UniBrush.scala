@@ -93,7 +93,7 @@ object UniBrushSource extends AndroidImplicits {
           val stream = sourceFiles.get(brushpath)
             .map(new ByteArrayInputStream(_))
             .getOrElse(UniBrush.logAbort(s"unable to load bitmap in unibrush: ${brushpath}"))
-          brush = Some(DrawFiles.BitmapReader.readSource(stream))
+          brush = Some(DrawFiles.BitmapReaderAlpha.readSource(stream))
         }
         case "pointshaders" => pointshaders = j.readArray(j2 => ShaderSource.readFromJson(j2, sourceFiles)).toArray
         case "animshaders" => animshaders = j.readArray(j2 => ShaderSource.readFromJson(j2, sourceFiles)).toArray

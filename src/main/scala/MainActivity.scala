@@ -588,7 +588,7 @@ class MainActivity extends Activity with TypedActivity with AndroidImplicits {
       if (resultCode == Activity.RESULT_OK) {
         val path = FileUtils.getPath(this, data.getData())
         val bitmap = (try {
-          val unread = new DrawFiles.Unread(DrawFiles.FileSource, DrawFiles.BitmapReader)
+          val unread = new DrawFiles.Unread(DrawFiles.FileSource, new DrawFiles.BitmapReader(Bitmap.Config.ARGB_8888))
           Some(unread.read(path).content)
         } catch {
           case e: Exception => {

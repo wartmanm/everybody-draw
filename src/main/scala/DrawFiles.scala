@@ -169,10 +169,12 @@ object DrawFiles {
     }
   }
 
-  object BitmapReader extends PartialReader[Bitmap, Texture] {
-    override def readSource(i: InputStream) = decodeBitmap(Bitmap.Config.ALPHA_8)(i)
+  class BitmapReader(config: Bitmap.Config) extends PartialReader[Bitmap, Texture] {
+    override def readSource(i: InputStream) = decodeBitmap(config)(i)
     override def compile(g: GLInit, source: Bitmap) = Texture(g, source)
   }
+  
+  val BitmapReaderAlpha = new BitmapReader(Bitmap.Config.ALPHA_8)
   
   class ShaderReader[T](constructor: (GLInit, String, String)=>GLResult[T]) extends PartialReader[String, T] {
     override def readSource(i: InputStream) = readStream(i)
@@ -265,7 +267,8 @@ class LoadedDrawFiles(c: Context, useExternal: Boolean) {
   }
 
   val brushes: Array[Readable[Texture]] = {
-    allfiles[Texture](PreinstalledPaintResources.brushes, BitmapReader, null)
+    val constructor = BitmapReaderAlpha
+    allfiles[Texture](PreinstalledPaintResources.brushes, constructor, null)
   }
 
   // TODO: make these safe
