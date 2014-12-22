@@ -187,7 +187,7 @@ impl TargetData {
 }
 
 impl<'a> GLInit<'a> {
-    pub fn draw_image(&mut self, w: i32, h: i32, pixels: &[u8]) -> () {
+    pub fn draw_image(&mut self, w: i32, h: i32, pixels: &[u8], rotation: matrix::Rotation) -> () {
         logi!("drawing image...");
         let target = self.targetdata.get_current_texturetarget();
         let (tw, th) = target.texture.dimensions;
@@ -198,10 +198,7 @@ impl<'a> GLInit<'a> {
         // account for gl's own scaling
         let (glratiox, glratioy) = (widthratio / ratio, heightratio / ratio);
 
-        let matrix = [ glratiox,                 0f32,                    0f32, 0f32,
-                       0f32,                    -glratioy,                0f32, 0f32,
-                       0f32,                     0f32,                    1f32, 0f32,
-                      (1f32 - glratiox) / 2f32, (1f32 + glratioy) / 2f32, 0f32, 0f32];
+        let matrix = matrix::fit_inside((w, h), target.texture.dimensions, rotation);
         logi!("drawing with ratio: {:5.3}, glratio {:5.3}, {:5.3}, matrix:\n{}", ratio, glratiox, glratioy, matrix::log(matrix.as_slice()));
 
         self.paintstate.copyshader.map(|shader| {

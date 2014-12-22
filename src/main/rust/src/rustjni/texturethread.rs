@@ -119,7 +119,7 @@ pub unsafe extern "C" fn export_pixels(env: *mut JNIEnv, _: jobject, data: jpoin
     bitmap.obj
 }
 
-pub unsafe extern "C" fn draw_image(env: *mut JNIEnv, _: jobject, data: jpointer, bitmap: jobject) {
+pub unsafe extern "C" fn draw_image(env: *mut JNIEnv, _: jobject, data: jpointer, bitmap: jobject, rotation: jint) {
     let bitmap = AndroidBitmap::from_jobject(env, bitmap);
 
     // This is really dumb.
@@ -133,7 +133,7 @@ pub unsafe extern "C" fn draw_image(env: *mut JNIEnv, _: jobject, data: jpointer
     let exception = match bitmap.as_slice() {
         Ok(pixels) => {
             let data = get_safe_data(data);
-            data.glinit.draw_image(bitmap.info.width as i32, bitmap.info.height as i32, pixels);
+            data.glinit.draw_image(bitmap.info.width as i32, bitmap.info.height as i32, pixels, mem::transmute(rotation));
             return;
         },
         Err(err) => {
@@ -231,7 +231,7 @@ pub unsafe fn init(env: *mut JNIEnv) {
         native_method!("nativeDrawQueuedPoints", "(II[F)V", native_draw_queued_points),
         native_method!("nativeFinishLuaScript", "(II)V", native_finish_lua_script),
         native_method!("nativeClearFramebuffer", "(I)V", clear_framebuffer),
-        native_method!("nativeDrawImage", "(ILandroid/graphics/Bitmap;)V", draw_image),
+        native_method!("nativeDrawImage", "(ILandroid/graphics/Bitmap;I)V", draw_image),
         native_method!("nativeSetAnimShader", "(II)Z", set_anim_shader),
         native_method!("nativeSetCopyShader", "(II)Z", set_copy_shader),
         native_method!("nativeSetPointShader", "(II)Z", set_point_shader),

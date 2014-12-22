@@ -1,4 +1,15 @@
+use core::prelude::*;
+
 pub type Matrix = [f32, ..16];
+
+#[repr(i32)]
+#[deriving(Copy, Show, PartialEq, Eq)]
+pub enum Rotation {
+    Rotation0 = 0,
+    Rotation90 = 1,
+    Rotation180 = 2,
+    Rotation270 = 3,
+}
 
 /// copied from android.opengl.matrix
 /// intended for framebuffers, which range from (-1, -1) to (1, 1), and not textures, which range
@@ -27,4 +38,42 @@ pub fn log(matrix: &[f32]) -> ::collections::string::String {
           matrix[8], matrix[9], matrix[10], matrix[11],
           matrix[12], matrix[13], matrix[14], matrix[15],
     )
+}
+
+pub fn fit_inside(srcdimensions: (i32, i32), targetdimensions: (i32, i32), rotation: Rotation) -> Matrix {
+    use matrix::Rotation::*;
+    logi!("using rotation {}", rotation);
+    let (tw, th) = targetdimensions;
+    let (w, h) = srcdimensions;
+
+    let (widthratio, heightratio) = match rotation {
+        Rotation0  | Rotation180 => ((tw as f32 / w as f32), (th as f32 / h as f32)),
+        Rotation90 | Rotation270 => ((th as f32 / w as f32), (tw as f32 / h as f32)),
+    };
+    // fit inside
+    let ratio = if heightratio > widthratio { heightratio } else { widthratio };
+    // account for gl's own scaling
+    let (glratiox, glratioy) = (widthratio / ratio, heightratio / ratio);
+
+    match rotation {
+        Rotation0   => [ glratiox,                 0f32,                    0f32, 0f32,
+                         0f32,                    -glratioy,                0f32, 0f32,
+                         0f32,                     0f32,                    1f32, 0f32,
+                        (1f32 - glratiox) / 2f32, (1f32 + glratioy) / 2f32, 0f32, 0f32],
+
+        Rotation180 => [-glratiox,                 0f32,                    0f32, 0f32,
+                         0f32,                     glratioy,                0f32, 0f32,
+                         0f32,                     0f32,                    1f32, 0f32,
+                        (1f32 + glratiox) / 2f32, (1f32 - glratioy) / 2f32, 0f32, 0f32],
+
+        Rotation90  => [ 0f32,                    -glratiox,                0f32, 0f32,
+                        -glratioy,                 0f32,                    0f32, 0f32,
+                         0f32,                     0f32,                    1f32, 0f32,
+                        (1f32 - glratioy) / 2f32, (1f32 - glratiox) / 2f32, 0f32, 0f32],
+
+        Rotation270 => [ 0f32,                     glratiox,                0f32, 0f32,
+                         glratioy,                 0f32,                    0f32, 0f32,
+                         0f32,                     0f32,                    1f32, 0f32,
+                        (1f32 + glratioy) / 2f32, (1f32 + glratiox) / 2f32, 0f32, 0f32],
+    }
 }
