@@ -64,10 +64,9 @@ function onframe()
   default_onframe()
   if active < 4 then return end
   clearlayer(1)
-  local outpoints = ShaderPaintPointArray(4)
-  outpoints[0] = positions[1]
-  outpoints[1] = positions[2]
-  outpoints[2] = positions[3]
-  outpoints[3] = positions[4]
-  pushcubicbezier(1, outpoints)
+  local out1 = ShaderPaintPoint(positions[1])
+  local out2 = ShaderPaintPoint(positions[2])
+  local out3 = ShaderPaintPoint(positions[3])
+  local out4 = ShaderPaintPoint(positions[4])
+  pushcubicbezier(1, out1, out2, out3, out4)
 end

@@ -1,3 +1,6 @@
+local mWidth = width
+local mHeight = height
+
 local kStop = 0 -- Jare is cleaning.
 local kJare = 1
 local kKaki = 2 -- Kaki is scratching the ear.
@@ -133,7 +136,7 @@ function getImageIndex(mState, mTickCount)
   return index
 end
 
-function think(neko, mickey, mWidth, mHeight)
+function think(neko, mickey)
   neko.mTickCount = neko.mTickCount + 1
   if (neko.mTickCount % 2 == 0) then
     neko.mStateCount = neko.mStateCount + 1
@@ -216,7 +219,7 @@ function think(neko, mickey, mWidth, mHeight)
 end
 
 function onframe()
-  local nekoX, nekoY, imgIndex = think(mNeko, mMickey, x, y)
+  local nekoX, nekoY, imgIndex = think(mNeko, mMickey)
   local imgX = imgIndex % 4
   local imgY = math.floor(imgIndex / 4)
   local nekopoint = ShaderPaintPoint(nekoX, nekoY, 0, 0, imgX / 4, imgY / 9, 0, 0)
