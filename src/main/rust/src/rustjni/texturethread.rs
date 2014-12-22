@@ -38,7 +38,7 @@ unsafe extern "C" fn init_gl(env: *mut JNIEnv, _: jobject, w: jint, h: jint, cal
     let glinit = GLInit::setup_graphics(w, h);
     let events = Events::new();
     let jni_undo_callback = JNIUndoCallback::new(env, callback);
-    let lua = ::lua_geom::create_lua(w, h);
+    let lua = ::lua_geom::ensure_lua_exists(w, h);
     mem::transmute(box GLInitEvents {
         glinit: glinit,
         events: events,

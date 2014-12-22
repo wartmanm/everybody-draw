@@ -15,8 +15,8 @@ ffi.cdef[[
   short lua_nextpoint(void *output, struct ShaderPaintPoint *points);
   void lua_log(const char *message);
   void lua_pushline(void *output, int queue, struct ShaderPaintPoint *pointa, struct ShaderPaintPoint *pointb);
-  void lua_pushcatmullrom(void *output, int queue, struct ShaderPaintPoint points[4]);
-  void lua_pushcubicbezier(void *output, int queue, struct ShaderPaintPoint points[4]);
+  void lua_pushcatmullrom(void *output, int queue, struct ShaderPaintPoint *a, struct ShaderPaintPoint *b, struct ShaderPaintPoint *c, struct ShaderPaintPoint *d);
+  void lua_pushcubicbezier(void *output, int queue, struct ShaderPaintPoint *a, struct ShaderPaintPoint *b, struct ShaderPaintPoint *c, struct ShaderPaintPoint *d);
   void lua_clearlayer(void *output, int layer);
   void lua_savelayers(void *output);
   void lua_saveundobuffer(void *output);

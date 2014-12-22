@@ -1,4 +1,4 @@
-function main(a, b)
+function onmove(a, b)
   pushline(0, a, b)
 end
 

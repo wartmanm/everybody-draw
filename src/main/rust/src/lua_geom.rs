@@ -122,6 +122,16 @@ extern "C" fn stringreader(L: *mut lua_State, data: *mut c_void, size: *mut size
     }
 }
 
+pub unsafe fn ensure_lua_exists<'a>(w: i32, h: i32) -> GLResult<&'a LuaInterpolatorState> {
+    match STATIC_LUA.as_mut() {
+        Some(lua) => {
+            lua.update(w, h);
+            Ok(&*lua)
+        },
+        None => create_lua(w, h)
+    }
+}
+
 pub unsafe fn create_lua<'a>(w: i32, h: i32) -> GLResult<&'a LuaInterpolatorState> {
     assert!(STATIC_LUA.is_none(), "tried to create a lua state when one already existed!");
     let lua = try!(LuaInterpolatorState::init_lua(w, h));
@@ -444,5 +454,10 @@ impl LuaInterpolatorState {
         let L = self.L;
         lua_pushlightuserdata(L, &mut self.output as *mut *mut c_void as *mut c_void);
         lua_setglobal(L, cstr!("output"));
+    }
+
+    pub unsafe fn update(&mut self, w: i32, h: i32) {
+        self.dimensions = (w, h);
+        self.output = 0 as *mut c_void;
     }
 }

@@ -14,7 +14,7 @@ callbacks.pushpoint = function(queue, point)
   ffi.C.lua_pushpoint(output, queue, point)
 end
 callbacks.pushline = function(queue, pointa, pointb)
-  ffi.C.lua_pushpoint(output, queue, pointa, pointb)
+  ffi.C.lua_pushline(output, queue, pointa, pointb)
 end
 callbacks.pushcatmullrom = function(queue, pointa, pointb, pointc, pointd)
   ffi.C.lua_pushcatmullrom(output, queue, pointa, pointb, pointc, pointd)
