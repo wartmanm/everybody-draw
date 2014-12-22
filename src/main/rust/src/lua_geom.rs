@@ -88,6 +88,7 @@ impl RegistryRef {
         lua_rawgeti(L, LUA_REGISTRYINDEX, self.idx);
     }
     #[inline(always)]
+    #[allow(unused)]
     pub unsafe fn destroy(&mut self, L: *mut lua_State) {
         luaL_unref(L, LUA_REGISTRYINDEX, self.idx);
     }
@@ -256,7 +257,7 @@ impl LuaInterpolatorState {
             let stopfns = RegistryRef::new(L);
 
             let original_panicfn = lua_atpanic(L, panic_wrapper);
-            let mut state = LuaInterpolatorState {
+            let state = LuaInterpolatorState {
                 L: L,
                 original_panicfn: original_panicfn,
                 create_sandbox_ref: create_sandbox,

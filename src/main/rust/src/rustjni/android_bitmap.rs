@@ -6,7 +6,7 @@ use libc::c_void;
 use jni::{jobject, jclass, jmethodID, JNIEnv};
 use jni_constants::{JNI_TRUE, JNI_FALSE};
 use android::bitmap::{AndroidBitmap_getInfo, AndroidBitmap_lockPixels, AndroidBitmap_unlockPixels, AndroidBitmapInfo};
-use android::bitmap::{Enum_AndroidBitmapFormat, ANDROID_BITMAP_FORMAT_NONE, ANDROID_BITMAP_FORMAT_RGBA_8888, ANDROID_BITMAP_FORMAT_RGB_565, ANDROID_BITMAP_FORMAT_RGBA_4444, ANDROID_BITMAP_FORMAT_A_8};
+use android::bitmap::{ANDROID_BITMAP_FORMAT_NONE, ANDROID_BITMAP_FORMAT_RGBA_8888, ANDROID_BITMAP_FORMAT_RGB_565, ANDROID_BITMAP_FORMAT_RGBA_4444, ANDROID_BITMAP_FORMAT_A_8};
 use gltexture;
 use gltexture::PixelFormat;
 use glcommon::GLResult;

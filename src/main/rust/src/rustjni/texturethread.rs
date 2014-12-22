@@ -13,6 +13,7 @@ use matrix::Matrix;
 use rustjni::{register_classmethods, CaseClass, get_safe_data, str_to_jstring, GLInitEvents, JNIUndoCallback, JNICallbackClosure, jpointer, GL_EXCEPTION};
 use jni_helpers::ToJValue;
 use jni_constants::*;
+use lua_geom;
 
 static mut LUA_EXCEPTION: CaseClass = CaseClass { constructor: 0 as jmethodID, class: 0 as jclass };
 static mut RUNTIME_EXCEPTION: CaseClass = CaseClass { constructor: 0 as jmethodID, class: 0 as jclass };
@@ -38,7 +39,7 @@ unsafe extern "C" fn init_gl(env: *mut JNIEnv, _: jobject, w: jint, h: jint, cal
     let glinit = GLInit::setup_graphics(w, h);
     let events = Events::new();
     let jni_undo_callback = JNIUndoCallback::new(env, callback);
-    let lua = ::lua_geom::ensure_lua_exists(w, h);
+    let _ = lua_geom::ensure_lua_exists(w, h);
     mem::transmute(box GLInitEvents {
         glinit: glinit,
         events: events,
@@ -129,7 +130,6 @@ pub unsafe extern "C" fn draw_image(env: *mut JNIEnv, _: jobject, data: jpointer
     //  - the match arm consumes it
     //  - Err(_) doesn't even use the bitmap's lifetime anywhere
     //  In conclusion, blargh.
-    let mut exception: Option<jobject> = None;
     let exception = match bitmap.as_slice() {
         Ok(pixels) => {
             let data = get_safe_data(data);

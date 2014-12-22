@@ -20,9 +20,6 @@ use drawevent::Events;
 use glcommon::MString;
 use libc::types::os::arch::posix88::pid_t;
 
-use lua_callbacks::LuaCallbackType;
-use lua_geom::LuaInterpolatorState;
-
 use std;
 
 extern "C" {

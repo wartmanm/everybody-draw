@@ -13,7 +13,6 @@ use point::ShaderPaintPoint;
 use pointshader::PointShader;
 use paintlayer::{TextureTarget, CompletedLayer};
 use copyshader::*;
-use gltexture;
 use gltexture::{Texture, PixelFormat};
 use matrix;
 use eglinit;
