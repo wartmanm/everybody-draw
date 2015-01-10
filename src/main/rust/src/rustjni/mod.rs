@@ -2,7 +2,6 @@
 use std::prelude::v1::*;
 use core::{ptr, mem, raw};
 use core::any::Any;
-use core::fmt::Show;
 use core::fmt::Writer as FormatWriter;
 use core::iter;
 use libc::{c_void, c_char};
@@ -165,11 +164,12 @@ unsafe fn get_jpointer(env: *mut JNIEnv, obj: jobject, field: jfieldID) -> jpoin
 fn on_unwind(msg: &(Any + Send), file: &'static str, line: uint) {
     //use core::fmt::FormatWriter;
     // as far as I know there's no way to identify traits that can be cast to Show at runtime
-    if let Some(s) = msg.downcast_ref::<&Show>() {
-        loge!("fatal error in {}:{} as &Show: {:?}", file, line, s);
-    } else if let Some(s) = msg.downcast_ref::<Box<Show>>() {
-        loge!("fatal error in {}:{} as Box<Show>: {:?}", file, line, &**s);
-    } else if let Some(s) = msg.downcast_ref::<&str>() {
+    // these cause compiler crashes:
+    //if let Some(s) = msg.downcast_ref::<&Show>() {
+        //loge!("fatal error in {}:{} as &Show: {:?}", file, line, s);
+    //if let Some(s) = msg.downcast_ref::<Box<Show>>() {
+        //loge!("fatal error in {}:{} as Box<Show>: {:?}", file, line, &**s);
+    if let Some(s) = msg.downcast_ref::<&str>() {
         loge!("fatal error in {}:{} as &str: {}", file, line, s);
     } else if let Some(s) = msg.downcast_ref::<String>() {
         loge!("fatal error in {}:{} as String: {}", file, line, s);
