@@ -1,4 +1,5 @@
-use ::point::AsSelf;
+use point::AsSelf;
+use core::ops::{Add, Sub, Div};
 macro_rules! rolling_average_count (
     ($name:ident, $count:expr) => (
         pub struct $name<T> {
@@ -27,15 +28,15 @@ macro_rules! rolling_average_count (
                 if self.count < $count {
                     self.count += 1;
                 } else {
-                    self.sum = (self.sum - self.entries[self.pos]).as_self();
+                    self.sum = *::point::as_self(&(self.sum - self.entries[self.pos]));
                 }
                 self.entries[self.pos] = value;
-                self.sum = (self.sum + value).as_self();
+                self.sum = *::point::as_self(&(self.sum + value));
                 self.pos = (self.pos + 1) % $count;
                 self.get_average()
             }
             pub fn get_average(&self) -> T {
-                (self.sum / self.count as f32).as_self();
+                *::point::as_self(&(self.sum / self.count as f32))
             }
             pub fn clear(&mut self) {
                 self.sum = ::core::default::Default::default();

@@ -21,6 +21,9 @@ impl AsSelf<f32> for f32 {
     fn as_self(&self) -> &f32 { self }
 }
 
+#[inline(always)]
+fn as_self<T, U: AsSelf<T>>(u: &U) -> &T { u.as_self() }
+
 /// Holds data from motionevent entries.
 #[deriving(Clone, Show, PartialEq, Copy)]
 #[repr(C)]
