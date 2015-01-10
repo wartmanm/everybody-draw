@@ -26,7 +26,7 @@ use drawevent::event_stream::EventState;
 //use collections::slice::CloneSliceExt;
 
 // can't use Copy, wtf
-#[deriving(Clone)]
+#[derive(Clone)]
 enum DrawEvent {
     UseAnimShader(DrawObjectIndex<CopyShader>),
     UseCopyShader(DrawObjectIndex<CopyShader>),
@@ -135,12 +135,13 @@ impl<'a> Events<'a> {
     pub fn clear(&mut self) {
         self.eventlist.clear();
     }
-    fn get_event(&self, idx: uint) -> Option<&DrawEvent> {
-        self.eventlist.as_slice().get(idx)
-    }
+    //fn get_event(&self, idx: uint) -> Option<&DrawEvent> {
+        //self.eventlist.as_slice().get(idx)
+    //}
 }
 
 #[inline]
+#[allow(unused)]
 pub fn handle_event<'a>(gl: &mut ::glinit::GLInit<'a>, events: &mut Events<'a>, queue: &mut ::point::PointProducer, eventidx: i32) -> event_stream::EventState {
 
     // FIXME do this without exposing Events or GLInit internal details
@@ -172,7 +173,7 @@ pub mod event_stream {
     use core::prelude::*;
     use drawevent::{Events, handle_event};
 
-    #[deriving(Copy)]
+    #[derive(Copy)]
     pub enum EventState {
         Done,
         Frame,

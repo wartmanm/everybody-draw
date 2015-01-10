@@ -17,14 +17,12 @@ use std::hash::Hash;
 use std::collections::HashMap;
 use std::collections::hash_map::Entry;
 use copyshader::CopyShader;
-use gltexture::{PixelFormat, Texture, BrushTexture};
+use gltexture::{PixelFormat, Texture};
 use pointshader::PointShader;
-use glcommon::Shader;
 use luascript::LuaScript;
 use arena::TypedArena;
 use glcommon::GLResult;
 use glcommon::{UsingDefaults, UsingDefaultsSafe, MString};
-use std::collections::hash_map::Hasher;
 use std::collections::hash_state::DefaultState;
 use std::hash::SipHasher;
 
@@ -45,7 +43,7 @@ pub struct DrawObjectList<'a, T: 'a, Init: Eq+Hash<HashType>+'a> {
 }
 
 // copy doesn't work, wtf
-#[deriving(Show, Copy)]
+#[derive(Show, Copy)]
 pub struct DrawObjectIndex<T>(i32);
 
 impl<T> DrawObjectIndex<T> {
@@ -111,7 +109,7 @@ pub trait InitFromCache<Init> {
 //}
 
 pub fn init_from_defaults<T: UsingDefaults<Init>, Init: Hash<HashType>+Eq+Show>(init: Init) -> GLResult<T> {
-    Err("lolnope".into_cow())
+    UsingDefaults::maybe_init(init)
 }
 
 // FIXME maybe a BrushTexture wrapper?
@@ -132,7 +130,6 @@ pub fn init_from_defaults<T: UsingDefaults<Init>, Init: Hash<HashType>+Eq+Show>(
     //fn get_source(&self) -> &MString { &self.source }
 //}
 
-#[old_impl_check]
 impl<'a, T: UsingDefaults<Init>, Init: Hash<HashType>+Eq+Show> DrawObjectList<'a, T, Init> {
     pub fn new() -> DrawObjectList<'a, T, Init> {
         // the default hasher is keyed off of the task-local rng,
@@ -187,7 +184,6 @@ impl<'a, T: UsingDefaults<Init>, Init: Hash<HashType>+Eq+Show> DrawObjectList<'a
     }
 }
 
-#[old_impl_check]
 impl<'a, T: UsingDefaults<Init> + UsingDefaultsSafe, Init: Hash<HashType>+Eq+Show> DrawObjectList<'a, T, Init> {
     pub fn safe_push_object(&mut self, init: Init) -> DrawObjectIndex<T> {
         self.push_object(init).unwrap()

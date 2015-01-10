@@ -1,6 +1,5 @@
 use core::prelude::*;
 use core::fmt;
-use core::mem;
 use core::fmt::Show;
 use core::hash::Hash;
 

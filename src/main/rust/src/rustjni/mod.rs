@@ -1,12 +1,12 @@
 // cannot use core::prelude and still import StrExt needed for utf16_units
 use std::prelude::v1::*;
-use core::{ptr, mem, raw, fmt};
+use core::{ptr, mem, raw};
 use core::any::Any;
 use core::fmt::Show;
 use core::fmt::Writer as FormatWriter;
 use core::iter;
 use libc::{c_void, c_char};
-use core::borrow::{Cow, IntoCow};
+use core::borrow::IntoCow;
 
 use jni::{jobject, jclass, jmethodID, jfieldID, JNIEnv, jint, jstring, jvalue, JNINativeMethod, JavaVM};
 #[cfg(target_word_size = "64")] use jni::jlong;
@@ -54,7 +54,7 @@ struct GLInitEvents<'a> {
     //lua: LuaInterpolatorState<LuaCallbackType>,
 }
 
-#[deriving(Copy)]
+#[derive(Copy)]
 pub struct JNIUndoCallback {
     callback_obj: jobject,
     callback_method: jmethodID,

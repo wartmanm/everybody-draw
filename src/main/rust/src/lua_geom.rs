@@ -5,6 +5,7 @@ use core::str;
 use core::borrow::{IntoCow, ToOwned};
 use collections::string::String;
 use libc::{c_char, c_void, size_t};
+use std::ffi;
 
 use lua::lib::raw::*;
 use lua::aux::raw::*;
@@ -58,14 +59,14 @@ macro_rules! safe_pop {
 
 type ReaderState<'a> = (&'a str, bool);
 
-#[deriving(Copy)]
+#[derive(Copy)]
 enum SandboxMode {
     Sandboxed(LuaValue),
     Unsandboxed,
 }
 
-#[allow(raw_pointer_deriving)]
-#[deriving(Copy)]
+#[allow(raw_pointer_derive)]
+#[derive(Copy)]
 enum LuaValue {
     #[allow(dead_code)]
     RegistryValue(*mut c_void),
@@ -156,7 +157,11 @@ pub unsafe fn create_lua<'a>(w: i32, h: i32) -> GLResult<&'a LuaInterpolatorStat
 unsafe extern "C" fn panic_wrapper(L: *mut lua_State) -> i32 {
     loge!("inside lua panic handler!");
     let errorcstr = lua_tostring(L, -1);
-    let errorstr = if errorcstr.is_null() { "" } else { str::from_c_str(errorcstr) };
+    let errorstr = if errorcstr.is_null() {
+        ""
+    } else {
+        str::from_utf8(ffi::c_str_to_bytes(&errorcstr)).unwrap()
+    };
     loge!("error is {}", errorstr);
     let panicfn = get_existing_lua().unwrap().original_panicfn;
     panicfn(L); // should never return

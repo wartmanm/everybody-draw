@@ -26,7 +26,7 @@ pub struct AndroidBitmap {
 }
 
 #[repr(i32)]
-#[deriving(Copy)]
+#[derive(Copy)]
 #[allow(non_camel_case_types, dead_code)]
 pub struct AndroidBitmapFormat {
     value: i32,

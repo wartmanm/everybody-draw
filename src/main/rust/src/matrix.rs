@@ -1,6 +1,4 @@
 use core::prelude::*;
-use core::fmt;
-use core::fmt::Show;
 
 pub type Matrix = [f32; 16];
 

@@ -1,4 +1,3 @@
-#![feature(associated_types)]
 use core::prelude::*;
 use opengles::gl2;
 use opengles::gl2::{GLuint, GLint};
@@ -103,7 +102,6 @@ pub trait Shader {
     fn new(vertopt: MString, fragopt: MString) -> GLResult<Self>;
 }
 
-#[deriving(Show)]
 pub struct Defaults<Init> {
     pub val: Init
 }

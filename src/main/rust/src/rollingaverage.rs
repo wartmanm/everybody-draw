@@ -1,5 +1,3 @@
-use point::AsSelf;
-use core::ops::{Add, Sub, Div};
 macro_rules! rolling_average_count (
     ($name:ident, $count:expr) => (
         pub struct $name<T> {

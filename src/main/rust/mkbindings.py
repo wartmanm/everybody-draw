@@ -24,6 +24,7 @@ prelude_lints = [
     'non_snake_case',
     'non_upper_case_globals',
     'missing_copy_implementations',
+    'raw_pointer_derive',
 ]
 
 builtins_name = 'bindgen_builtins'

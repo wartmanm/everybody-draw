@@ -25,7 +25,7 @@ impl AsSelf<f32> for f32 {
 pub fn as_self<T, U: AsSelf<T>>(u: &U) -> &T { u.as_self() }
 
 /// Holds data from motionevent entries.
-#[deriving(Clone, Show, PartialEq, Copy)]
+#[derive(Clone, Show, PartialEq, Copy)]
 #[repr(C)]
 pub struct PaintPoint {
     pub pos: Coordinate,
@@ -36,7 +36,7 @@ pub struct PaintPoint {
 /// Holds raw data used for pointshader attribs.
 /// These fields overlap with PaintPoint somewhat but aren't necessarily directly sourced from one
 /// so adding it as a child doesn't seem ideal
-#[deriving(Clone, Show, Copy)]
+#[derive(Clone, Show, Copy)]
 #[repr(C)]
 pub struct ShaderPaintPoint {
     pub pos: Coordinate,
@@ -53,14 +53,14 @@ pub struct ShaderPaintPoint {
 /// it's arguably simpler than ensuring each pointer gets a unique queue for its entire
 /// lifetime and maintaining an up-to-date pointer id -> queue mapping
 /// FrameStop indicates that we should stop reading 
-#[deriving(PartialEq, Copy, Clone)]
+#[derive(PartialEq, Copy, Clone)]
 pub enum PointInfo {
     Stop,
     FrameStop,
     Point(PaintPoint),
 }
 
-#[deriving(Copy)]
+#[derive(Copy)]
 pub enum ShaderPointEvent {
     Move(ShaderPaintPoint, ShaderPaintPoint),
     Down(ShaderPaintPoint),
@@ -69,7 +69,7 @@ pub enum ShaderPointEvent {
 }
 
 /// A single entry in the point queue.
-#[deriving(PartialEq, Copy, Clone)]
+#[derive(PartialEq, Copy, Clone)]
 pub struct PointEntry {
     pub index: i32,
     pub entry: PointInfo,
