@@ -1,3 +1,4 @@
+#![feature(associated_types)]
 use core::prelude::*;
 use opengles::gl2;
 use opengles::gl2::{GLuint, GLint};
@@ -107,8 +108,9 @@ pub struct Defaults<Init, Base> {
     pub val: Init
 }
 
-pub trait FillDefaults<T, Init, Base> {
-    fn fill_defaults(T) -> Defaults<Init, Base>;
+pub trait FillDefaults<Init, Base> {
+    type Unfilled;
+    fn fill_defaults(unfilled: <Self as FillDefaults<Init, Base>>::Unfilled) -> Defaults<Init, Base>;
 }
 
 macro_rules! glattrib_f32 (

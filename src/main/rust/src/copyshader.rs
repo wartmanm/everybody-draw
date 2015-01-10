@@ -100,7 +100,8 @@ impl Show for CopyShader {
     }
 }
 
-impl FillDefaults<(Option<MString>, Option<MString>), (MString, MString), CopyShader> for CopyShader {
+impl FillDefaults<(MString, MString), CopyShader> for CopyShader {
+    type Unfilled = (Option<MString>, Option<MString>); 
     fn fill_defaults(init: (Option<MString>, Option<MString>)) -> Defaults<(MString, MString), CopyShader> {
         let (vertopt, fragopt) = init;
         let vert = vertopt.unwrap_or_else(|| { logi!("point shader: using default vertex shader"); DEFAULT_VERTEX_SHADER.into_cow()});

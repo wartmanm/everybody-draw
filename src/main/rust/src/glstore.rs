@@ -107,8 +107,8 @@ impl MaybeInitFromCache<BrushInitValues> for BrushTexture {
     fn get_source(&self) -> &BrushInitValues { &self.source }
 }
 
-pub fn init_from_defaults<Unfilled, T: MaybeInitFromCache<Init> + FillDefaults<Unfilled, Init, T>, Init>(init: Unfilled) -> GLResult<T> {
-    let filled = FillDefaults::fill_defaults(init).val;
+pub fn init_from_defaults<T: MaybeInitFromCache<Init> + FillDefaults<Init, T>, Init>(init: <T as FillDefaults<Init, T>>::Unfilled) -> GLResult<T> {
+    let filled: Init = FillDefaults::fill_defaults(init).val;
     MaybeInitFromCache::<Init>::maybe_init(filled)
 }
 
@@ -131,7 +131,7 @@ impl MaybeInitFromCache<LuaInitValues> for LuaScript {
 }
 
 #[old_impl_check]
-impl<'a, Unfilled, T: MaybeInitFromCache<Init> + FillDefaults<Unfilled, Init, T>, Init: Hash<HashType>+Eq+Show> DrawObjectList<'a, T, Init> {
+impl<'a, T: MaybeInitFromCache<Init> + FillDefaults<Init, T>, Init: Hash<HashType>+Eq+Show> DrawObjectList<'a, T, Init> {
     pub fn new() -> DrawObjectList<'a, T, Init> {
         // the default hasher is keyed off of the task-local rng,
         // which would blow up since we don't have a task
@@ -148,7 +148,7 @@ impl<'a, Unfilled, T: MaybeInitFromCache<Init> + FillDefaults<Unfilled, Init, T>
         }
     }
 
-    pub fn push_object(&mut self, init: Unfilled) -> GLResult<DrawObjectIndex<T>> {
+    pub fn push_object(&mut self, init: <T as FillDefaults<Init, T>>::Unfilled) -> GLResult<DrawObjectIndex<T>> {
         // Can't use map.entry() here as it consumes the key
         let filled = FillDefaults::fill_defaults(init).val;
         let filledref: &'a Init = unsafe { mem::transmute(&filled) };
@@ -186,8 +186,8 @@ impl<'a, Unfilled, T: MaybeInitFromCache<Init> + FillDefaults<Unfilled, Init, T>
 }
 
 #[old_impl_check]
-impl<'a, Unfilled, T: InitFromCache<Init> + MaybeInitFromCache<Init> + FillDefaults<Unfilled, Init, T>, Init: Hash<HashType>+Eq+Show> DrawObjectList<'a, T, Init> {
-    pub fn safe_push_object(&mut self, init: Unfilled) -> DrawObjectIndex<T> {
+impl<'a, T: InitFromCache<Init> + MaybeInitFromCache<Init> + FillDefaults<Init, T>, Init: Hash<HashType>+Eq+Show> DrawObjectList<'a, T, Init> {
+    pub fn safe_push_object(&mut self, init: <T as FillDefaults<Init, T>>::Unfilled) -> DrawObjectIndex<T> {
         self.push_object(init).unwrap()
     }
 }
