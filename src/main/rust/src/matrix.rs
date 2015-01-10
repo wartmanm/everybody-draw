@@ -44,12 +44,19 @@ pub fn fit_inside(srcdimensions: (i32, i32), targetdimensions: (i32, i32), rotat
     use matrix::Rotation::*;
     logi!("using rotation {}", rotation);
     let (tw, th) = targetdimensions;
-    let (w, h) = srcdimensions;
-
-    let (widthratio, heightratio) = match rotation {
-        Rotation0  | Rotation180 => ((tw as f32 / w as f32), (th as f32 / h as f32)),
-        Rotation90 | Rotation270 => ((th as f32 / w as f32), (tw as f32 / h as f32)),
+    let (w, h) = {
+        let (srcw, srch) = srcdimensions;
+        //(srcw, srch)
+        let (w, h) = match rotation {
+            Rotation0  | Rotation180 => (srcw, srch),
+            Rotation90 | Rotation270 => (srch, srcw),
+        };
+        (w, h)
+        //let (offsetX, offsetY) = (tw / 2f32, th / 2f32);
     };
+    //let (offsetX, offsetY) = (tw / 2f32, th / 2f32);
+
+    let (widthratio, heightratio) = ((tw as f32 / w as f32), (th as f32 / h as f32));
     // fit inside
     let ratio = if heightratio > widthratio { heightratio } else { widthratio };
     // account for gl's own scaling
@@ -66,14 +73,24 @@ pub fn fit_inside(srcdimensions: (i32, i32), targetdimensions: (i32, i32), rotat
                          0f32,                     0f32,                    1f32, 0f32,
                         (1f32 + glratiox) / 2f32, (1f32 - glratioy) / 2f32, 0f32, 0f32],
 
-        Rotation90  => [ 0f32,                    -glratiox,                0f32, 0f32,
+        _           => [ 0f32,                    -glratiox,                0f32, 0f32,
                         -glratioy,                 0f32,                    0f32, 0f32,
                          0f32,                     0f32,                    1f32, 0f32,
-                        (1f32 - glratioy) / 2f32, (1f32 - glratiox) / 2f32, 0f32, 0f32],
+                        (1f32 + glratiox) / 2f32, (1f32 + glratioy) / 2f32, 0f32, 0f32],
 
-        Rotation270 => [ 0f32,                     glratiox,                0f32, 0f32,
-                         glratioy,                 0f32,                    0f32, 0f32,
-                         0f32,                     0f32,                    1f32, 0f32,
-                        (1f32 + glratioy) / 2f32, (1f32 + glratiox) / 2f32, 0f32, 0f32],
+        //Rotation270 => [ 0f32,                    -glratiox,                0f32, 0f32,
+                         //glratioy,                 0f32,                    0f32, 0f32,
+                         //0f32,                     0f32,                    1f32, 0f32,
+                        //(0f32 - glratioy) / 2f32, (0f32 + glratiox) / 2f32, 0f32, 0f32],
+
     }
+
+
+    // rotation90, shifted left and compressed (no w/h flipping)
+    /* rotation90
+        _           => [ 0f32,                    -glratiox,                0f32, 0f32,
+                        -glratioy,                 0f32,                    0f32, 0f32,
+                         0f32,                     0f32,                    1f32, 0f32,
+                        (1f32 + glratioy) / 2f32, (0f32 + glratiox) / 2f32, 0f32, 0f32],
+                        */
 }

@@ -249,9 +249,18 @@ class MainActivity extends Activity with TypedActivity with AndroidImplicits {
       case R.id.menu_clear => this.clearScreen()
       case R.id.menu_credits => Toast.makeText(this, "Soon.", Toast.LENGTH_LONG).show()
       case R.id.menu_debug => showDebugMessagebox()
+      case R.id.menu_rotate => debugRotate()
       case _ => return super.onOptionsItemSelected(item)
     }
     true
+  }
+
+  def debugRotate() = {
+    for (thread <- textureThread) {
+      thread.getBitmap((gl, bitmap) => {
+        thread.initScreen(gl, Some(bitmap), new Rotation(1))
+      })
+    }
   }
 
   override def onStart() = {

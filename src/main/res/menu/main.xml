@@ -20,6 +20,9 @@
 	  <item
 		  android:id="@+id/menu_credits"
 		  android:title="@string/button_credits"/>
+	  <item
+		  android:id="@+id/menu_rotate"
+		  android:title="rotate"/>
     <item
         android:id="@+id/action_settings"
         android:orderInCategory="100"
