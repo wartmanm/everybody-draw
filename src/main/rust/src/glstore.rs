@@ -25,10 +25,13 @@ use arena::TypedArena;
 use glcommon::GLResult;
 use glcommon::{FillDefaults, MString};
 use std::collections::hash_map::Hasher;
+use std::collections::hash_state::DefaultState;
+use std::hash::SipHasher;
 
 use core::borrow::IntoCow;
 
-type HashType=::std::collections::hash_map::Hasher;
+//type HashType=::std::collections::hash_map::Hasher;
+type HashType=SipHasher;
 
 /// Holds GL objects that can be inited using the given keys.
 /// The list is to avoid having to pass those keys around, and serialize more easily.
@@ -36,7 +39,7 @@ type HashType=::std::collections::hash_map::Hasher;
 /// even if it needs some encouragement to do so.
 /// There ought to be a better way.
 pub struct DrawObjectList<'a, T: 'a, Init: Eq+Hash<HashType>+'a> {
-    map: HashMap<&'a Init, DrawObjectIndex<T>>,
+    map: HashMap<&'a Init, DrawObjectIndex<T>, DefaultState<HashType>>,
     list: Vec<&'a T>,
     arena: TypedArena<T>,
 }
@@ -136,7 +139,7 @@ impl<'a, Unfilled, T: MaybeInitFromCache<Init> + FillDefaults<Unfilled, Init, T>
         //let hasher = SipHasher::new_with_keys(rng.next_u64(), rng.next_u64());
         // FIXME weak_rng also blows up? can it not find /dev/urandom?
         //let hasher = SipHasher::new_with_keys(0, 0);
-        let hasher = ::std::collections::hash_state::DefaultState;
+        let hasher = DefaultState;
         let map = HashMap::with_hash_state(hasher);
         DrawObjectList {
             map: map,

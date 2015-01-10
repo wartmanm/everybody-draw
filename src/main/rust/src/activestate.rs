@@ -8,7 +8,7 @@ pub const STARTING: ActiveState = ActiveState(NEWMASK);
 pub const STOPPING: ActiveState  = ActiveState(OLDMASK);
 pub const CONTINUING: ActiveState  = ActiveState(NEWMASK | OLDMASK);
 pub const INACTIVE: ActiveState = ActiveState(0);
-#[deriving(Eq, PartialEq, Copy)]
+#[derive(Eq, PartialEq, Copy)]
 pub struct ActiveState(u8);
 
 impl ActiveState {
@@ -21,12 +21,4 @@ impl ActiveState {
     //pub fn is_active(self) -> bool {
         //(self & NEWMASK) != 0
     //}
-}
-
-impl Eq for ActiveState { }
-impl PartialEq for ActiveState {
-    fn eq(&self, other: &ActiveState) -> bool {
-        let (ActiveState(selfstate), ActiveState(otherstate)) = (*self, *other);
-        selfstate == otherstate
-    }
 }

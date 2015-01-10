@@ -12,28 +12,12 @@ use glcommon::{check_gl_error, GLResult, FillDefaults, Defaults};
 
 use collections::vec::Vec;
 
-#[deriving(PartialEq, Eq, Hash, Show, Copy)]
+#[derive(PartialEq, Eq, Hash, Show, Copy)]
 #[repr(i8)]
 pub enum PixelFormat {
     RGBA = gl2::RGBA as i8,
     RGB = gl2::RGB as i8,
     ALPHA = gl2::ALPHA as i8,
-}
-
-impl Hash<SipHasher> for PixelFormat {
-    fn hash(&self, state: &mut SipHasher) {
-        unsafe {
-            mem::transmute::<PixelFormat, i8>(*self).hash(state);
-        }
-        //(self as i8).hash(state);
-    }
-}
-impl Eq for PixelFormat { }
-impl PartialEq for PixelFormat {
-    fn eq(&self, other: &PixelFormat) -> bool {
-        let (selfi8, otheri8) = mem::transmute::<(PixelFormat, PixelFormat), (i8, i8)>((*self, *other));
-        return selfi8 == otheri8;
-    }
 }
 
 pub trait ToPixelFormat {

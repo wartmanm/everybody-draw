@@ -5,25 +5,13 @@ use core::fmt::Show;
 pub type Matrix = [f32; 16];
 
 #[repr(i32)]
-#[deriving(Copy, Show, PartialEq, Eq)]
+#[derive(Copy, Show, PartialEq, Eq)]
 pub enum Rotation {
     Rotation0 = 0,
     Rotation90 = 1,
     Rotation180 = 2,
     Rotation270 = 3,
 }
-
-impl Show for Rotation {
-    fn fmt(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
-        write!(formatter, "{}", match self {
-            Rotation0    => "Rotation0",
-            Rotation90   => "Rotation90",
-            Rotation180  => "Rotation180",
-            Rotation270  => "Rotation270",
-        })
-    }
-}
-
 
 /// copied from android.opengl.matrix
 /// intended for framebuffers, which range from (-1, -1) to (1, 1), and not textures, which range
