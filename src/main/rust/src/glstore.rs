@@ -13,7 +13,6 @@ use core::mem;
 use core::fmt::Show;
 use collections::vec::Vec;
 use std::hash::Hash;
-use std::hash::sip::SipHasher;
 
 use std::collections::HashMap;
 use std::collections::hash_map::Entry;
@@ -25,16 +24,19 @@ use luascript::LuaScript;
 use arena::TypedArena;
 use glcommon::GLResult;
 use glcommon::{FillDefaults, MString};
+use std::collections::hash_map::Hasher;
 
 use core::borrow::IntoCow;
+
+type HashType=::std::collections::hash_map::Hasher;
 
 /// Holds GL objects that can be inited using the given keys.
 /// The list is to avoid having to pass those keys around, and serialize more easily.
 /// The arena doesn't relocate its entries, so we can pass back longer-lived pointers,
 /// even if it needs some encouragement to do so.
 /// There ought to be a better way.
-pub struct DrawObjectList<'a, T: 'a, Init: Eq+Hash<SipHasher>+'a> {
-    map: HashMap<&'a Init, DrawObjectIndex<T>, SipHasher>,
+pub struct DrawObjectList<'a, T: 'a, Init: Eq+Hash<HashType>+'a> {
+    map: HashMap<&'a Init, DrawObjectIndex<T>>,
     list: Vec<&'a T>,
     arena: TypedArena<T>,
 }
@@ -126,7 +128,7 @@ impl MaybeInitFromCache<LuaInitValues> for LuaScript {
 }
 
 #[old_impl_check]
-impl<'a, Unfilled, T: MaybeInitFromCache<Init> + FillDefaults<Unfilled, Init, T>, Init: Hash<SipHasher>+Eq+Show> DrawObjectList<'a, T, Init> {
+impl<'a, Unfilled, T: MaybeInitFromCache<Init> + FillDefaults<Unfilled, Init, T>, Init: Hash<HashType>+Eq+Show> DrawObjectList<'a, T, Init> {
     pub fn new() -> DrawObjectList<'a, T, Init> {
         // the default hasher is keyed off of the task-local rng,
         // which would blow up since we don't have a task
@@ -181,7 +183,7 @@ impl<'a, Unfilled, T: MaybeInitFromCache<Init> + FillDefaults<Unfilled, Init, T>
 }
 
 #[old_impl_check]
-impl<'a, Unfilled, T: InitFromCache<Init> + MaybeInitFromCache<Init> + FillDefaults<Unfilled, Init, T>, Init: Hash<SipHasher>+Eq+Show> DrawObjectList<'a, T, Init> {
+impl<'a, Unfilled, T: InitFromCache<Init> + MaybeInitFromCache<Init> + FillDefaults<Unfilled, Init, T>, Init: Hash<HashType>+Eq+Show> DrawObjectList<'a, T, Init> {
     pub fn safe_push_object(&mut self, init: Unfilled) -> DrawObjectIndex<T> {
         self.push_object(init).unwrap()
     }
