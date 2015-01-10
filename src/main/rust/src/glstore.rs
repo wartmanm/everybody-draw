@@ -31,7 +31,7 @@ use std::hash::SipHasher;
 use core::borrow::IntoCow;
 
 //type HashType=::std::collections::hash_map::Hasher;
-type HashType=SipHasher;
+pub type HashType=SipHasher;
 
 /// Holds GL objects that can be inited using the given keys.
 /// The list is to avoid having to pass those keys around, and serialize more easily.

@@ -9,7 +9,7 @@ pub struct Coordinate {
     pub y: f32,
 }
 
-trait AsSelf<T> {
+pub trait AsSelf<T> {
     fn as_self(&self) -> &T;
 }
 impl AsSelf<Coordinate> for Coordinate {
@@ -22,7 +22,7 @@ impl AsSelf<f32> for f32 {
 }
 
 #[inline(always)]
-fn as_self<T, U: AsSelf<T>>(u: &U) -> &T { u.as_self() }
+pub fn as_self<T, U: AsSelf<T>>(u: &U) -> &T { u.as_self() }
 
 /// Holds data from motionevent entries.
 #[deriving(Clone, Show, PartialEq, Copy)]

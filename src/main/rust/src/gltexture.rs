@@ -2,7 +2,6 @@ use core::prelude::*;
 use core::fmt;
 use core::mem;
 use core::fmt::Show;
-use core::hash::sip::SipHasher;
 use core::hash::Hash;
 
 use opengles::gl2;
