@@ -26,6 +26,7 @@ extern "C" {
     pub fn gettid() -> pid_t;
 }
 
+#[macro_use]
 mod macros;
 pub mod texturethread;
 pub mod android_bitmap;

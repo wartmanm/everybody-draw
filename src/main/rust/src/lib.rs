@@ -20,8 +20,11 @@ pub mod jni_constants;
 pub mod luajit;
 pub mod luajit_constants;
 
+#[macro_use]
 pub mod macros;
+#[macro_use]
 pub mod log;
+#[macro_use]
 pub mod glcommon;
 pub mod rollingaverage;
 

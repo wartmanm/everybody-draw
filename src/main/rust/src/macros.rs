@@ -1,5 +1,3 @@
-#![macro_escape]
-
 macro_rules! format {
     ($($arg:tt)*) => ($crate::fmt::format(format_args!($($arg)*)))
 }

@@ -1,5 +1,3 @@
-#![macro_escape]
-
 #[allow(unused)] use core::prelude::*;
 use android::log::*;
 use libc::{c_char, c_int};

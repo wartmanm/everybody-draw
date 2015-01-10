@@ -1,4 +1,3 @@
-#![macro_escape]
 use core::prelude::*;
 use opengles::gl2;
 use opengles::gl2::{GLuint, GLint};
