@@ -113,6 +113,15 @@ pub trait FillDefaults<Init> {
     fn fill_defaults(unfilled: <Self as FillDefaults<Init>>::Unfilled) -> Defaults<Init>;
 }
 
+pub trait UsingDefaults<Init> {
+    type Defaults;
+    //fn fill_defaults(Init) -> <Self as UsingDefaults<Init>>::Defaults;
+    fn maybe_init(Init) -> GLResult<Self>;
+    fn get_source(&self) -> &<Self as UsingDefaults<Init>>::Defaults;
+}
+
+pub trait UsingDefaultsSafe { }
+
 macro_rules! glattrib_f32 (
     // struct elements
     ($handle:expr, $count:expr, $item:ident, $elem:ident) => ({

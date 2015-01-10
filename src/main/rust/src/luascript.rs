@@ -1,7 +1,7 @@
 use core::prelude::*;
 use core::fmt;
 use core::fmt::Show;
-use glcommon::{GLResult, FillDefaults, Defaults, MString};
+use glcommon::{GLResult, UsingDefaults, MString};
 use lua_geom::{load_lua_script, destroy_lua_script};
 use core::borrow::IntoCow;
 
@@ -41,10 +41,15 @@ impl Show for LuaScript {
     }
 }
 
-impl FillDefaults<MString> for LuaScript {
-    type Unfilled = Option<MString>;
-    fn fill_defaults(script: Option<MString>) -> Defaults<MString> {
-        Defaults { val: script.unwrap_or_else(|| DEFAULT_SCRIPT.into_cow()) }
+impl UsingDefaults<Option<MString>> for LuaScript {
+    type Defaults = MString;
+    fn maybe_init(script: Option<MString>) -> GLResult<LuaScript> {
+        LuaScript::new(fill_defaults(script))
     }
+    fn get_source(&self) -> &MString { &self.source }
 }
 
+fn fill_defaults(script: Option<MString>) -> MString {
+    let script = script.unwrap_or_else(|| DEFAULT_SCRIPT.into_cow());
+    script
+}

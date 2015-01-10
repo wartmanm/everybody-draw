@@ -7,7 +7,7 @@ use opengles::gl2;
 use opengles::gl2::{GLint, GLuint};
 
 use glcommon;
-use glcommon::{check_gl_error, get_shader_handle, get_uniform_handle_option, Shader, GLResult, FillDefaults, Defaults, MString};
+use glcommon::{check_gl_error, get_shader_handle, get_uniform_handle_option, Shader, GLResult, UsingDefaults, MString};
 use point::ShaderPaintPoint;
 use gltexture::Texture;
 
@@ -131,13 +131,19 @@ impl Show for PointShader {
 }
 
 
-impl FillDefaults<(MString, MString)> for PointShader {
-    type Unfilled = (Option<MString>, Option<MString>);
-    fn fill_defaults(init: (Option<MString>, Option<MString>)) -> Defaults<(MString, MString)> {
-        let (vertopt, fragopt) = init;
-        let vert = vertopt.unwrap_or_else(|| { logi!("point shader: using default vertex shader"); DEFAULT_VERTEX_SHADER.into_cow()});
-        let frag = fragopt.unwrap_or_else(|| { logi!("point shader: using default fragment shader"); DEFAULT_FRAGMENT_SHADER.into_cow()});
-        Defaults { val: (vert, frag) }
+impl UsingDefaults<(Option<MString>, Option<MString>)> for PointShader {
+    type Defaults = (MString, MString);
+    fn maybe_init(init: (Option<MString>, Option<MString>)) -> GLResult<PointShader> {
+        let (vert, frag) = fill_defaults(init);
+        Shader::new(vert, frag)
     }
+    fn get_source(&self) -> &(MString, MString) { &self.source }
+}
+
+fn fill_defaults(init: (Option<MString>, Option<MString>)) -> (MString, MString) {
+    let (vertopt, fragopt) = init;
+    let vert = vertopt.unwrap_or_else(|| { logi!("point shader: using default vertex shader"); DEFAULT_VERTEX_SHADER.into_cow()});
+    let frag = fragopt.unwrap_or_else(|| { logi!("point shader: using default fragment shader"); DEFAULT_FRAGMENT_SHADER.into_cow()});
+    (vert, frag)
 }
 

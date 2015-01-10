@@ -15,13 +15,13 @@ use point::PointEntry;
 use glstore::{DrawObjectIndex, DrawObjectList};
 use glstore::{ShaderInitValues, BrushInitValues, LuaInitValues};
 use glstore::{BrushUnfilledValues, LuaUnfilledValues};
-use glstore::MaybeInitFromCache; // FIXME separate out get_source()
+//use glstore::MaybeInitFromCache; // FIXME separate out get_source()
 use gltexture::{BrushTexture, PixelFormat};
 use pointshader::PointShader;
 use copyshader::CopyShader;
 use luascript::LuaScript;
 use paintlayer::PaintLayer;
-use glcommon::{GLResult, MString};
+use glcommon::{GLResult, MString, UsingDefaults};
 use drawevent::event_stream::EventState;
 //use collections::slice::CloneSliceExt;
 

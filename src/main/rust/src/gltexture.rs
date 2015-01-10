@@ -8,7 +8,7 @@ use core::hash::Hash;
 use opengles::gl2;
 use opengles::gl2::GLuint;
 
-use glcommon::{check_gl_error, GLResult, FillDefaults, Defaults};
+use glcommon::{check_gl_error, GLResult, UsingDefaults, UsingDefaultsSafe};
 
 use collections::vec::Vec;
 
@@ -80,9 +80,15 @@ impl Show for BrushTexture {
     }
 }
 
-impl FillDefaults<(PixelFormat, (i32, i32), Vec<u8>)> for BrushTexture {
-    type Unfilled = (PixelFormat, (i32, i32), Vec<u8>);
-    fn fill_defaults(init: (PixelFormat, (i32, i32), Vec<u8>)) -> Defaults<(PixelFormat, (i32, i32), Vec<u8>)> {
-        Defaults { val: init }
+impl UsingDefaultsSafe for BrushTexture { }
+impl UsingDefaults<(PixelFormat, (i32, i32), Vec<u8>)> for BrushTexture {
+    type Defaults = (PixelFormat, (i32, i32), Vec<u8>);
+    fn maybe_init(init: (PixelFormat, (i32, i32), Vec<u8>)) -> GLResult<BrushTexture> {
+        let tex = {
+            let (ref format, (w, h), ref pixels) = init;
+            Texture::with_image(w, h, Some(pixels.as_slice()), *format)
+        };
+        Ok(BrushTexture { texture: tex, source: init })
     }
+    fn get_source(&self) -> &(PixelFormat, (i32, i32), Vec<u8>) { &self.source }
 }
