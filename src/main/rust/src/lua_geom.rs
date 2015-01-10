@@ -2,7 +2,7 @@
 use core::prelude::*;
 use core::{mem, ptr, raw};
 use core::str;
-use core::borrow::IntoCow;
+use core::borrow::{IntoCow, ToOwned};
 use collections::string::String;
 use libc::{c_char, c_void, size_t};
 
@@ -234,7 +234,7 @@ unsafe fn err_to_str(L: *mut lua_State) -> String {
     let mut size: size_t = 0;
     let strptr = lua_tolstring(L, -1, &mut size);
     let luastr: &str = mem::transmute(raw::Slice { data: strptr, len: size as uint });
-    let result = luastr.into_string();
+    let result = luastr.to_owned();
     safe_pop!(L, 1);
     result
 }

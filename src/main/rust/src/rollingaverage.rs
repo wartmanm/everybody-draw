@@ -8,11 +8,16 @@ macro_rules! rolling_average_count (
         }
 
         #[allow(dead_code)]
-        impl<T: ::core::ops::Sub<T> + ::core::default::Default + ::core::ops::Div<f32> + ::core::marker::Copy> $name<T> {
+        impl<T> $name<T>
+        where T: ::core::ops::Add<T> + ::core::ops::Sub<T> + ::core::default::Default + ::core::ops::Div<f32> + ::core::marker::Copy
+        + ::core::num::NumCast,
+        <T as ::core::ops::Sub>::Output: ::core::num::NumCast,
+        <T as ::core::ops::Add>::Output: ::core::num::NumCast,
+        <T as ::core::ops::Div<f32>>::Output: ::core::num::NumCast {
             pub fn new() -> $name<T> {
                 $name {
-                    entries: [::core::default::Default::default::<T>(); $count],
-                    sum: ::core::default::Default::default::<T>(),
+                    entries: [::core::default::Default::default(); $count],
+                    sum: ::core::default::Default::default(),
                     count: 0,
                     pos: 0,
                 }
@@ -21,18 +26,18 @@ macro_rules! rolling_average_count (
                 if self.count < $count {
                     self.count += 1;
                 } else {
-                    self.sum = self.sum - self.entries[self.pos];
+                    self.sum = ::core::num::cast(self.sum - self.entries[self.pos]).unwrap();
                 }
                 self.entries[self.pos] = value;
-                self.sum = self.sum + value;
+                self.sum = ::core::num::cast(self.sum + value).unwrap();
                 self.pos = (self.pos + 1) % $count;
                 self.get_average()
             }
             pub fn get_average(&self) -> T {
-                self.sum / self.count as f32
+                ::core::num::cast(self.sum / self.count as f32).unwrap()
             }
             pub fn clear(&mut self) {
-                self.sum = ::core::default::Default::default::<T>();
+                self.sum = ::core::default::Default::default();
                 self.count = 0;
                 self.pos = 0;
             }

@@ -9,6 +9,7 @@
 // TODO: remove all this duplication
 
 use core::prelude::*;
+use core::borrow::ToOwned;
 use collections::vec::Vec;
 use point::PointEntry;
 use glstore::{DrawObjectIndex, DrawObjectList};
@@ -82,7 +83,7 @@ impl<'a> Events<'a> {
         self.pointshaders.maybe_get_object(idx)
     }
     pub fn load_brush(&mut self, w: i32, h: i32, pixels: &[u8], format: PixelFormat) -> DrawObjectIndex<BrushTexture> {
-        let ownedpixels = pixels.to_vec();
+        let ownedpixels = pixels.to_owned();
         let init: BrushUnfilledValues = (format, (w, h), ownedpixels);
         self.textures.safe_push_object(init)
     }

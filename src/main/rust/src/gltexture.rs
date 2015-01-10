@@ -12,6 +12,7 @@ use glcommon::{check_gl_error, GLResult, FillDefaults, Defaults};
 use collections::vec::Vec;
 
 #[deriving(PartialEq, Eq, Hash, Show, Copy)]
+#[repr(i8)]
 pub enum PixelFormat {
     RGBA = gl2::RGBA as int,
     RGB = gl2::RGB as int,

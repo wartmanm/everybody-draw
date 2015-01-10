@@ -173,10 +173,10 @@ fn on_unwind(msg: &(Any + Send), file: &'static str, line: uint) {
         loge!("fatal error in {}:{} as &str: {}", file, line, s);
     } else if let Some(s) = msg.downcast_ref::<String>() {
         loge!("fatal error in {}:{} as String: {}", file, line, s);
-    } else if let Some(s) = msg.downcast_ref::<Cow<'static, String, &str>>() {
-        loge!("fatal error in {}:{} as MaybeOwned: {}", file, line, s);
+    //} else if let Some(s) = msg.downcast_ref::<Cow<'static, String, &str>>() {
+        //loge!("fatal error in {}:{} as MaybeOwned: {}", file, line, s);
     } else {
-        loge!("fatal error in {}:{}: unknown error message type {}!", file, line, msg.get_type_id());
+        loge!("fatal error in {}:{}: unknown error message type {:?}!", file, line, msg.get_type_id());
         loge!("Printing start:");
         unsafe {
             let mut line = Vec::new();
@@ -223,7 +223,7 @@ pub unsafe extern "C" fn JNI_OnLoad(vm: *mut JavaVM, reserved: *mut c_void) -> j
         return -1;
     }
     let env = env as *mut JNIEnv;
-    logi!("got environment!: {}", env);
+    logi!("got environment!: {:?}", env);
 
     texturethread::init(env);
     texturethread::init(env);

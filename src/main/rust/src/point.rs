@@ -9,6 +9,17 @@ pub struct Coordinate {
     pub y: f32,
 }
 
+trait AsSelf<T> {
+    fn as_self(&self) -> &T;
+}
+impl AsSelf<Coordinate> for Coordinate {
+    #[inline(always)]
+    fn as_self(&self) -> &Coordinate { self }
+}
+impl ::core::default::Default for Coordinate {
+    fn default() -> Coordinate { Coordinate { x: 0f32, y: 0f32 } }
+}
+
 /// Holds data from motionevent entries.
 #[deriving(Clone, Show, PartialEq, Copy)]
 #[repr(C)]
@@ -64,24 +75,28 @@ pub type PointConsumer = mpsc::Receiver<PointEntry>;
 pub type PointProducer = mpsc::Sender<PointEntry>;
 
 impl Add<Coordinate> for Coordinate {
+    type Output = Coordinate;
     #[inline(always)]
     fn add(self, rhs: Coordinate) -> Coordinate {
         Coordinate { x: self.x + rhs.x, y: self.y + rhs.y }
     }
 }
 impl Sub<Coordinate> for Coordinate {
+    type Output = Coordinate;
     #[inline(always)]
     fn sub(self, rhs: Coordinate) -> Coordinate {
         Coordinate { x: self.x - rhs.x, y: self.y - rhs.y }
     }
 }
 impl Div<f32> for Coordinate {
+    type Output = Coordinate;
     #[inline(always)]
     fn div(self, rhs: f32) -> Coordinate {
         Coordinate { x: self.x / rhs, y: self.y / rhs }
     }
 }
 impl Mul<f32> for Coordinate {
+    type Output = Coordinate;
     #[inline(always)]
     fn mul(self, rhs: f32) -> Coordinate {
         Coordinate { x: self.x * rhs, y: self.y * rhs }

@@ -72,7 +72,7 @@ fn get_queue_or_raise_err<'a, 'b, 'c, 'd>(data: &'d mut LuaCallbackType, queue: 
             rust_raise_lua_err!(None, "tried to push point to queue {} of {}", queue + 1, points.len());
         }
     }
-    unsafe { points.as_mut_slice().unsafe_mut(queue as uint) }
+    unsafe { points.as_mut_slice().get_unchecked_mut(queue as uint) }
 }
 
 #[no_mangle]
