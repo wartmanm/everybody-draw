@@ -1,16 +1,12 @@
-use core::prelude::*;
-use alloc::boxed::Box;
-use collections::string::String;
+// cannot use core::prelude and still import StrExt needed for utf16_units
+use std::prelude::v1::*;
 use core::{ptr, mem, raw, fmt};
-//use core::ptr::RawMutPtr;
-//use core::any::{Any, AnyRefExt};
 use core::any::Any;
-use core::fmt::{Show, Writer};
+use core::fmt::Show;
+use core::fmt::Writer as FormatWriter;
 use core::iter;
 use libc::{c_void, c_char};
 use core::borrow::{Cow, IntoCow};
-use collections::vec::Vec;
-use std::str;
 
 use jni::{jobject, jclass, jmethodID, jfieldID, JNIEnv, jint, jstring, jvalue, JNINativeMethod, JavaVM};
 #[cfg(target_word_size = "64")] use jni::jlong;
