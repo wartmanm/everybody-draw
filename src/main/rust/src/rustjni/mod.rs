@@ -34,7 +34,7 @@ pub mod gldataclasses;
 pub mod motionevent;
 
 
-#[cfg(target_word_size = "32")]
+#[cfg(not(target_word_size = "64"))]
 #[allow(non_camel_case_types)]
 pub type jpointer = jint;
 #[cfg(target_word_size = "64")]
@@ -140,7 +140,7 @@ fn get_safe_data<'a>(data: jpointer) -> &'a mut GLInitEvents<'a> {
 }
 
 
-#[cfg(target_word_size = "32")]
+#[cfg(not(target_word_size = "64"))]
 #[inline(always)]
 unsafe fn get_jpointer(env: *mut JNIEnv, obj: jobject, field: jfieldID) -> jpointer {
     ((**env).GetIntField)(env, obj, field)
