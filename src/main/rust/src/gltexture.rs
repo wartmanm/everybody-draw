@@ -11,11 +11,11 @@ use glcommon::{check_gl_error, GLResult, UsingDefaults, UsingDefaultsSafe};
 use collections::vec::Vec;
 
 #[derive(PartialEq, Eq, Hash, Show, Copy)]
-#[repr(i8)]
+#[repr(u32)]
 pub enum PixelFormat {
-    RGBA = gl2::RGBA as i8,
-    RGB = gl2::RGB as i8,
-    ALPHA = gl2::ALPHA as i8,
+    RGBA = gl2::RGBA,
+    RGB = gl2::RGB,
+    ALPHA = gl2::ALPHA,
 }
 
 pub trait ToPixelFormat {
