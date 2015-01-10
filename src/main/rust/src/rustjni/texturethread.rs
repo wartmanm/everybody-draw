@@ -40,13 +40,13 @@ unsafe extern "C" fn init_gl(env: *mut JNIEnv, _: jobject, w: jint, h: jint, cal
     let events = Events::new();
     let jni_undo_callback = JNIUndoCallback::new(env, callback);
     let _ = lua_geom::ensure_lua_exists(w, h);
-    mem::transmute(box GLInitEvents {
+    mem::transmute(Box::new(GLInitEvents {
         glinit: glinit,
         events: events,
         jni_undo_callback: jni_undo_callback,
         owning_thread: ::rustjni::gettid(),
         /* lua: lua */
-    })
+    }))
 }
 
 unsafe extern "C" fn finish_gl(env: *mut JNIEnv, _: jobject, data: jpointer) {
@@ -171,7 +171,7 @@ unsafe extern "C" fn jni_replay_begin(_: *mut JNIEnv, _: jobject, data: jpointer
     let data = get_safe_data(data);
     data.glinit.clear_layers();
     data.glinit.clear_buffer();
-    mem::transmute(box EventStream::new())
+    mem::transmute(Box::new(EventStream::new()))
 }
 
 #[allow(unused)]
