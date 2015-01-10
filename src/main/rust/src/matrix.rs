@@ -1,6 +1,6 @@
 use core::prelude::*;
 
-pub type Matrix = [f32, ..16];
+pub type Matrix = [f32; 16];
 
 #[repr(i32)]
 #[deriving(Copy, Show, PartialEq, Eq)]

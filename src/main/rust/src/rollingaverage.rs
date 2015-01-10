@@ -3,7 +3,7 @@
 macro_rules! rolling_average_count (
     ($name:ident, $count:expr) => (
         pub struct $name<T> {
-            pub entries: [T, ..$count],
+            pub entries: [T; $count],
             sum: T,
             count: uint,
             pos: uint,
@@ -13,7 +13,7 @@ macro_rules! rolling_average_count (
         impl<T: ::core::ops::Sub<T, T> + ::core::num::Zero + ::core::ops::Div<f32, T> + ::core::kinds::Copy> $name<T> {
             pub fn new() -> $name<T> {
                 $name {
-                    entries: [::std::num::zero::<T>(), ..$count],
+                    entries: [::std::num::zero::<T>(); $count],
                     sum: ::std::num::zero::<T>(),
                     count: 0,
                     pos: 0,

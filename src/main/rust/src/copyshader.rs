@@ -10,13 +10,13 @@ use glcommon;
 use glcommon::{check_gl_error, get_shader_handle, get_uniform_handle_option, Shader, GLResult, FillDefaults, Defaults, MString};
 use gltexture::{Texture};
     
-static TRIANGLE_VERTICES: [GLfloat, ..8] = [
+static TRIANGLE_VERTICES: [GLfloat; 8] = [
    -1.0,  1.0,
    -1.0, -1.0,
     1.0, -1.0,
     1.0,  1.0
 ];
-static TEXTURE_VERTICES: [GLfloat, ..8] = [
+static TEXTURE_VERTICES: [GLfloat; 8] = [
     0.0, 1.0,
     0.0, 0.0,
     1.0, 0.0,

@@ -68,7 +68,7 @@ impl Shader for PointShader {
 
 impl PointShader {
 
-    pub fn prep(&self, matrix: &[f32], points: &[ShaderPaintPoint], color: [f32, ..3], brushsize: f32, brush: &Texture, backbuffer: &Texture) {
+    pub fn prep(&self, matrix: &[f32], points: &[ShaderPaintPoint], color: [f32; 3], brushsize: f32, brush: &Texture, backbuffer: &Texture) {
         gl2::use_program(self.program);
         check_gl_error("pointshader: use_program");
 

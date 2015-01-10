@@ -24,7 +24,7 @@ use drawevent::Events;
 use rustjni::JNICallbackClosure;
 
 
-static DRAW_INDEXES: [GLubyte, ..6] = [
+static DRAW_INDEXES: [GLubyte; 6] = [
     0, 1, 2,
     0, 2, 3
 ];
@@ -44,12 +44,12 @@ pub struct GLInit<'a> {
 }
 
 pub struct TargetData {
-    targets: [TextureTarget, ..2],
+    targets: [TextureTarget; 2],
     current_target: u8,
 }
 
 pub struct UndoTargets {
-    targets: [TextureTarget, ..UNDO_BUFFERS as uint],
+    targets: [TextureTarget; UNDO_BUFFERS as uint],
     start: i32,
     len: i32,
     max: i32,
@@ -129,7 +129,7 @@ pub struct PaintState<'a> {
     pub interpolator: Option<&'a LuaScript>,
     pub layers: Vec<PaintLayer<'a>>,
     pub undo_targets: UndoTargets,
-    pub brush_color: [f32, ..3],
+    pub brush_color: [f32; 3],
     pub brush_size: f32,
 }
 
@@ -162,7 +162,7 @@ fn perform_copy(dest_framebuffer: GLuint, source_texture: &Texture, shader: &Cop
     check_gl_error("drew elements");
 }
 
-fn draw_layer(layer: CompletedLayer, matrix: &[f32], color: [f32, ..3], size: f32
+fn draw_layer(layer: CompletedLayer, matrix: &[f32], color: [f32; 3], size: f32
               , brush: &Texture, back_buffer: &Texture, points: &[ShaderPaintPoint]) {
     if points.len() > 0 {
         gl2::bind_framebuffer(gl2::FRAMEBUFFER, layer.target.framebuffer);
