@@ -16,7 +16,7 @@ use std::hash::Hash;
 use std::hash::sip::SipHasher;
 
 use std::collections::HashMap;
-use std::collections::hash_map::{Vacant, Occupied};
+use std::collections::hash_map::Entry;
 use copyshader::CopyShader;
 use gltexture::{PixelFormat, Texture, BrushTexture};
 use pointshader::PointShader;
@@ -33,7 +33,7 @@ use core::borrow::IntoCow;
 /// The arena doesn't relocate its entries, so we can pass back longer-lived pointers,
 /// even if it needs some encouragement to do so.
 /// There ought to be a better way.
-pub struct DrawObjectList<'a, T: 'a, Init: Eq+Hash+'a> {
+pub struct DrawObjectList<'a, T: 'a, Init: Eq+Hash<SipHasher>+'a> {
     map: HashMap<&'a Init, DrawObjectIndex<T>, SipHasher>,
     list: Vec<&'a T>,
     arena: TypedArena<T>,
@@ -125,7 +125,8 @@ impl MaybeInitFromCache<LuaInitValues> for LuaScript {
     fn get_source(&self) -> &MString { &self.source }
 }
 
-impl<'a, Unfilled, T: MaybeInitFromCache<Init> + FillDefaults<Unfilled, Init, T>, Init: Hash+Eq+Show> DrawObjectList<'a, T, Init> {
+#[old_impl_check]
+impl<'a, Unfilled, T: MaybeInitFromCache<Init> + FillDefaults<Unfilled, Init, T>, Init: Hash<SipHasher>+Eq+Show> DrawObjectList<'a, T, Init> {
     pub fn new() -> DrawObjectList<'a, T, Init> {
         // the default hasher is keyed off of the task-local rng,
         // which would blow up since we don't have a task
@@ -133,7 +134,7 @@ impl<'a, Unfilled, T: MaybeInitFromCache<Init> + FillDefaults<Unfilled, Init, T>
         //let hasher = SipHasher::new_with_keys(rng.next_u64(), rng.next_u64());
         // FIXME weak_rng also blows up? can it not find /dev/urandom?
         let hasher = SipHasher::new_with_keys(0, 0);
-        let map = HashMap::with_hasher(hasher);
+        let map = HashMap::with_hash_state(hasher);
         DrawObjectList {
             map: map,
             list: Vec::new(),
@@ -147,8 +148,8 @@ impl<'a, Unfilled, T: MaybeInitFromCache<Init> + FillDefaults<Unfilled, Init, T>
         let filledref: &'a Init = unsafe { mem::transmute(&filled) };
         // see below -- these are safe, we just can't prove it
         match self.map.entry(filledref) {
-            Occupied(entry) => Ok(entry.get().clone()),
-            Vacant(entry) => {
+            Entry::Occupied(entry) => Ok(entry.get().clone()),
+            Entry::Vacant(entry) => {
                 let inited: T = try!(MaybeInitFromCache::<Init>::maybe_init(filled));
                 // ptr's lifetime is limited to &self's, which is fair but not very useful.
                 // smart ptrs involve individual allocs but are probably better
@@ -178,7 +179,8 @@ impl<'a, Unfilled, T: MaybeInitFromCache<Init> + FillDefaults<Unfilled, Init, T>
     }
 }
 
-impl<'a, Unfilled, T: InitFromCache<Init> + MaybeInitFromCache<Init> + FillDefaults<Unfilled, Init, T>, Init: Hash+Eq+Show> DrawObjectList<'a, T, Init> {
+#[old_impl_check]
+impl<'a, Unfilled, T: InitFromCache<Init> + MaybeInitFromCache<Init> + FillDefaults<Unfilled, Init, T>, Init: Hash<SipHasher>+Eq+Show> DrawObjectList<'a, T, Init> {
     pub fn safe_push_object(&mut self, init: Unfilled) -> DrawObjectIndex<T> {
         self.push_object(init).unwrap()
     }

@@ -1,5 +1,5 @@
 macro_rules! format {
-    ($($arg:tt)*) => ($crate::fmt::format(format_args!($($arg)*)))
+    ($($arg:tt)*) => (::std::fmt::format(format_args!($($arg)*)))
 }
 
 macro_rules! write {
@@ -7,7 +7,7 @@ macro_rules! write {
 }
 
 macro_rules! println {
-    ($($arg:tt)*) => ($crate::io::stdio::println_args(format_args!($($arg)*)))
+    ($($arg:tt)*) => (::std::io::stdio::println_args(format_args!($($arg)*)))
 }
 
 macro_rules! cstr {
@@ -21,14 +21,14 @@ macro_rules! panic {
         panic!("explicit panic")
     });
     ($msg:expr) => ({
-        $crate::rt::begin_unwind($msg, {
+        ::std::rt::begin_unwind($msg, {
             // static requires less code at runtime, more constant data
             static _FILE_LINE: (&'static str, usize) = (file!(), line!());
             &_FILE_LINE
         })
     });
     ($fmt:expr, $($arg:tt)+) => ({
-        $crate::rt::begin_unwind_fmt(format_args!($fmt, $($arg)+), {
+        ::std::rt::begin_unwind_fmt(format_args!($fmt, $($arg)+), {
             // The leading _'s are to avoid dead code warnings if this is
             // used inside a dead function. Just `#[allow(dead_code)]` is
             // insufficient, since the user may have
@@ -44,9 +44,9 @@ macro_rules! panic {
 
 macro_rules! try {
     ($expr:expr) => (match $expr {
-        $crate::result::Result::Ok(val) => val,
-        $crate::result::Result::Err(err) => {
-            return $crate::result::Result::Err($crate::error::FromError::from_error(err))
+        ::core::result::Result::Ok(val) => val,
+        ::core::result::Result::Err(err) => {
+            return ::core::result::Result::Err(::std::error::FromError::from_error(err))
         }
     })
 }

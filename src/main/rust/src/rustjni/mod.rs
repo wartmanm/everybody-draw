@@ -2,14 +2,14 @@ use core::prelude::*;
 use alloc::boxed::Box;
 use collections::string::String;
 use core::{ptr, mem, raw, fmt};
-use core::ptr::RawMutPtr;
-use core::any::{Any, AnyRefExt};
+//use core::ptr::RawMutPtr;
+//use core::any::{Any, AnyRefExt};
+use core::any::Any;
 use core::fmt::Show;
 use core::iter;
 use libc::{c_void, c_char};
-use core::borrow::IntoCow;
+use core::borrow::{Cow, IntoCow};
 use collections::vec::Vec;
-use collections::str::MaybeOwned;
 
 use jni::{jobject, jclass, jmethodID, jfieldID, JNIEnv, jint, jstring, jvalue, JNINativeMethod, JavaVM};
 #[cfg(target_word_size = "64")] use jni::jlong;
@@ -163,7 +163,7 @@ unsafe fn get_jpointer(env: *mut JNIEnv, obj: jobject, field: jfieldID) -> jpoin
 //}
 
 fn on_unwind(msg: &(Any + Send), file: &'static str, line: uint) {
-    use core::fmt::FormatWriter;
+    //use core::fmt::FormatWriter;
     // as far as I know there's no way to identify traits that can be cast to Show at runtime
     if let Some(s) = msg.downcast_ref::<&Show>() {
         loge!("fatal error in {}:{} as &Show: {}", file, line, s);
@@ -173,7 +173,7 @@ fn on_unwind(msg: &(Any + Send), file: &'static str, line: uint) {
         loge!("fatal error in {}:{} as &str: {}", file, line, s);
     } else if let Some(s) = msg.downcast_ref::<String>() {
         loge!("fatal error in {}:{} as String: {}", file, line, s);
-    } else if let Some(s) = msg.downcast_ref::<MaybeOwned<'static>>() {
+    } else if let Some(s) = msg.downcast_ref::<Cow<'static, String, &str>>() {
         loge!("fatal error in {}:{} as MaybeOwned: {}", file, line, s);
     } else {
         loge!("fatal error in {}:{}: unknown error message type {}!", file, line, msg.get_type_id());
@@ -182,9 +182,9 @@ fn on_unwind(msg: &(Any + Send), file: &'static str, line: uint) {
             let mut line = Vec::new();
             // stolen from unwind.rs
             struct VecWriter<'a> { v: &'a mut Vec<u8> }
-            impl<'a> ::core::fmt::FormatWriter for VecWriter<'a> {
-                fn write(&mut self, buf: &[u8]) -> fmt::Result {
-                    self.v.push_all(buf);
+            impl<'a> ::core::fmt::Writer for VecWriter<'a> {
+                fn write_str(&mut self, s: &str) -> fmt::Result {
+                    self.v.push_all(s.as_bytes());
                     Ok(())
                 }
             }

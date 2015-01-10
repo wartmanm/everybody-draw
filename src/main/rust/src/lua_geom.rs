@@ -4,7 +4,6 @@ use core::{mem, ptr, raw};
 use core::str;
 use core::borrow::IntoCow;
 use collections::string::String;
-use collections::str::StrAllocating;
 use libc::{c_char, c_void, size_t};
 
 use lua::lib::raw::*;

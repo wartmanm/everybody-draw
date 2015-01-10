@@ -3,9 +3,10 @@ use core::mem;
 use core::num::Float;
 use collections::vec::Vec;
 use collections::vec_map::VecMap;
+use core::ops::{Add, Sub, Mul};
 use alloc::boxed::Box;
 
-use std::comm;
+use std::sync::mpsc;
 
 use motionevent;
 use motionevent::append_motion_event;
@@ -37,7 +38,7 @@ pub struct MotionEventProducer {
 }
 
 pub fn create_motion_event_handler(left_edge: i32) -> (MotionEventConsumer, MotionEventProducer) {
-    let (producer, consumer) = comm::channel::<PointEntry>();
+    let (producer, consumer) = mpsc::channel::<PointEntry>();
     let handler = MotionEventConsumer {
         consumer: consumer,
         current_points: VecMap::new(),
@@ -237,7 +238,7 @@ fn push_splinepts<T: Spline<Coordinate>>(drawvec: &mut Vec<ShaderPaintPoint>, po
     }
 }
 
-trait Spline<T: Mul<f32, T> + Add<T, T> + Sub<T, T>> {
+trait Spline<T: Mul<f32> + Add<T> + Sub<T>> {
     fn new(points: [T; 4]) -> Self;
     fn get_time_scale(&self) -> (f32, f32);
     fn interpolate(&self, t: f32) -> T;

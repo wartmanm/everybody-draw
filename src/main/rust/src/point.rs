@@ -1,5 +1,5 @@
 // TODO: more meaningful names
-use std::comm;
+use std::sync::mpsc;
 use core::ops::{Add, Div, Sub, Mul};
 
 #[deriving(Clone, Show, PartialEq, Zero, Copy)]
@@ -60,28 +60,28 @@ pub struct PointEntry {
     pub entry: PointInfo,
 }
 
-pub type PointConsumer = comm::Receiver<PointEntry>;
-pub type PointProducer = comm::Sender<PointEntry>;
+pub type PointConsumer = mpsc::Receiver<PointEntry>;
+pub type PointProducer = mpsc::Sender<PointEntry>;
 
-impl Add<Coordinate, Coordinate> for Coordinate {
+impl Add<Coordinate> for Coordinate {
     #[inline(always)]
     fn add(self, rhs: Coordinate) -> Coordinate {
         Coordinate { x: self.x + rhs.x, y: self.y + rhs.y }
     }
 }
-impl Sub<Coordinate, Coordinate> for Coordinate {
+impl Sub<Coordinate> for Coordinate {
     #[inline(always)]
     fn sub(self, rhs: Coordinate) -> Coordinate {
         Coordinate { x: self.x - rhs.x, y: self.y - rhs.y }
     }
 }
-impl Div<f32, Coordinate> for Coordinate {
+impl Div<f32> for Coordinate {
     #[inline(always)]
     fn div(self, rhs: f32) -> Coordinate {
         Coordinate { x: self.x / rhs, y: self.y / rhs }
     }
 }
-impl Mul<f32, Coordinate> for Coordinate {
+impl Mul<f32> for Coordinate {
     #[inline(always)]
     fn mul(self, rhs: f32) -> Coordinate {
         Coordinate { x: self.x * rhs, y: self.y * rhs }

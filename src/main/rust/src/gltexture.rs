@@ -1,6 +1,8 @@
 use core::prelude::*;
 use core::fmt;
 use core::fmt::Show;
+use core::hash::sip::SipHasher;
+use core::hash::Hash;
 
 use opengles::gl2;
 use opengles::gl2::GLuint;
@@ -14,6 +16,18 @@ pub enum PixelFormat {
     RGBA = gl2::RGBA as int,
     RGB = gl2::RGB as int,
     ALPHA = gl2::ALPHA as int,
+}
+
+impl Hash<SipHasher> for PixelFormat {
+    fn hash(&self, state: &mut SipHasher) {
+        (self as i8).hash(state);
+    }
+}
+impl Eq for PixelFormat { }
+impl PartialEq for PixelFormat {
+    fn eq(&self, other: &PixelFormat) {
+        return (self as i8) == (other as i8);
+    }
 }
 
 pub trait ToPixelFormat {

@@ -22,7 +22,7 @@ use luascript::LuaScript;
 use paintlayer::PaintLayer;
 use glcommon::{GLResult, MString};
 use drawevent::event_stream::EventState;
-use collections::slice::CloneSliceExt;
+//use collections::slice::CloneSliceExt;
 
 // can't use Copy, wtf
 #[deriving(Clone)]
