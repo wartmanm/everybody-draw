@@ -80,9 +80,9 @@ impl Show for BrushTexture {
     }
 }
 
-impl FillDefaults<(PixelFormat, (i32, i32), Vec<u8>), BrushTexture> for BrushTexture {
+impl FillDefaults<(PixelFormat, (i32, i32), Vec<u8>)> for BrushTexture {
     type Unfilled = (PixelFormat, (i32, i32), Vec<u8>);
-    fn fill_defaults(init: (PixelFormat, (i32, i32), Vec<u8>)) -> Defaults<(PixelFormat, (i32, i32), Vec<u8>), BrushTexture> {
+    fn fill_defaults(init: (PixelFormat, (i32, i32), Vec<u8>)) -> Defaults<(PixelFormat, (i32, i32), Vec<u8>)> {
         Defaults { val: init }
     }
 }

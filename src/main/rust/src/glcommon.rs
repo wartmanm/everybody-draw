@@ -104,13 +104,13 @@ pub trait Shader {
 }
 
 #[deriving(Show)]
-pub struct Defaults<Init, Base> {
+pub struct Defaults<Init> {
     pub val: Init
 }
 
-pub trait FillDefaults<Init, Base> {
+pub trait FillDefaults<Init> {
     type Unfilled;
-    fn fill_defaults(unfilled: <Self as FillDefaults<Init, Base>>::Unfilled) -> Defaults<Init, Base>;
+    fn fill_defaults(unfilled: <Self as FillDefaults<Init>>::Unfilled) -> Defaults<Init>;
 }
 
 macro_rules! glattrib_f32 (

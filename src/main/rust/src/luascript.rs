@@ -41,9 +41,9 @@ impl Show for LuaScript {
     }
 }
 
-impl FillDefaults<MString, LuaScript> for LuaScript {
+impl FillDefaults<MString> for LuaScript {
     type Unfilled = Option<MString>;
-    fn fill_defaults(script: Option<MString>) -> Defaults<MString, LuaScript> {
+    fn fill_defaults(script: Option<MString>) -> Defaults<MString> {
         Defaults { val: script.unwrap_or_else(|| DEFAULT_SCRIPT.into_cow()) }
     }
 }
