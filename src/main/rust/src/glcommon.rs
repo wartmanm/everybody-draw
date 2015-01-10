@@ -116,7 +116,7 @@ macro_rules! glattrib_f32 (
     ($handle:expr, $count:expr, $item:ident, $elem:ident) => ({
         unsafe {
             // XXX probably also unsafe
-            let firstref = $item.unsafe_get(0);
+            let firstref = $item.get_unchecked(0);
             gl2::glVertexAttribPointer($handle, $count, gl2::FLOAT, false as ::opengles::gl2::GLboolean,
                 mem::size_of_val(firstref) as i32,
                 // XXX this actually derefences firstref and is completely unsafe
@@ -130,7 +130,7 @@ macro_rules! glattrib_f32 (
     // densely-packed array
     ($handle:expr, $count:expr, $item:ident) => ({
         unsafe {
-            let firstref =  $item.unsafe_get(0) ;
+            let firstref =  $item.get_unchecked(0) ;
             gl2::glVertexAttribPointer($handle, $count, gl2::FLOAT,
                 false as ::opengles::gl2::GLboolean, 0, mem::transmute(firstref));
         }

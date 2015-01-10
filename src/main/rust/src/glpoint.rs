@@ -203,19 +203,19 @@ fn push_splinepts<T: Spline<Coordinate>>(drawvec: &mut Vec<ShaderPaintPoint>, po
     let coords = unsafe {
         let mut coords: [Coordinate; 4] = mem::uninitialized();
         for i in range(0, 4) {
-            *coords.unsafe_mut(i) = points.unsafe_get(i).pos;
+            *coords.get_unchecked_mut(i) = points.get_unchecked(i).pos;
         }
         coords
     };
     let spline: T = Spline::new(coords);
     let (tstart, tend) = spline.get_time_scale();
-    let count = unsafe { get_count(points.unsafe_get(1), points.unsafe_get(2)) };
+    let count = unsafe { get_count(points.get_unchecked(1), points.get_unchecked(2)) };
     let timestep = (tend - tstart) / (count as f32);
 
     let mut addpoint = points[0];
     let mut curtime = tstart;
 
-    let (a, b) = unsafe { (points.unsafe_get(1), points.unsafe_get(2)) };
+    let (a, b) = unsafe { (points.get_unchecked(1), points.get_unchecked(2)) };
     let timescale = 10f32;
     let steptime = ((*b).time - (*a).time) / (count as f32 * timescale);
     let stepsize = ((*b).size - (*a).size) / count as f32;
@@ -255,10 +255,10 @@ impl Spline<Coordinate> for CatmullRom {
         let mut total = 0f32;
         unsafe {
             for i in range(0, 3) {
-                let (p, pnext) = (points.unsafe_get(i), points.unsafe_get(i+1));
+                let (p, pnext) = (points.get_unchecked(i), points.get_unchecked(i+1));
                 let Coordinate { x: dx, y: dy } = *pnext - *p;
                 total += (dx * dx + dy * dy).powf(0.25f32);
-                *time.unsafe_mut(i+1) = total;
+                *time.get_unchecked_mut(i+1) = total;
             }
         }
         CatmullRom { points: points, time: time }
