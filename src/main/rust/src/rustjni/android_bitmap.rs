@@ -50,7 +50,7 @@ impl gltexture::ToPixelFormat for AndroidBitmapFormat {
         match self.value as u32 {
             ANDROID_BITMAP_FORMAT_RGBA_8888 => Ok(PixelFormat::RGBA),
             ANDROID_BITMAP_FORMAT_A_8 => Ok(PixelFormat::ALPHA),
-            _ => Err(format!("Unsupported texture format: {}!", self).into_cow()),
+            _ => Err(format!("Unsupported texture format: {:?}!", self).into_cow()),
         }
     }
 }
@@ -59,7 +59,7 @@ impl AndroidBitmap {
     pub unsafe fn from_jobject(env: *mut JNIEnv, bitmap: jobject) -> AndroidBitmap {
         let mut pixels: *mut c_void = ptr::null_mut();
         AndroidBitmap_lockPixels(env, bitmap, &mut pixels);
-        logi!("locked pixels in {}", pixels);
+        logi!("locked pixels in {:?}", pixels);
         let mut result = AndroidBitmap { env: env, obj: bitmap, pixels: pixels as *mut u8, info: mem::zeroed() };
         AndroidBitmap_getInfo(env, bitmap, &mut result.info);
         result

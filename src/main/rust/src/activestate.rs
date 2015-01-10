@@ -1,4 +1,5 @@
 #![allow(unused_variables, dead_code)]
+use core::prelude::*;
 
 const NEWMASK: u8 = 0x01;
 const OLDMASK: u8 = 0x02;
@@ -22,3 +23,10 @@ impl ActiveState {
     //}
 }
 
+impl Eq for ActiveState { }
+impl PartialEq for ActiveState {
+    fn eq(&self, other: &ActiveState) -> bool {
+        let (ActiveState(selfstate), ActiveState(otherstate)) = (*self, *other);
+        selfstate == otherstate
+    }
+}

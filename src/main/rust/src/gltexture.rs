@@ -1,5 +1,6 @@
 use core::prelude::*;
 use core::fmt;
+use core::mem;
 use core::fmt::Show;
 use core::hash::sip::SipHasher;
 use core::hash::Hash;
@@ -14,20 +15,24 @@ use collections::vec::Vec;
 #[deriving(PartialEq, Eq, Hash, Show, Copy)]
 #[repr(i8)]
 pub enum PixelFormat {
-    RGBA = gl2::RGBA as int,
-    RGB = gl2::RGB as int,
-    ALPHA = gl2::ALPHA as int,
+    RGBA = gl2::RGBA as i8,
+    RGB = gl2::RGB as i8,
+    ALPHA = gl2::ALPHA as i8,
 }
 
 impl Hash<SipHasher> for PixelFormat {
     fn hash(&self, state: &mut SipHasher) {
-        (self as i8).hash(state);
+        unsafe {
+            mem::transmute::<PixelFormat, i8>(*self).hash(state);
+        }
+        //(self as i8).hash(state);
     }
 }
 impl Eq for PixelFormat { }
 impl PartialEq for PixelFormat {
-    fn eq(&self, other: &PixelFormat) {
-        return (self as i8) == (other as i8);
+    fn eq(&self, other: &PixelFormat) -> bool {
+        let (selfi8, otheri8) = mem::transmute::<(PixelFormat, PixelFormat), (i8, i8)>((*self, *other));
+        return selfi8 == otheri8;
     }
 }
 
@@ -75,19 +80,19 @@ impl Texture {
 impl Drop for Texture {
     fn drop(&mut self) {
         gl2::delete_textures([self.texture].as_slice());
-        logi!("deleted {} texture", self.dimensions);
+        logi!("deleted {:?} texture", self.dimensions);
     }
 }
 
 impl Show for Texture {
     fn fmt(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
-        write!(formatter, "texture 0x{:x}, dimensions {}", self.texture, self.dimensions)
+        write!(formatter, "texture 0x{:x}, dimensions {:?}", self.texture, self.dimensions)
     }
 }
 
 impl Show for BrushTexture {
     fn fmt(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
-        write!(formatter, "brushtexture 0x{:x}, dimensions {}", self.texture.texture, self.texture.dimensions)
+        write!(formatter, "brushtexture 0x{:x}, dimensions {:?}", self.texture.texture, self.texture.dimensions)
     }
 }
 

@@ -1,3 +1,4 @@
+use ::point::AsSelf;
 macro_rules! rolling_average_count (
     ($name:ident, $count:expr) => (
         pub struct $name<T> {
@@ -10,10 +11,10 @@ macro_rules! rolling_average_count (
         #[allow(dead_code)]
         impl<T> $name<T>
         where T: ::core::ops::Add<T> + ::core::ops::Sub<T> + ::core::default::Default + ::core::ops::Div<f32> + ::core::marker::Copy
-        + ::core::num::NumCast,
-        <T as ::core::ops::Sub>::Output: ::core::num::NumCast,
-        <T as ::core::ops::Add>::Output: ::core::num::NumCast,
-        <T as ::core::ops::Div<f32>>::Output: ::core::num::NumCast {
+        + ::point::AsSelf<T>,
+        <T as ::core::ops::Sub>::Output: ::point::AsSelf<T>,
+        <T as ::core::ops::Add>::Output: ::point::AsSelf<T>,
+        <T as ::core::ops::Div<f32>>::Output: ::point::AsSelf<T>, {
             pub fn new() -> $name<T> {
                 $name {
                     entries: [::core::default::Default::default(); $count],
@@ -26,15 +27,15 @@ macro_rules! rolling_average_count (
                 if self.count < $count {
                     self.count += 1;
                 } else {
-                    self.sum = ::core::num::cast(self.sum - self.entries[self.pos]).unwrap();
+                    self.sum = (self.sum - self.entries[self.pos]).as_self();
                 }
                 self.entries[self.pos] = value;
-                self.sum = ::core::num::cast(self.sum + value).unwrap();
+                self.sum = (self.sum + value).as_self();
                 self.pos = (self.pos + 1) % $count;
                 self.get_average()
             }
             pub fn get_average(&self) -> T {
-                ::core::num::cast(self.sum / self.count as f32).unwrap()
+                (self.sum / self.count as f32).as_self();
             }
             pub fn clear(&mut self) {
                 self.sum = ::core::default::Default::default();

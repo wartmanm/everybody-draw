@@ -5,11 +5,12 @@ use core::{ptr, mem, raw, fmt};
 //use core::ptr::RawMutPtr;
 //use core::any::{Any, AnyRefExt};
 use core::any::Any;
-use core::fmt::Show;
+use core::fmt::{Show, Writer};
 use core::iter;
 use libc::{c_void, c_char};
 use core::borrow::{Cow, IntoCow};
 use collections::vec::Vec;
+use std::str;
 
 use jni::{jobject, jclass, jmethodID, jfieldID, JNIEnv, jint, jstring, jvalue, JNINativeMethod, JavaVM};
 #[cfg(target_word_size = "64")] use jni::jlong;
@@ -111,7 +112,10 @@ unsafe fn get_string(env: *mut JNIEnv, string: jstring) -> Option<String> {
     let strslice: &[u16] = mem::transmute(raw::Slice { data: c, len: len as uint });
     let ruststr = String::from_utf16(strslice);
     ((**env).ReleaseStringChars)(env, string as jstring, strslice.as_ptr());
-    Some(try_opt!(ruststr))
+    match ruststr {
+        Ok(s) => Some(s),
+        Err(_) => None,
+    }
 }
 
 unsafe fn get_mstring(env: *mut JNIEnv, string: jstring) -> Option<MString> {
@@ -166,9 +170,9 @@ fn on_unwind(msg: &(Any + Send), file: &'static str, line: uint) {
     //use core::fmt::FormatWriter;
     // as far as I know there's no way to identify traits that can be cast to Show at runtime
     if let Some(s) = msg.downcast_ref::<&Show>() {
-        loge!("fatal error in {}:{} as &Show: {}", file, line, s);
+        loge!("fatal error in {}:{} as &Show: {:?}", file, line, s);
     } else if let Some(s) = msg.downcast_ref::<Box<Show>>() {
-        loge!("fatal error in {}:{} as Box<Show>: {}", file, line, &**s);
+        loge!("fatal error in {}:{} as Box<Show>: {:?}", file, line, &**s);
     } else if let Some(s) = msg.downcast_ref::<&str>() {
         loge!("fatal error in {}:{} as &str: {}", file, line, s);
     } else if let Some(s) = msg.downcast_ref::<String>() {
@@ -179,15 +183,7 @@ fn on_unwind(msg: &(Any + Send), file: &'static str, line: uint) {
         loge!("fatal error in {}:{}: unknown error message type {:?}!", file, line, msg.get_type_id());
         loge!("Printing start:");
         unsafe {
-            let mut line = Vec::new();
-            // stolen from unwind.rs
-            struct VecWriter<'a> { v: &'a mut Vec<u8> }
-            impl<'a> ::core::fmt::Writer for VecWriter<'a> {
-                fn write_str(&mut self, s: &str) -> fmt::Result {
-                    self.v.push_all(s.as_bytes());
-                    Ok(())
-                }
-            }
+            let mut line = String::new();
 
             let width = 32;
             let raw::TraitObject { data: msgptr, vtable: _ } = mem::transmute(msg);
@@ -195,13 +191,12 @@ fn on_unwind(msg: &(Any + Send), file: &'static str, line: uint) {
             let poscounter = iter::count(msgptr as u32, width as u32);
             for (chunk, pos) in msgslice.chunks(width).zip(poscounter) {
                 {
-                    let mut writer = VecWriter { v: &mut line };
-                    let _ = write!(&mut writer, "{:08x}: ", pos);
+                    let _ = write!(&mut line, "{:08x}: ", pos);
                     for byte in chunk.iter() {
-                        let _ = write!(&mut writer, "{} ", byte);
+                        let _ = write!(&mut line, "{} ", byte);
                     }
                 }
-                loge!("{}", ::core::str::from_utf8_unchecked(line.as_slice().init()));
+                loge!("{}", line);
                 line.clear();
             }
         }

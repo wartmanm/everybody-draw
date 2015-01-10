@@ -16,9 +16,14 @@ impl AsSelf<Coordinate> for Coordinate {
     #[inline(always)]
     fn as_self(&self) -> &Coordinate { self }
 }
+impl AsSelf<f32> for f32 {
+    #[inline(always)]
+    fn as_self(&self) -> &f32 { self }
+}
 impl ::core::default::Default for Coordinate {
     fn default() -> Coordinate { Coordinate { x: 0f32, y: 0f32 } }
 }
+impl ::core::marker::Copy for Coordinate { }
 
 /// Holds data from motionevent entries.
 #[deriving(Clone, Show, PartialEq, Copy)]

@@ -144,6 +144,7 @@ impl<'a> Events<'a> {
 pub fn handle_event<'a>(gl: &mut ::glinit::GLInit<'a>, events: &mut Events<'a>, queue: &mut ::point::PointProducer, eventidx: i32) -> event_stream::EventState {
 
     // FIXME do this without exposing Events or GLInit internal details
+    /*
     match events.get_event(eventidx as uint) {
         Some(event) => match event.clone() {
             DrawEvent::UseAnimShader(idx) => gl.set_anim_shader(events.copyshaders.get_object(idx)),
@@ -163,6 +164,7 @@ pub fn handle_event<'a>(gl: &mut ::glinit::GLInit<'a>, events: &mut Events<'a>, 
         },
         None => return EventState::Done,
     }
+    */
     return EventState::NoFrame;
 }
 

@@ -36,7 +36,7 @@ pub fn pause(data: &mut Data, queue: &mut PointProducer) {
     // pro: straightforward, con: extra 4 bytes on every pointentry
     // could fold index into pointinfo, or have a magic index like -1 to indicate framestop
     // maybe this entire approach isn't such a good one after all?
-    queue.send(PointEntry { index: 0, entry: PointInfo::FrameStop })
+    queue.send(PointEntry { index: 0, entry: PointInfo::FrameStop });
 }
 
 pub fn append_motion_event(data: &mut Data, evt: *const AInputEvent, queue: &mut PointProducer) -> () {

@@ -80,7 +80,7 @@ fn init_context(surface_texture: *mut c_void) -> Option<EGLStatus> {
         return None;
     }
     let display = displayopt.unwrap();
-    logi!("got display: {}", display);
+    logi!("got display: {:?}", display);
     let (mut vermajor, mut verminor) = (0, 0);
     if Initialize(display, &mut vermajor, &mut verminor) != EGL_TRUE {
         loge!("failed to initialize display :(");

@@ -55,7 +55,7 @@ impl Shader for PointShader {
                     texture_size_handle: gl2::get_uniform_location(program, "texturesize"),
                     source: (vert, frag),
                 };
-                logi!("created {}", shader);
+                logi!("created {:?}", shader);
                 Ok(shader)
             }
             _ => {
@@ -119,7 +119,7 @@ impl PointShader {
 
 impl Drop for PointShader {
     fn drop(&mut self) {
-        logi!("dropping {}", self);
+        logi!("dropping {:?}", self);
         gl2::delete_program(self.program);
     }
 }

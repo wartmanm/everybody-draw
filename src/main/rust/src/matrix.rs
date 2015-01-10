@@ -1,4 +1,6 @@
 use core::prelude::*;
+use core::fmt;
+use core::fmt::Show;
 
 pub type Matrix = [f32; 16];
 
@@ -10,6 +12,18 @@ pub enum Rotation {
     Rotation180 = 2,
     Rotation270 = 3,
 }
+
+impl Show for Rotation {
+    fn fmt(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
+        write!(formatter, "{}", match self {
+            Rotation0    => "Rotation0",
+            Rotation90   => "Rotation90",
+            Rotation180  => "Rotation180",
+            Rotation270  => "Rotation270",
+        })
+    }
+}
+
 
 /// copied from android.opengl.matrix
 /// intended for framebuffers, which range from (-1, -1) to (1, 1), and not textures, which range
@@ -42,7 +56,7 @@ pub fn log(matrix: &[f32]) -> ::collections::string::String {
 
 pub fn fit_inside(srcdimensions: (i32, i32), targetdimensions: (i32, i32), rotation: Rotation) -> Matrix {
     use matrix::Rotation::*;
-    logi!("using rotation {}", rotation);
+    logi!("using rotation {:?}", rotation);
     let (tw, th) = targetdimensions;
     let (w, h) = {
         let (srcw, srch) = srcdimensions;

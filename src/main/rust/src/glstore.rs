@@ -133,7 +133,8 @@ impl<'a, Unfilled, T: MaybeInitFromCache<Init> + FillDefaults<Unfilled, Init, T>
         //let mut rng = rand::weak_rng();
         //let hasher = SipHasher::new_with_keys(rng.next_u64(), rng.next_u64());
         // FIXME weak_rng also blows up? can it not find /dev/urandom?
-        let hasher = SipHasher::new_with_keys(0, 0);
+        //let hasher = SipHasher::new_with_keys(0, 0);
+        let hasher = ::std::collections::hash_state::DefaultState;
         let map = HashMap::with_hash_state(hasher);
         DrawObjectList {
             map: map,
@@ -159,7 +160,7 @@ impl<'a, Unfilled, T: MaybeInitFromCache<Init> + FillDefaults<Unfilled, Init, T>
                 }
                 let index = self.list.len() - 1;
                 let objindex = DrawObjectIndex(index as i32);
-                entry.set(objindex.clone());
+                entry.insert(objindex.clone());
                 Ok(objindex)
             }
         }

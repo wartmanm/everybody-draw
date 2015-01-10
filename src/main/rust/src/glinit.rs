@@ -1,6 +1,7 @@
 extern crate opengles;
 use core::prelude::*;
 use core::mem;
+use core::iter;
 use collections::vec::Vec;
 use core::borrow::IntoCow;
 
@@ -273,7 +274,8 @@ impl<'a> GLInit<'a> {
         logi!("adding layer");
         let extra: i32 = (layer.pointidx as i32 + 1) - self.points.len() as i32;
         if extra > 0 {
-            self.points.grow(extra as uint, Vec::new());
+            //self.points.extend(iter::repeat(Vec::new()).take(extra as uint));
+            self.points.extend(iter::range(0, extra).map(|_| Vec::new()));
         }
         self.paintstate.layers.push(layer);
     }
@@ -328,7 +330,7 @@ impl<'a> GLInit<'a> {
 
     pub fn unload_interpolator(&mut self, handler: &mut MotionEventConsumer, events: &'a mut Events<'a>, undo_callback: &JNICallbackClosure) -> GLResult<()> {
         if let Some(interpolator) = self.paintstate.interpolator {
-            logi!("finishing {}", interpolator);
+            logi!("finishing {:?}", interpolator);
             unsafe {
                 let mut callback = LuaCallbackType::new(self, events, handler, undo_callback);
                 finish_lua_script(&mut callback, interpolator)
@@ -445,7 +447,7 @@ impl<'a> GLInit<'a> {
                 eglinit::egl_swap();
             },
             (x, y) => {
-                logi!("skipped frame! copyshader is {}, animshader is {}", x, y);
+                logi!("skipped frame! copyshader is {:?}, animshader is {:?}", x, y);
             }
         }
     }
