@@ -134,7 +134,8 @@ class MainActivity extends Activity with TypedActivity with AndroidImplicits {
   // runs on gl thread
   def onTextureCreated(thread: TextureSurfaceThread, producer: MotionEventProducer, undoCallback: MainUndoListener)(gl: GLInit) = {
     try {
-      val rotation = Rotation.fromSurfaceOrientation(controls.rotation.value, newRotation)
+      //val rotation = Rotation.fromSurfaceOrientation(controls.rotation.value, newRotation)
+      val rotation = NoRotation
       controls.rotation.value = newRotation
       thread.initScreen(gl, savedBitmap, rotation)
     } catch {
@@ -244,11 +245,11 @@ class MainActivity extends Activity with TypedActivity with AndroidImplicits {
     else item.getItemId() match {
       case R.id.menu_save => saveFile()
       case R.id.menu_load => loadFile()
-      case R.id.menu_replay => startReplay()
+      //case R.id.menu_replay => startReplay()
       case R.id.menu_clear => this.clearScreen()
-      case R.id.menu_credits => Toast.makeText(this, "Soon.", Toast.LENGTH_LONG).show()
+      case R.id.menu_credits => Toast.makeText(this, "Not yet added :(", Toast.LENGTH_LONG).show()
       case R.id.menu_debug => showDebugMessagebox()
-      case R.id.menu_rotate => debugRotate()
+      //case R.id.menu_rotate => debugRotate()
       case _ => return super.onOptionsItemSelected(item)
     }
     true

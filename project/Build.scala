@@ -118,6 +118,9 @@ object General {
         -keepclassmembers class com.github.wartman4404.gldraw.MainActivity$MainUndoListener {
           void undoBufferChanged(int);
         }
+        -keepclassmembers class com.github.wartman4404.gldraw.Replay$ {
+          native int init(int);
+        }
         """
       )
     )

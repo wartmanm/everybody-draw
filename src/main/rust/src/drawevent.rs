@@ -40,7 +40,7 @@ enum DrawEvent {
 }
 
 pub struct Events<'a> {
-    eventlist: Vec<DrawEvent>,
+    //eventlist: Vec<DrawEvent>,
     pointshaders: DrawObjectList<'a, PointShader, ShaderInitValues>,
     copyshaders: DrawObjectList<'a, CopyShader, ShaderInitValues>,
     textures: DrawObjectList<'a, BrushTexture, BrushInitValues>,
@@ -50,7 +50,7 @@ pub struct Events<'a> {
 impl<'a> Events<'a> {
     pub fn new() -> Events<'a> {
         Events {
-            eventlist: Vec::new(),
+            //eventlist: Vec::new(),
             pointshaders: DrawObjectList::new(),
             copyshaders: DrawObjectList::new(),
             textures: DrawObjectList::new(),
@@ -65,12 +65,12 @@ impl<'a> Events<'a> {
     }
 
     pub fn use_copyshader(&mut self, idx: DrawObjectIndex<CopyShader>) -> GLResult<&'a CopyShader> {
-        self.eventlist.push(DrawEvent::UseCopyShader(idx.clone()));
+        //self.eventlist.push(DrawEvent::UseCopyShader(idx.clone()));
         self.copyshaders.maybe_get_object(idx)
     }
 
     pub fn use_animshader(&mut self, idx: DrawObjectIndex<CopyShader>) -> GLResult<&'a CopyShader> {
-        self.eventlist.push(DrawEvent::UseAnimShader(idx.clone()));
+        //self.eventlist.push(DrawEvent::UseAnimShader(idx.clone()));
         self.copyshaders.maybe_get_object(idx)
     }
 
@@ -79,7 +79,7 @@ impl<'a> Events<'a> {
         self.pointshaders.push_object(initargs)
     }
     pub fn use_pointshader(&mut self, idx: DrawObjectIndex<PointShader>) -> GLResult<&'a PointShader> {
-        self.eventlist.push(DrawEvent::UsePointShader(idx.clone()));
+        //self.eventlist.push(DrawEvent::UsePointShader(idx.clone()));
         self.pointshaders.maybe_get_object(idx)
     }
     pub fn load_brush(&mut self, w: i32, h: i32, pixels: &[u8], format: PixelFormat) -> DrawObjectIndex<BrushTexture> {
@@ -88,7 +88,7 @@ impl<'a> Events<'a> {
         self.textures.safe_push_object(init)
     }
     pub fn use_brush(&mut self, idx: DrawObjectIndex<BrushTexture>) -> GLResult<&'a BrushTexture> {
-        self.eventlist.push(DrawEvent::UseBrush(idx.clone()));
+        //self.eventlist.push(DrawEvent::UseBrush(idx.clone()));
         self.textures.maybe_get_object(idx)
     }
     pub fn load_interpolator(&mut self, script: Option<MString>) -> GLResult<DrawObjectIndex<LuaScript>> {
@@ -97,21 +97,21 @@ impl<'a> Events<'a> {
     }
 
     pub fn use_interpolator(&mut self, idx: DrawObjectIndex<LuaScript>) -> GLResult<&'a LuaScript> {
-        self.eventlist.push(DrawEvent::UseInterpolator(idx.clone()));
+        //self.eventlist.push(DrawEvent::UseInterpolator(idx.clone()));
         self.luascripts.maybe_get_object(idx)
     }
 
     pub fn add_layer(&mut self, dimensions: (i32, i32)
                      , copyshader: Option<DrawObjectIndex<CopyShader>>, pointshader: Option<DrawObjectIndex<PointShader>>
                      , pointidx: i32) -> PaintLayer<'a> {
-        self.eventlist.push(DrawEvent::AddLayer(copyshader.clone(), pointshader.clone(), pointidx));
+        //self.eventlist.push(DrawEvent::AddLayer(copyshader.clone(), pointshader.clone(), pointidx));
         let copyshader = match copyshader { Some(x) => Some(self.copyshaders.get_object(x)), None => None };
         let pointshader = match pointshader { Some(x) => Some(self.pointshaders.get_object(x)), None => None };
         PaintLayer::new(dimensions, copyshader, pointshader, pointidx)
     }
 
     pub fn clear_layers(&mut self) {
-        self.eventlist.push(DrawEvent::ClearLayers);
+        //self.eventlist.push(DrawEvent::ClearLayers);
     }
 
     pub fn get_pointshader_source(&mut self, pointshader: DrawObjectIndex<PointShader>) -> &(MString, MString) {
@@ -127,13 +127,13 @@ impl<'a> Events<'a> {
     }
 
     pub fn pushpoint(&mut self, event: PointEntry) {
-        self.eventlist.push(DrawEvent::Point(event));
+        //self.eventlist.push(DrawEvent::Point(event));
     }
     pub fn pushframe(&mut self) {
-        self.eventlist.push(DrawEvent::Frame);
+        //self.eventlist.push(DrawEvent::Frame);
     }
     pub fn clear(&mut self) {
-        self.eventlist.clear();
+        //self.eventlist.clear();
     }
     //fn get_event(&self, idx: uint) -> Option<&DrawEvent> {
         //self.eventlist.as_slice().get(idx)
