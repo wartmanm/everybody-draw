@@ -11,23 +11,23 @@ import com.cyanogenmod.filemanager.ash.SyntaxHighlightProcessor;
 import com.cyanogenmod.filemanager.ash.indent.LineIndentCounter;
 import com.cyanogenmod.filemanager.ash.indent.BracketIndentCounter;
 
-public class SyntaxHighlightEditText extends EditText {
+public class SyntaxHighlightTextView extends EditText {
     private TextWatcher syntaxHighlightListener;
     private IndentLineFilter newlineFilter;
 
     public void refresh() { }
 
-    public SyntaxHighlightEditText(Context context) {
+    public SyntaxHighlightTextView(Context context) {
         super(context);
         init();
     }
 
-    public SyntaxHighlightEditText(Context context, AttributeSet attrs) {
+    public SyntaxHighlightTextView(Context context, AttributeSet attrs) {
         super(context, attrs);
         init();
     }
 
-    public SyntaxHighlightEditText(Context context, AttributeSet attrs, int defStyle) {
+    public SyntaxHighlightTextView(Context context, AttributeSet attrs, int defStyle) {
         super(context, attrs, defStyle);
         init();
     }
