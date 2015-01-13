@@ -21,7 +21,10 @@ class LazyPicker[U](context: Context, thread: TextureSurfaceThread, content: Arr
     getResourceView(position, convertView, parent, android.R.layout.simple_spinner_item)
   }
   override def getDropDownView(position: Int, convertView: View, parent: ViewGroup) = {
-    getResourceView(position, convertView, parent, android.R.layout.simple_spinner_dropdown_item)
+    val view = getResourceView(position, convertView, parent, android.R.layout.simple_spinner_dropdown_item)
+    val checked = parent.asInstanceOf[AdapterView[_]].getSelectedItemPosition() == position
+    view.getTag().asInstanceOf[Holder].nameView.asInstanceOf[CheckedTextView].setChecked(checked)
+    view
   }
 
   private def getResourceView(position: Int, convertView: View, parent: ViewGroup, resource: Int): View = {
