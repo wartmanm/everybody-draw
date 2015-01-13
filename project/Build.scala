@@ -77,7 +77,7 @@ object General {
     versionCode := 0,
     scalaVersion := "2.11.2",
     platformName := "android-21",
-    javacOptions ++= Seq("-encoding", "UTF-8", "-source", "1.6", "-target", "1.6"),
+    javacOptions ++= Seq("-encoding", "UTF-8", "-source", "1.6", "-target", "1.6", "-Xlint:all"),
     scalacOptions ++= Seq("-feature", "-language:implicitConversions", "-deprecation", "-Xlint")
   ) ++ debugSettings
 
