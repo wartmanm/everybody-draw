@@ -2,7 +2,6 @@ package com.github.wartman4404.gldraw
 import android.view._
 import android.widget._
 import android.content.Context
-import GLResultTypeDef._
 
 import DrawFiles.Readable
 
