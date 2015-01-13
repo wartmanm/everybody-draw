@@ -115,13 +115,15 @@ pub unsafe extern "C" fn lua_savelayers(data: &mut &mut LuaCallbackType) {
 #[no_mangle]
 pub unsafe extern "C" fn lua_pushcatmullrom(data: &mut &mut LuaCallbackType, queue: i32, a: &ShaderPaintPoint, b: &ShaderPaintPoint, c: &ShaderPaintPoint, d: &ShaderPaintPoint) {
     let points = [*a, *b, *c, *d];
-    glpoint::push_catmullrom(&mut data.glinit.points.as_mut_slice()[queue as uint], &points);
+    let queue = get_queue_or_raise_err(*data, queue);
+    glpoint::push_catmullrom(queue, &points);
 }
 
 #[no_mangle]
 pub unsafe extern "C" fn lua_pushcubicbezier(data: &mut &mut LuaCallbackType, queue: i32, a: &ShaderPaintPoint, b: &ShaderPaintPoint, c: &ShaderPaintPoint, d: &ShaderPaintPoint) {
     let points = [*a, *b, *c, *d];
-    glpoint::push_cubicbezier(&mut data.glinit.points.as_mut_slice()[queue as uint], &points);
+    let queue = get_queue_or_raise_err(*data, queue);
+    glpoint::push_cubicbezier(queue, &points);
 }
 
 #[no_mangle]
