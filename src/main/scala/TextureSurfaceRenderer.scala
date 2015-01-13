@@ -88,7 +88,7 @@ extends Thread with Handler.Callback with AndroidImplicits {
         val BeginGLArgs(undoCallback, beginGLCallback) = msg.obj.asInstanceOf[BeginGLArgs]
         val gl = GLInit(msg.arg1, msg.arg2, undoCallback)
         glinit = Some(gl)
-        initOutputShader(gl)
+        pOutputShader = Some(CopyShader(gl, null, null))
         android.opengl.Matrix.orthoM(matrix, 0,
           0, msg.arg1,
           msg.arg2, 0,
@@ -170,13 +170,6 @@ extends Thread with Handler.Callback with AndroidImplicits {
   }
 
   // private
-  private def initOutputShader(g: GLInit) = {
-    pOutputShader = Some(CopyShader(g, null, null))
-    pOutputShader.map((x) => {
-        nativeSetCopyShader(g, x)
-      })
-  }
-
   private def drawQueuedPoints(g: GLInit) = {
     nativeDrawQueuedPoints(g, motionHandler, matrix)
   }

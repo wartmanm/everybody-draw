@@ -42,6 +42,7 @@ pub struct GLInit<'a> {
     pub paintstate: PaintState<'a>,
     targetdata: TargetData,
     pub points: Vec<Vec<ShaderPaintPoint>>,
+    undo_shader: &'a CopyShader,
 }
 
 pub struct TargetData {
@@ -202,11 +203,9 @@ impl<'a> GLInit<'a> {
         let matrix = matrix::fit_inside((w, h), target.texture.dimensions, rotation);
         logi!("drawing with ratio: {:5.3}, glratio {:5.3}, {:5.3}, matrix:\n{}", ratio, glratiox, glratioy, matrix::log(matrix.as_slice()));
 
-        self.paintstate.copyshader.map(|shader| {
-            let intexture = Texture::with_image(w, h, Some(pixels), PixelFormat::RGBA);
-            check_gl_error("creating texture");
-            perform_copy(target.framebuffer, &intexture, shader, matrix.as_slice());
-        });
+        let intexture = Texture::with_image(w, h, Some(pixels), PixelFormat::RGBA);
+        check_gl_error("creating texture");
+        perform_copy(target.framebuffer, &intexture, self.undo_shader, matrix.as_slice());
     }
 
     pub fn get_buffer_dimensions(&self) -> (i32, i32) {
@@ -301,7 +300,7 @@ impl<'a> GLInit<'a> {
         Ok(())
     }
 
-    pub fn setup_graphics(w: i32, h: i32) -> GLInit<'a> {
+    pub fn setup_graphics(w: i32, h: i32, events: &mut Events<'a>) -> GLInit<'a> {
         print_gl_string("Version", gl2::VERSION);
         print_gl_string("Vendor", gl2::VENDOR);
         print_gl_string("Renderer", gl2::RENDERER);
@@ -310,6 +309,14 @@ impl<'a> GLInit<'a> {
         logi!("setupGraphics({},{})", w, h);
         let targets = [TextureTarget::new(w, h, PixelFormat::RGBA), TextureTarget::new(w, h, PixelFormat::RGBA)];
         let mut points: Vec<Vec<ShaderPaintPoint>> = Vec::new();
+
+        // yuck!
+        let outputshaderidx = events.load_copyshader(None, None).unwrap();
+        let outputshader = events.use_copyshader(outputshaderidx).unwrap();
+
+        let mut paintstate = PaintState::new();
+        paintstate.copyshader = Some(outputshader);
+
         points.push(Vec::new());
         let data = GLInit {
             dimensions: (w, h),
@@ -318,7 +325,8 @@ impl<'a> GLInit<'a> {
                 current_target: 0,
             },
             points: points,
-            paintstate: PaintState::new(),
+            paintstate: paintstate,
+            undo_shader: outputshader,
         };
 
         gl2::viewport(0, 0, w, h);
@@ -342,17 +350,13 @@ impl<'a> GLInit<'a> {
 
     pub fn push_undo_frame(&mut self) -> i32 {
         let source = self.targetdata.get_current_texturetarget(); // should be identical when called from within lua callback
-        if let Some(copy_shader) = self.paintstate.copyshader {
-            self.paintstate.undo_targets.push_new_buffer(source, copy_shader);
-        }
+        self.paintstate.undo_targets.push_new_buffer(source, self.undo_shader);
         self.paintstate.undo_targets.len
     }
 
     pub fn load_undo_frame(&mut self, idx: i32) {
         let source = self.targetdata.get_current_texturetarget();
-        if let Some(copy_shader) = self.paintstate.copyshader {
-            self.paintstate.undo_targets.load_buffer_at(idx, source, copy_shader);
-        }
+        self.paintstate.undo_targets.load_buffer_at(idx, source, self.undo_shader);
     }
 
     pub fn clear_undo_frames(&mut self) {
