@@ -33,8 +33,7 @@ import scala.util.{Success,Failure}
 import java.util.concurrent.Executors
 
 import PaintControls.UnnamedPicker
-import PaintControls.GLControl
-
+import PaintControls.{GLControl, SelectedListener}
 
 
 class MainActivity extends Activity with TypedActivity with AndroidImplicits {
@@ -739,7 +738,7 @@ class MainActivity extends Activity with TypedActivity with AndroidImplicits {
       new SidebarEntryPicker(names(4), controls.unipicker, (u: UniBrush) => None),
       new SidebarEntryHider(names(5))
     )
-    val copyShaderControl = new SidebarEntryPicker(names(6), controls.copypicker, (u: UniBrush) => u.basecopyshader)
+    val copyShaderControl = new SidebarHiddenEntryPicker(names(6), controls.copypicker, (u: UniBrush) => u.basecopyshader)
     override def areAllItemsEnabled = false
     override def isEnabled(pos: Int) = sidebarControls(pos).enabled
     override def getCount = sidebarControls.length
@@ -776,7 +775,7 @@ class MainActivity extends Activity with TypedActivity with AndroidImplicits {
       def enabled: Boolean
       def name: String
     }
-    class SidebarEntryPicker[T](val name: String, picker: GLControl[_], getUnibrushValue: (UniBrush) => Option[T]) extends SidebarEntry {
+    class SidebarHiddenEntryPicker[T](val name: String, picker: GLControl[_], getUnibrushValue: (UniBrush) => Option[T]) extends SidebarEntry {
       override def enabled = picker.enabled
       override def updateForUnibrush(u: UniBrush) = {
         val oldstate = enabled
@@ -784,6 +783,14 @@ class MainActivity extends Activity with TypedActivity with AndroidImplicits {
         Log.i("main", s"${if (enabled) "enabling" else "disabling"} control ${name} for unibrush (was: ${if (oldstate) "enabled" else "disabled"})")
       }
     }
+    class SidebarEntryPicker[T](name: String, picker: GLControl[_] with SelectedListener, getUnibrushValue: (UniBrush) => Option[T])
+    extends SidebarHiddenEntryPicker[T](name, picker, getUnibrushValue) {
+      override def updateForUnibrush(u: UniBrush) = {
+        super.updateForUnibrush(u)
+        picker.control.setEnabled(enabled)
+      }
+    }
+
     class SidebarEntryHider(val name: String) extends SidebarEntry {
       override def enabled = true
       override def updateForUnibrush(u: UniBrush) = { }
