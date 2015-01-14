@@ -49,7 +49,9 @@ class MainActivity extends Activity with TypedActivity with AndroidImplicits {
     animpicker = findView(TR.animpicker),
     paintpicker = findView(TR.paintpicker),
     interppicker = findView(TR.interppicker),
-    unipicker = findView(TR.unipicker)
+    unipicker = findView(TR.unipicker),
+    colorpicker = colorPicker,
+    scalebar = findView(TR.brush_colorpicker_scalebar)
   )
 
   lazy val drawerParent = findView(TR.drawer_parent)
@@ -198,9 +200,9 @@ class MainActivity extends Activity with TypedActivity with AndroidImplicits {
     loadButton.setOnClickListener(loadFile _)
     clearButton.setOnClickListener(() => this.clearScreen())
 
+    val scaleBar = controls.scalebar.scale
     colorPicker.addSaturationBar(findView(TR.brush_colorpicker_saturationbar))
     colorPicker.addValueBar(findView(TR.brush_colorpicker_valuebar))
-    val scaleBar = findView(TR.brush_colorpicker_scalebar)
     colorPicker.addScaleBar(scaleBar)
     colorPicker.setShowOldCenterColor(false)
     colorPicker.setOnColorChangedListener(new ColorPicker.OnColorChangedListener() {

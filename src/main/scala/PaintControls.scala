@@ -16,16 +16,20 @@ import GLResultTypeDef._
 import java.io.{StringReader, StringWriter}
 import android.util.{JsonReader, JsonWriter}
 
-class PaintControls
-  (val animpicker: UP[CopyShader], val brushpicker: UP[Texture], val paintpicker: UP[PointShader], val interppicker: UP[LuaScript], val unipicker: UP[UniBrush], val copypicker: UUP[CopyShader], val rotation: RotationUnpicker) {
+import com.larswerkman.holocolorpicker.{ColorPicker, ScaleBar}
 
-  val namedPickers = Map(
+class PaintControls
+  (val animpicker: UP[CopyShader], val brushpicker: UP[Texture], val paintpicker: UP[PointShader], val interppicker: UP[LuaScript], val unipicker: UP[UniBrush], val copypicker: UUP[CopyShader], val colorpicker: ColorUnpicker, val scalebar: ScaleUnpicker, val rotation: RotationUnpicker) {
+
+  val namedPickers: Map[String, SavedControl] = Map(
     "anim" -> animpicker,
     "brush" -> brushpicker,
     "paint" -> paintpicker,
     "interp" -> interppicker,
     "unibrush" -> unipicker,
     "copy" -> copypicker,
+    "color" -> colorpicker,
+    "scale" -> scalebar,
     "rotation" -> rotation
   )
 
@@ -75,7 +79,7 @@ object PaintControls extends AndroidImplicits {
   type UUP[T] = UnnamedUnpicker[T]
   type FIP = FixedIndexPicker
   def apply
-  (animpicker: LAV, brushpicker: LAV, paintpicker: LAV, interppicker: LAV, unipicker: LAV) = {
+  (animpicker: LAV, brushpicker: LAV, paintpicker: LAV, interppicker: LAV, unipicker: LAV, colorpicker: ColorPicker, scalebar: ScaleBar) = {
     new PaintControls (
       new UnnamedPicker[CopyShader](animpicker),
       new UnnamedPicker[Texture](brushpicker),
@@ -83,6 +87,8 @@ object PaintControls extends AndroidImplicits {
       new UnnamedPicker[LuaScript](interppicker),
       new UnnamedPicker[UniBrush](unipicker),
       new UnnamedUnpicker[CopyShader](None),
+      new ColorUnpicker(colorpicker),
+      new ScaleUnpicker(scalebar),
       new RotationUnpicker(-1))
   }
 
@@ -185,6 +191,16 @@ object PaintControls extends AndroidImplicits {
     override def save(j: JsonWriter) = j.value(value)
     override def load(j: JsonReader) = { value = j.nextInt() }
     override def restoreState() = { }
+  }
+
+  class ColorUnpicker(val color: ColorPicker) extends SavedControl {
+    override def save(j: JsonWriter) = j.value(color.getColor())
+    override def load(j: JsonReader) = { color.setColor(j.nextInt()) }
+  }
+
+  class ScaleUnpicker(val scale: ScaleBar) extends SavedControl {
+    override def save(j: JsonWriter) = j.value(scale.getScale())
+    override def load(j: JsonReader) = { scale.setScale(j.nextDouble().asInstanceOf[Float]) }
   }
 
   implicit class AdapterSeq(a: Adapter) extends IndexedSeq[Object] {
