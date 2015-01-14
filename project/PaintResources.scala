@@ -45,6 +45,8 @@ s"""|package ${(manifestPackage in Compile).value}
   lazy val settings: Seq[Setting[_]] = Seq (
     generatePreinstalledSources <<= generatePreinstalledSourcesTask,
     (sourceGenerators in Compile) <+= generatePreinstalledSources,
+    (sourceGenerators in Preload) <+= generatePreinstalledSources,
+    (sourceGenerators in Release) <+= generatePreinstalledSources,
     watchSources <++= Def.task { resources.value.flatMap(_._2) }
   )
 }
