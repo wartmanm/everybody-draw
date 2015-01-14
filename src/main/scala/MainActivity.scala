@@ -198,7 +198,8 @@ class MainActivity extends Activity with TypedActivity with AndroidImplicits {
     loadButton.setOnClickListener(loadFile _)
     clearButton.setOnClickListener(() => this.clearScreen())
 
-    colorPicker.addSVBar(findView(TR.brush_colorpicker_svbar))
+    colorPicker.addSaturationBar(findView(TR.brush_colorpicker_saturationbar))
+    colorPicker.addValueBar(findView(TR.brush_colorpicker_valuebar))
     val scaleBar = findView(TR.brush_colorpicker_scalebar)
     colorPicker.addScaleBar(scaleBar)
     colorPicker.setShowOldCenterColor(false)

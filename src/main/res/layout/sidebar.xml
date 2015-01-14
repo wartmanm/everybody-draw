@@ -28,26 +28,40 @@
         android:layout_marginBottom="15dp"
         android:text="@string/button_clear" />
 
-    <com.larswerkman.holocolorpicker.ScaleBar
-        android:id="@+id/brush_colorpicker_scalebar"
+    <LinearLayout
+        android:id="@+id/brush_colorpicker_layout"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:layout_above="@id/clear_button"
-        android:paddingBottom="5dp"
-        android:paddingTop="5dp" />
+        android:layout_marginBottom="15dp"
+        android:orientation="vertical" >
 
-    <com.larswerkman.holocolorpicker.SVBar
-        android:id="@+id/brush_colorpicker_svbar"
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:layout_above="@id/brush_colorpicker_scalebar"
-        android:paddingBottom="5dp"
-        android:paddingTop="5dp" />
+        <com.larswerkman.holocolorpicker.ScaleBar
+            android:id="@+id/brush_colorpicker_scalebar"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:paddingBottom="10dp"
+            android:paddingTop="10dp" />
 
-    <com.larswerkman.holocolorpicker.ColorPicker
-        android:id="@+id/brush_colorpicker_main"
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:layout_above="@id/brush_colorpicker_svbar" />
+        <com.larswerkman.holocolorpicker.SaturationBar
+            android:id="@+id/brush_colorpicker_saturationbar"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginBottom="5dp"
+            android:layout_marginTop="5dp" />
+
+        <com.larswerkman.holocolorpicker.ValueBar
+            android:id="@+id/brush_colorpicker_valuebar"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginBottom="5dp"
+            android:layout_marginTop="5dp" />
+
+        <com.larswerkman.holocolorpicker.ColorPicker
+            android:id="@+id/brush_colorpicker_main"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginBottom="5dp" />
+    </LinearLayout>
 
 </RelativeLayout>
