@@ -250,7 +250,7 @@ class MainActivity extends Activity with TypedActivity with AndroidImplicits {
       case R.id.menu_load => loadFile()
       //case R.id.menu_replay => startReplay()
       case R.id.menu_clear => this.clearScreen()
-      case R.id.menu_credits => Toast.makeText(this, "Not yet added :(", Toast.LENGTH_LONG).show()
+      case R.id.menu_credits => Credits.displayCredits(this)
       case R.id.menu_debug => showDebugMessagebox()
       //case R.id.menu_rotate => debugRotate()
       case _ => return super.onOptionsItemSelected(item)

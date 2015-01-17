@@ -102,6 +102,7 @@ object General {
     rustSettings ++
     onlyLocalResolvers ++
     PaintResources.settings ++
+    CreditResources.settings ++
     Seq(zipAlignPath in Release <<= Def.setting { buildToolsPath.value / "zipalign" }) ++
     Seq (ndkJniSourcePath <<= Def.setting { baseDirectory.value / "jni" }) ++
     Seq (
