@@ -7,7 +7,7 @@ import scala.io.Source
   
 object CreditResources {
   private val creditFiles = Def.task {
-    ((sourceDirectory).value / "credits" * "*" get).sorted
+    ((sourceDirectory in Compile).value / "credits" * "*" get).sorted
   }
 
   private val creditContents = Def.task {
@@ -15,17 +15,17 @@ object CreditResources {
       val src = Source.fromFile(f)
       val text = src.mkString
       src.close()
-      (f, text)
+      (f.getName(), text)
     })
   }
 
   private def formatCredits = Def.task {
     val credititems = creditContents.value.map({ case (filename, text) =>
-      "CreditItem(\"\"\"%s\"\"\", \"\"\"%s\"\"\"".format(filename, text)
+      "CreditItem(\"\"\"%s\"\"\", \"\"\"%s\"\"\")".format(filename, text)
     })
     val creditdata =
 s"""|package ${(manifestPackage in Compile).value}
-    |trait CreditData {
+    |object CreditData {
     |  val creditArray: Array[CreditItem] = Array(
         ${credititems.map("|\t\t" + _).mkString(",\n")}
     |  )

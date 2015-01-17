@@ -5,11 +5,13 @@ import android.content.Context
 import android.view._
 import android.widget._
 import TypedResource.view2typed
+import android.util.Log
 
 case class CreditItem(title: String, license: String)
 
-trait CreditContents extends AndroidImplicits {
-  val creditArray: Array[CreditItem]
+object Credits extends AndroidImplicits {
+  val creditArray = CreditData.creditArray
+  Log.i("credits", s"got ${creditArray.length} credits: \n${creditArray.map(_.title).mkString("\n")}")
 
   class CreditAdapter(context: Context) extends BaseAdapter {
     val inflater = LayoutInflater.from(context)
@@ -28,6 +30,8 @@ trait CreditContents extends AndroidImplicits {
   def displayCredits(context: Context) = {
     val content = LayoutInflater.from(context)
       .inflate(R.layout.credit_list, null)
+      .asInstanceOf[ListView]
+    content.findView(TR.credit_list).setAdapter(new CreditAdapter(context))
     new AlertDialog.Builder(context)
     .setView(content)
     .setTitle("Everybody Draws!")
@@ -35,5 +39,3 @@ trait CreditContents extends AndroidImplicits {
     .show()
   }
 }
-
-object Credits extends CreditContents with CreditData
