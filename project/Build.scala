@@ -80,7 +80,7 @@ object General {
   val settings = Defaults.defaultSettings ++ Seq (
     name := "everybodydraw",
     version := "0.1",
-    versionCode := 0,
+    versionCode := 1,
     scalaVersion := "2.11.2",
     platformName := "android-21",
     javacOptions ++= Seq("-encoding", "UTF-8", "-source", "1.6", "-target", "1.6", "-Xlint:all"),
@@ -102,6 +102,7 @@ object General {
     rustSettings ++
     onlyLocalResolvers ++
     PaintResources.settings ++
+    Seq(zipAlignPath in Release <<= Def.setting { buildToolsPath.value / "zipalign" }) ++
     Seq (ndkJniSourcePath <<= Def.setting { baseDirectory.value / "jni" }) ++
     Seq (
       keyalias := "android_2015",
