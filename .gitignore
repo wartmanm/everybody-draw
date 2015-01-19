@@ -21,3 +21,4 @@ src/main/assets/unibrushes
 src/main/rust/src/bindgen_builtins.rs
 src/main/rust/src/jni.rs
 src/main/rust/src/luajit.rs
+src/main/rust/src/redirect_stderr.rs

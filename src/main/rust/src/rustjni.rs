@@ -15,7 +15,7 @@ use android::native_window_jni::{ANativeWindow_fromSurface};//, ANativeWindow_re
 use android::native_window::ANativeWindow_release;
 use glcommon::GLResult;
 
-use log::logi;
+use log::{logi, loge};
 
 use glstore::DrawObjectIndex;
 use glinit::{GLInit, AndroidBitmapFormat};
@@ -27,6 +27,8 @@ use drawevent::Events;
 use drawevent::event_stream::EventStream;
 use gltexture::ToPixelFormat;
 use gltexture::Texture;
+use redirect_stderr;
+use redirect_stderr::Struct_stdout_forwarder;
 
 macro_rules! native_method(
     ($name:expr, $sig:expr, $fn_ptr:expr) => (
@@ -40,6 +42,8 @@ macro_rules! native_method(
 
 static mut MOTION_CLASS: jclass = 0 as jclass;
 static mut MOTIONEVENT_NATIVE_PTR_FIELD: jfieldID = 0 as jfieldID;
+
+static mut REDIRECT_PTR: *mut () = 0 as *mut ();
 
 struct CaseClass {
     constructor: jmethodID,
@@ -428,10 +432,30 @@ unsafe fn register_classmethods(env: *mut JNIEnv, classname: *const i8, methods:
     ((**env).RegisterNatives)(env, class, methods.as_ptr(), methods.len() as i32);
 }
 
+unsafe fn forward_stdout() {
+    let pipes: Box<Struct_stdout_forwarder> = box mem::zeroed();
+    let pipe_ptr: *mut Struct_stdout_forwarder = mem::transmute(pipes);
+    if redirect_stderr::begin_forwarding(pipe_ptr) == -1 {
+        loge!("failed to forward stdout.");
+    } else {
+        loge!("forwarded stdout!");
+        REDIRECT_PTR = mem::transmute(pipe_ptr);
+    }
+}
+
+unsafe fn done_forward_stdout() {
+    redirect_stderr::end_forwarding(mem::transmute(REDIRECT_PTR));
+    let pipes: Box<Struct_stdout_forwarder> = mem::transmute(REDIRECT_PTR);
+    mem::drop(pipes);
+}
+
 #[allow(non_snake_case, unused_variables)]
 #[no_mangle]
 pub unsafe extern "C" fn JNI_OnLoad(vm: *mut JavaVM, reserved: *mut c_void) -> jint {
     logi!("jni onload!!");
+    println!("testing before forwarding");
+    forward_stdout();
+    println!("testing after forwarding");
     let mut env: *mut c_void = ptr::null_mut();
     if ((**vm).GetEnv)(vm, (&mut env as *mut *mut c_void), JNI_VERSION_1_6) != JNI_OK {
         return -1;

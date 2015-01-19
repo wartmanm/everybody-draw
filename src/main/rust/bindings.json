@@ -21,5 +21,8 @@
         "match": [ "luajit" ], 
         "path": "luajit", 
         "root": "../jni/lua"
+    }, {
+        "path": "redirect_stderr",
+        "root": "../jni"
     }
 ]
