@@ -1,6 +1,8 @@
 extern crate opengles;
 use core::prelude::*;
 use core::{mem,ptr};
+use collections::vec::Vec;
+use collections::{Mutable, MutableSeq};
 
 use std::c_str::CString;
 
@@ -10,8 +12,10 @@ use opengles::gl2;
 use opengles::gl2::{GLuint, GLenum, GLubyte};
 
 use glcommon::{Shader, check_gl_error};
-use glpoint::{MotionEventConsumer, draw_path};
+use glpoint::{MotionEventConsumer, run_interpolators};
+use point::ShaderPaintPoint;
 use pointshader::PointShader;
+use paintlayer::{TextureTarget, CompletedLayer};
 use copyshader;
 use copyshader::*;
 use gltexture;
@@ -41,40 +45,13 @@ enum AndroidBitmapFormat {
     ANDROID_BITMAP_FORMAT_A_8       = 8,
 }
 
-struct TextureTarget {
-    framebuffer: GLuint,
-    texture: Texture,
-}
-
-impl TextureTarget {
-    fn new(w: i32, h: i32, format: gltexture::PixelFormat) -> TextureTarget {
-        let framebuffer = gl2::gen_framebuffers(1)[0];
-        let texture = Texture::with_image(w, h, None, format);
-
-        gl2::bind_framebuffer(gl2::FRAMEBUFFER, framebuffer);
-        gl2::framebuffer_texture_2d(gl2::FRAMEBUFFER, gl2::COLOR_ATTACHMENT0, gl2::TEXTURE_2D, texture.texture, 0);
-        gl2::clear_color(0f32, 0f32, 0f32, 0f32);
-        gl2::clear(gl2::COLOR_BUFFER_BIT);
-        TextureTarget { framebuffer: framebuffer, texture: texture }
-    }
-
-}
-
-impl Drop for TextureTarget {
-    fn drop(&mut self) {
-        // should drop texture automatically?
-        gl2::delete_frame_buffers([self.framebuffer].as_slice());
-        logi!("deleted texturetarget: {} framebuffer {}", self.texture.dimensions, self.framebuffer);
-    }
-}
-
 /// struct for static storage of data that stays on rust side
 pub struct Data<'a> {
     #[allow(dead_code)]
     dimensions: (i32, i32),
     events: Events<'a>,
     targetdata: TargetData,
-    brushlayer: Option<TextureTarget>,
+    points: Vec<Vec<ShaderPaintPoint>>,
 }
 
 pub struct TargetData {
@@ -226,18 +203,23 @@ pub unsafe fn set_interpolator(data: *mut Data, interpolator: DrawObjectIndex<Lu
 }
 
 #[no_mangle]
-pub unsafe fn set_separate_brushlayer(data: *mut Data, separate_layer: bool) -> () {
+pub unsafe fn add_layer(data: *mut Data, copyshader: DrawObjectIndex<CopyShader>, pointshader: DrawObjectIndex<PointShader>, pointidx: i32) -> () {
+    logi("adding layer");
     let data = get_safe_data(data);
-    match (data.brushlayer.as_ref(), separate_layer) {
-        (_, false) => {
-            data.brushlayer = None;
-        },
-        (None, true) => {
-            let (w,h) = data.dimensions;
-            data.brushlayer = Some(TextureTarget::new(w, h, gltexture::RGBA));
-        },
-        _ => { },
-    };
+    let extra: i32 = (pointidx as i32 + 1) - data.points.len() as i32;
+    if extra > 0 {
+        data.points.grow(extra as uint, Vec::new());
+    }
+    data.events.add_layer(data.dimensions, Some(copyshader), Some(pointshader)
+                          , pointidx as uint, data.points.as_slice());
+}
+
+#[no_mangle]
+pub unsafe fn clear_layers(data: *mut Data) {
+    logi!("setting layer count to 0");
+    let data = get_safe_data(data);
+    data.events.clear_layers();
+    data.points.truncate(1);
 }
 
 #[no_mangle]
@@ -249,6 +231,8 @@ pub extern fn setup_graphics<'a>(w: i32, h: i32) -> *mut Data<'a> {
 
     logi!("setupGraphics({},{})", w, h);
     let targets = [TextureTarget::new(w, h, gltexture::RGBA), TextureTarget::new(w, h, gltexture::RGBA)];
+    let mut points: Vec<Vec<ShaderPaintPoint>> = Vec::new();
+    points.push(Vec::new());
     let data = box Data {
         dimensions: (w, h),
         events: Events::new(),
@@ -256,7 +240,7 @@ pub extern fn setup_graphics<'a>(w: i32, h: i32) -> *mut Data<'a> {
             targets: targets,
             current_target: 0,
         },
-        brushlayer: None,
+        points: points,
     };
 
     gl2::viewport(0, 0, w, h);
@@ -272,31 +256,55 @@ fn get_safe_data(data: *mut Data) -> &mut Data {
     unsafe { &mut *data }
 }
 
+fn draw_layer(layer: CompletedLayer, matrix: &[f32], color: [f32, ..3]
+              , brush: &Texture, back_buffer: &Texture) {
+    if layer.points.len() > 0 {
+        gl2::bind_framebuffer(gl2::FRAMEBUFFER, layer.target.framebuffer);
+        layer.pointshader.prep(matrix.as_slice(), layer.points.as_slice(), color, brush, back_buffer);
+        gl2::draw_arrays(gl2::POINTS, 0, layer.points.len() as i32);
+        check_gl_error("draw_arrays");
+    }
+}
+
 #[no_mangle]
 pub extern fn draw_queued_points(data: *mut Data, handler: *mut MotionEventConsumer, matrix: *mut f32) {
     let data = get_safe_data(data);
-    match (data.events.pointshader, data.events.brush, data.events.interpolator) {
-        (Some(point_shader), Some(brush), Some(interpolator)) => {
+    match (data.events.pointshader, data.events.copyshader, data.events.brush) {
+        (Some(point_shader), Some(copy_shader), Some(brush)) => {
             gl2::enable(gl2::BLEND);
             gl2::blend_func(gl2::ONE, gl2::ONE_MINUS_SRC_ALPHA);
             let (target, source) = get_texturetargets(&data.targetdata);
-            // TODO: brush color selection
-            let brushtarget = data.brushlayer.as_ref().unwrap_or(target);
-            let should_copy = draw_path(handler, brushtarget.framebuffer, point_shader, interpolator,
-                                        matrix, [1f32, 1f32, 0f32], brush, &source.texture, &mut data.events);
-            if should_copy && data.brushlayer.is_some() {
-                match data.events.copyshader {
-                    Some(copy_shader) => {
-                        let copymatrix = matrix::identity.as_slice();
-                        perform_copy(target.framebuffer, &brushtarget.texture, copy_shader, copymatrix);
-                        gl2::bind_framebuffer(gl2::FRAMEBUFFER, brushtarget.framebuffer);
-                        gl2::clear_color(0f32, 0f32, 0f32, 0f32);
-                        gl2::clear(gl2::COLOR_BUFFER_BIT);
-                        logi!("copied brush layer down");
-                    },
-                    None => {
-                        logi!("not copying brush layer");
-                    }
+
+            let safe_matrix: &matrix::Matrix = unsafe { mem::transmute(matrix) };
+            let safe_matrix = safe_matrix.as_slice();
+            let drawvecs = data.points.as_mut_slice();
+            let color = [1f32, 1f32, 0f32]; // TODO: brush color selection
+            let back_buffer = &source.texture;
+
+            for drawvec in drawvecs.iter_mut() {
+                drawvec.clear();
+            }
+            let should_copy = run_interpolators(data.dimensions, handler, &mut data.events, drawvecs);
+
+            let baselayer = CompletedLayer {
+                copyshader: copy_shader,
+                pointshader: point_shader,
+                target: target,
+                points: &drawvecs[0],
+            };
+            draw_layer(baselayer, safe_matrix, color, brush, back_buffer);
+
+            for layer in data.events.layers.iter() {
+                let completed = layer.complete(copy_shader, point_shader);
+                draw_layer(completed, safe_matrix, color, brush, back_buffer);
+
+                if should_copy {
+                    let copymatrix = matrix::identity.as_slice();
+                    perform_copy(target.framebuffer, &layer.target.texture, completed.copyshader, copymatrix);
+                    gl2::bind_framebuffer(gl2::FRAMEBUFFER, layer.target.framebuffer);
+                    gl2::clear_color(0f32, 0f32, 0f32, 0f32);
+                    gl2::clear(gl2::COLOR_BUFFER_BIT);
+                    logi!("copied brush layer down");
                 }
             }
         },
@@ -353,12 +361,9 @@ pub extern fn render_frame(data: *mut Data) {
             let (target, source) = get_texturetargets(&data.targetdata);
             perform_copy(target.framebuffer, &source.texture, anim_shader, copymatrix);
             perform_copy(0 as GLuint, &target.texture, copy_shader, copymatrix);
-            match data.brushlayer.as_ref() {
-                Some(ref brushtarget) => {
-                    gl2::enable(gl2::BLEND);
-                    perform_copy(0 as GLuint, &brushtarget.texture, copy_shader, copymatrix);
-                },
-                None => { },
+            gl2::enable(gl2::BLEND);
+            for layer in data.events.layers.iter() {
+                perform_copy(0 as GLuint, &layer.target.texture, layer.copyshader.unwrap_or(copy_shader), copymatrix);
             }
             eglinit::egl_swap();
         },

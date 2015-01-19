@@ -162,9 +162,9 @@ static jobject exportPixels(JNIEnv* env, jobject thiz, int data) {
   return (jobject) with_pixels((GLInit)data, mycallback, env);
 }
 
-static void jniSetSeparateBrushlayer(JNIEnv* env, jobject thiz, int data, jboolean separatelayer) {
-  set_separate_brushlayer((GLInit)data, separatelayer);
-}
+/*static void jniSetSeparateBrushlayer(JNIEnv* env, jobject thiz, int data, jboolean separatelayer) {*/
+  /*set_separate_brushlayer((GLInit)data, separatelayer);*/
+/*}*/
 
 static void jniEglFinish(JNIEnv* env, jobject thiz) {
   egl_finish();
@@ -190,6 +190,14 @@ static int jniLuaCompileScript(JNIEnv* env, jobject thiz, int data, jstring scri
 
 static void jniLuaSetInterpolator(JNIEnv* env, jobject thiz, int data, jint scriptid) {
   set_interpolator((GLInit) data, scriptid);
+}
+
+static void jniAddLayer(JNIEnv* env, jobject thiz, int data, int copyshader, int pointshader, int pointidx) {
+  add_layer((GLInit) data, copyshader, pointshader, pointidx);
+}
+
+static void jniClearLayers(JNIEnv* env, jobject thiz, int data) {
+  clear_layers((GLInit) data);
 }
 
 jint JNI_OnLoad(JavaVM* vm, void* reserved) {
@@ -251,10 +259,14 @@ jint JNI_OnLoad(JavaVM* vm, void* reserved) {
       .signature = "(II)V",
       .fnPtr = jniLuaSetInterpolator,
     }, {
-      .name = "nativeSetSeparateBrushlayer",
-      .signature = "(IZ)V",
-      .fnPtr = jniSetSeparateBrushlayer,
-    },
+      .name = "nativeAddLayer",
+      .signature = "(IIII)V",
+      .fnPtr = jniAddLayer,
+    }, {
+      .name = "nativeClearLayers",
+      .signature = "(I)V",
+      .fnPtr = jniClearLayers,
+    }
   };
   jclass textureclass = (*env)->FindClass(env, "com/github/wartman4404/gldraw/TextureSurfaceThread");
   (*env)->RegisterNatives(env, textureclass, texturemethods, sizeof(texturemethods)/sizeof(JNINativeMethod));

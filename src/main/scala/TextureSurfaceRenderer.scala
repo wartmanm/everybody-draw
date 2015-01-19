@@ -5,6 +5,7 @@ import android.graphics.SurfaceTexture
 import android.os.{Handler, Looper, Message, SystemClock}
 import android.util.Log
 import android.graphics.Bitmap
+import unibrush.Layer
 
 class TextureSurfaceThread(surface: SurfaceTexture, private var motionHandler: MotionEventHandler, handlerCallback: (TextureSurfaceThread)=>Unit)
 extends Thread with Handler.Callback with AndroidImplicits {
@@ -28,7 +29,8 @@ extends Thread with Handler.Callback with AndroidImplicits {
   @native protected def nativeSetBrushTexture(data: GLInit, t: Texture): Unit
   @native protected def exportPixels(data: GLInit): Bitmap
   @native protected def nativeSetInterpolator(data: GLInit, script: LuaScript): Unit
-  @native protected def nativeSetSeparateBrushlayer(data: GLInit, separatelayer: Boolean): Unit
+  @native protected def nativeAddLayer(data: GLInit, copyshader: CopyShader, pointshader: PointShader, pointidx: Int): Unit
+  @native protected def nativeClearLayers(data: GLInit): Unit
 
   override def run() = {
     Looper.prepare()
@@ -185,7 +187,14 @@ extends Thread with Handler.Callback with AndroidImplicits {
   def setAnimShader(shader: CopyShader) = for (gl <- glinit) { runHere { nativeSetAnimShader(gl, shader) } }
   def setPointShader(shader: PointShader) = for (gl <- glinit) { runHere { nativeSetPointShader(gl, shader) } }
   def setInterpScript(script: LuaScript) = for (gl <- glinit) { runHere { nativeSetInterpolator(gl, script) } }
-  def setSeparateBrushlayer(separatelayer: Boolean) = for (gl <- glinit) { runHere { nativeSetSeparateBrushlayer(gl, separatelayer) } }
+  def setUnibrushLayers(layers: Array[Layer]) = {
+    for (gl <- glinit) { runHere {
+      nativeClearLayers(gl)
+      for (layer <- layers) {
+        nativeAddLayer(gl, layer.copyshader, layer.pointshader, layer.pointsrc)
+      }
+    }}
+  }
   //unused
   def setCopyShader(shader: CopyShader) = for (gl <- glinit) { runHere { nativeSetCopyShader(gl, shader) } }
 }

@@ -31,3 +31,4 @@ pub mod matrix;
 pub mod drawevent;
 pub mod glstore;
 pub mod luascript;
+pub mod paintlayer;

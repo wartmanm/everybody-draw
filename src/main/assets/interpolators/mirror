@@ -12,13 +12,13 @@ function main(a, b, screenx, screeny, points)
   local out = ShaderPaintPoint(x,y,time,size,speed,distance,counter)
   for i = 1,steps do
     out.x = x; out.y = y
-    pushpoint(points, out)
+    pushpoint(points, 0, out)
     out.x = screenx - x; out.y = y
-    pushpoint(points, out)
+    pushpoint(points, 0, out)
     out.x = x; out.y = screeny - y
-    pushpoint(points, out)
+    pushpoint(points, 0, out)
     out.x = screenx - x; out.y = screeny - y
-    pushpoint(points, out)
+    pushpoint(points, 0, out)
 
     x = x + stepx
     y = y + stepy

@@ -49,3 +49,6 @@ void egl_finish();
 lua_State *initLua();
 int loadLuaScript(const char *script);
 void useLuaScript(int key);
+
+void add_layer(GLInit data, int copyshader, int pointshader, int pointidx);
+void clear_layers(GLInit data);

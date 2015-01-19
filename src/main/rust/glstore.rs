@@ -15,8 +15,6 @@ use collections::{Map, MutableMap, MutableSeq};
 use collections::hash::Hash;
 use collections::hash::sip::SipHasher;
 use std::collections::HashMap;
-use std::rand;
-use std::rand::Rng;
 use copyshader::CopyShader;
 use gltexture::{PixelFormat, Texture};
 use pointshader::PointShader;

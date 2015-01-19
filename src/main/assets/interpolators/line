@@ -10,7 +10,7 @@ function main(a, b, x, y, points)
   local stepdistance = (b.distance - a.distance) / steps
   local out = ShaderPaintPoint(a.x,a.y,a.time,a.size,a.speed,a.distance,a.counter)
   for i = 1,steps do
-    pushpoint(points, out)
+    pushpoint(points, 0, out)
     out.x = out.x + stepx
     out.y = out.y + stepy
     out.size = out.size + stepsize

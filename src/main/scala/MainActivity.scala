@@ -312,10 +312,10 @@ class MainActivity extends Activity with TypedActivity with AndroidImplicits {
     for (thread <- textureThread) {
       // TODO: don't load when nothing changed; perform load from texturethread side
       loadUniBrushItem(thread.setBrushTexture, unibrush.brush, controls.brushpicker)
-      loadUniBrushItem(thread.setAnimShader, unibrush.animshader, controls.animpicker)
-      loadUniBrushItem(thread.setPointShader, unibrush.pointshader, controls.paintpicker)
+      loadUniBrushItem(thread.setAnimShader, unibrush.baseanimshader, controls.animpicker)
+      loadUniBrushItem(thread.setPointShader, unibrush.basepointshader, controls.paintpicker)
       loadUniBrushItem(thread.setInterpScript, unibrush.interpolator, controls.interppicker)
-      thread.setSeparateBrushlayer(unibrush.separatelayer)
+      thread.setUnibrushLayers(unibrush.layers)
     }
   }
 
