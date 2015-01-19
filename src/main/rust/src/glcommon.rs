@@ -1,4 +1,3 @@
-#![macro_escape]
 use core::prelude::*;
 use opengles::gl2;
 use opengles::gl2::{GLuint, GLint};
@@ -103,21 +102,30 @@ pub trait Shader {
     fn new(vertopt: MString, fragopt: MString) -> GLResult<Self>;
 }
 
-#[deriving(Show)]
-pub struct Defaults<Init, Base> {
+pub struct Defaults<Init> {
     pub val: Init
 }
 
-pub trait FillDefaults<T, Init, Base> {
-    fn fill_defaults(T) -> Defaults<Init, Base>;
+pub trait FillDefaults<Init> {
+    type Unfilled;
+    fn fill_defaults(unfilled: <Self as FillDefaults<Init>>::Unfilled) -> Defaults<Init>;
 }
+
+pub trait UsingDefaults<Init> {
+    type Defaults;
+    //fn fill_defaults(Init) -> <Self as UsingDefaults<Init>>::Defaults;
+    fn maybe_init(Init) -> GLResult<Self>;
+    fn get_source(&self) -> &<Self as UsingDefaults<Init>>::Defaults;
+}
+
+pub trait UsingDefaultsSafe { }
 
 macro_rules! glattrib_f32 (
     // struct elements
     ($handle:expr, $count:expr, $item:ident, $elem:ident) => ({
         unsafe {
             // XXX probably also unsafe
-            let firstref = $item.unsafe_get(0);
+            let firstref = $item.get_unchecked(0);
             gl2::glVertexAttribPointer($handle, $count, gl2::FLOAT, false as ::opengles::gl2::GLboolean,
                 mem::size_of_val(firstref) as i32,
                 // XXX this actually derefences firstref and is completely unsafe
@@ -131,7 +139,7 @@ macro_rules! glattrib_f32 (
     // densely-packed array
     ($handle:expr, $count:expr, $item:ident) => ({
         unsafe {
-            let firstref =  $item.unsafe_get(0) ;
+            let firstref =  $item.get_unchecked(0) ;
             gl2::glVertexAttribPointer($handle, $count, gl2::FLOAT,
                 false as ::opengles::gl2::GLboolean, 0, mem::transmute(firstref));
         }
@@ -139,7 +147,7 @@ macro_rules! glattrib_f32 (
         gl2::enable_vertex_attrib_array($handle);
         check_gl_error("enable_vertex_array");
     });
-)
+);
 
 macro_rules! gl_bindtexture (
     ($texunit:expr, $kind:expr, $texture:expr, $handle:expr) => ({
@@ -150,4 +158,4 @@ macro_rules! gl_bindtexture (
         gl2::uniform_1i($handle, $texunit);
         check_gl_error(stringify!(uniform1i($texture)));
     });
-)
+);

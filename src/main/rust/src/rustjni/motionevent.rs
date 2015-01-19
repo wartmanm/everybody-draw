@@ -1,6 +1,7 @@
 use core::prelude::*;
 use core::mem;
 use core::cmp::min;
+use alloc::boxed::Box;
 use jni::{jint, jobject, jclass, jfieldID, JNIEnv, JNINativeMethod};
 use android::input::AInputEvent;
 
@@ -14,7 +15,7 @@ unsafe extern "C" fn init_motion_event_handler(env: *mut JNIEnv, _: jobject, wid
     let left = min(30, width / 10);
     let _ = height;
     let (consumer, producer) = glpoint::create_motion_event_handler(left);
-    let (consumer, producer) = (box consumer, box producer);
+    let (consumer, producer) = (Box::new(consumer), Box::new(producer));
     let pairclass = ((**env).FindClass)(env, cstr!("com/github/wartman4404/gldraw/MotionEventHandlerPair"));
     let constructor = ((**env).GetMethodID)(env, pairclass, cstr!("<init>"), cstr!("(II)V"));
     let (consumer, producer): (jpointer, jpointer) = (mem::transmute(consumer), mem::transmute(producer));

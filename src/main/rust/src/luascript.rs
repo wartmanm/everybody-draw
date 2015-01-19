@@ -1,7 +1,7 @@
 use core::prelude::*;
 use core::fmt;
 use core::fmt::Show;
-use glcommon::{GLResult, FillDefaults, Defaults, MString};
+use glcommon::{GLResult, UsingDefaults, MString};
 use lua_geom::{load_lua_script, destroy_lua_script};
 use core::borrow::IntoCow;
 
@@ -16,7 +16,7 @@ impl LuaScript {
     pub fn new(source: MString) -> GLResult<LuaScript> {
         let registry_id = unsafe { try!(load_lua_script(source.as_slice())) };
         let script = LuaScript { registry_id: registry_id, source: source };
-        logi!("created {}", script);
+        logi!("created {:?}", script);
         Ok(script)
     }
 
@@ -28,7 +28,7 @@ impl LuaScript {
 
 impl Drop for LuaScript {
     fn drop(&mut self) {
-        logi!("dropping {}", self);
+        logi!("dropping {:?}", self);
         unsafe {
             destroy_lua_script(self.registry_id);
         }
@@ -41,9 +41,15 @@ impl Show for LuaScript {
     }
 }
 
-impl FillDefaults<Option<MString>, MString, LuaScript> for LuaScript {
-    fn fill_defaults(script: Option<MString>) -> Defaults<MString, LuaScript> {
-        Defaults { val: script.unwrap_or_else(|| DEFAULT_SCRIPT.into_cow()) }
+impl UsingDefaults<Option<MString>> for LuaScript {
+    type Defaults = MString;
+    fn maybe_init(script: Option<MString>) -> GLResult<LuaScript> {
+        LuaScript::new(fill_defaults(script))
     }
+    fn get_source(&self) -> &MString { &self.source }
 }
 
+fn fill_defaults(script: Option<MString>) -> MString {
+    let script = script.unwrap_or_else(|| DEFAULT_SCRIPT.into_cow());
+    script
+}

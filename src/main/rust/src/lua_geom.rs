@@ -2,10 +2,10 @@
 use core::prelude::*;
 use core::{mem, ptr, raw};
 use core::str;
-use core::borrow::IntoCow;
+use core::borrow::{IntoCow, ToOwned};
 use collections::string::String;
-use collections::str::StrAllocating;
 use libc::{c_char, c_void, size_t};
+use std::ffi;
 
 use lua::lib::raw::*;
 use lua::aux::raw::*;
@@ -59,14 +59,14 @@ macro_rules! safe_pop {
 
 type ReaderState<'a> = (&'a str, bool);
 
-#[deriving(Copy)]
+#[derive(Copy)]
 enum SandboxMode {
     Sandboxed(LuaValue),
     Unsandboxed,
 }
 
-#[allow(raw_pointer_deriving)]
-#[deriving(Copy)]
+#[allow(raw_pointer_derive)]
+#[derive(Copy)]
 enum LuaValue {
     #[allow(dead_code)]
     RegistryValue(*mut c_void),
@@ -88,6 +88,7 @@ impl RegistryRef {
         lua_rawgeti(L, LUA_REGISTRYINDEX, self.idx);
     }
     #[inline(always)]
+    #[allow(unused)]
     pub unsafe fn destroy(&mut self, L: *mut lua_State) {
         luaL_unref(L, LUA_REGISTRYINDEX, self.idx);
     }
@@ -156,7 +157,11 @@ pub unsafe fn create_lua<'a>(w: i32, h: i32) -> GLResult<&'a LuaInterpolatorStat
 unsafe extern "C" fn panic_wrapper(L: *mut lua_State) -> i32 {
     loge!("inside lua panic handler!");
     let errorcstr = lua_tostring(L, -1);
-    let errorstr = if errorcstr.is_null() { "" } else { str::from_c_str(errorcstr) };
+    let errorstr = if errorcstr.is_null() {
+        ""
+    } else {
+        str::from_utf8(ffi::c_str_to_bytes(&errorcstr)).unwrap()
+    };
     loge!("error is {}", errorstr);
     let panicfn = get_existing_lua().unwrap().original_panicfn;
     panicfn(L); // should never return
@@ -234,7 +239,7 @@ unsafe fn err_to_str(L: *mut lua_State) -> String {
     let mut size: size_t = 0;
     let strptr = lua_tolstring(L, -1, &mut size);
     let luastr: &str = mem::transmute(raw::Slice { data: strptr, len: size as uint });
-    let result = luastr.into_string();
+    let result = luastr.to_owned();
     safe_pop!(L, 1);
     result
 }
@@ -256,7 +261,7 @@ impl LuaInterpolatorState {
             let stopfns = RegistryRef::new(L);
 
             let original_panicfn = lua_atpanic(L, panic_wrapper);
-            let mut state = LuaInterpolatorState {
+            let state = LuaInterpolatorState {
                 L: L,
                 original_panicfn: original_panicfn,
                 create_sandbox_ref: create_sandbox,

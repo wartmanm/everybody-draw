@@ -1,15 +1,11 @@
-use core::prelude::*;
-use alloc::boxed::Box;
-use collections::string::String;
-use core::{ptr, mem, raw, fmt};
-use core::ptr::RawMutPtr;
-use core::any::{Any, AnyRefExt};
-use core::fmt::Show;
+// cannot use core::prelude and still import StrExt needed for utf16_units
+use std::prelude::v1::*;
+use core::{ptr, mem, raw};
+use core::any::Any;
+use core::fmt::Writer as FormatWriter;
 use core::iter;
 use libc::{c_void, c_char};
 use core::borrow::IntoCow;
-use collections::vec::Vec;
-use collections::str::MaybeOwned;
 
 use jni::{jobject, jclass, jmethodID, jfieldID, JNIEnv, jint, jstring, jvalue, JNINativeMethod, JavaVM};
 #[cfg(target_word_size = "64")] use jni::jlong;
@@ -20,15 +16,13 @@ use drawevent::Events;
 use glcommon::MString;
 use libc::types::os::arch::posix88::pid_t;
 
-use lua_callbacks::LuaCallbackType;
-use lua_geom::LuaInterpolatorState;
-
-use rustrt;
+use std;
 
 extern "C" {
     pub fn gettid() -> pid_t;
 }
 
+#[macro_use]
 mod macros;
 pub mod texturethread;
 pub mod android_bitmap;
@@ -36,7 +30,7 @@ pub mod gldataclasses;
 pub mod motionevent;
 
 
-#[cfg(target_word_size = "32")]
+#[cfg(not(target_word_size = "64"))]
 #[allow(non_camel_case_types)]
 pub type jpointer = jint;
 #[cfg(target_word_size = "64")]
@@ -59,7 +53,7 @@ struct GLInitEvents<'a> {
     //lua: LuaInterpolatorState<LuaCallbackType>,
 }
 
-#[deriving(Copy)]
+#[derive(Copy)]
 pub struct JNIUndoCallback {
     callback_obj: jobject,
     callback_method: jmethodID,
@@ -113,7 +107,10 @@ unsafe fn get_string(env: *mut JNIEnv, string: jstring) -> Option<String> {
     let strslice: &[u16] = mem::transmute(raw::Slice { data: c, len: len as uint });
     let ruststr = String::from_utf16(strslice);
     ((**env).ReleaseStringChars)(env, string as jstring, strslice.as_ptr());
-    Some(try_opt!(ruststr))
+    match ruststr {
+        Ok(s) => Some(s),
+        Err(_) => None,
+    }
 }
 
 unsafe fn get_mstring(env: *mut JNIEnv, string: jstring) -> Option<MString> {
@@ -142,7 +139,7 @@ fn get_safe_data<'a>(data: jpointer) -> &'a mut GLInitEvents<'a> {
 }
 
 
-#[cfg(target_word_size = "32")]
+#[cfg(not(target_word_size = "64"))]
 #[inline(always)]
 unsafe fn get_jpointer(env: *mut JNIEnv, obj: jobject, field: jfieldID) -> jpointer {
     ((**env).GetIntField)(env, obj, field)
@@ -165,31 +162,24 @@ unsafe fn get_jpointer(env: *mut JNIEnv, obj: jobject, field: jfieldID) -> jpoin
 //}
 
 fn on_unwind(msg: &(Any + Send), file: &'static str, line: uint) {
-    use core::fmt::FormatWriter;
+    //use core::fmt::FormatWriter;
     // as far as I know there's no way to identify traits that can be cast to Show at runtime
-    if let Some(s) = msg.downcast_ref::<&Show>() {
-        loge!("fatal error in {}:{} as &Show: {}", file, line, s);
-    } else if let Some(s) = msg.downcast_ref::<Box<Show>>() {
-        loge!("fatal error in {}:{} as Box<Show>: {}", file, line, &**s);
-    } else if let Some(s) = msg.downcast_ref::<&str>() {
+    // these cause compiler crashes:
+    //if let Some(s) = msg.downcast_ref::<&Show>() {
+        //loge!("fatal error in {}:{} as &Show: {:?}", file, line, s);
+    //if let Some(s) = msg.downcast_ref::<Box<Show>>() {
+        //loge!("fatal error in {}:{} as Box<Show>: {:?}", file, line, &**s);
+    if let Some(s) = msg.downcast_ref::<&str>() {
         loge!("fatal error in {}:{} as &str: {}", file, line, s);
     } else if let Some(s) = msg.downcast_ref::<String>() {
         loge!("fatal error in {}:{} as String: {}", file, line, s);
-    } else if let Some(s) = msg.downcast_ref::<MaybeOwned<'static>>() {
-        loge!("fatal error in {}:{} as MaybeOwned: {}", file, line, s);
+    //} else if let Some(s) = msg.downcast_ref::<Cow<'static, String, &str>>() {
+        //loge!("fatal error in {}:{} as MaybeOwned: {}", file, line, s);
     } else {
-        loge!("fatal error in {}:{}: unknown error message type {}!", file, line, msg.get_type_id());
+        loge!("fatal error in {}:{}: unknown error message type {:?}!", file, line, msg.get_type_id());
         loge!("Printing start:");
         unsafe {
-            let mut line = Vec::new();
-            // stolen from unwind.rs
-            struct VecWriter<'a> { v: &'a mut Vec<u8> }
-            impl<'a> ::core::fmt::FormatWriter for VecWriter<'a> {
-                fn write(&mut self, buf: &[u8]) -> fmt::Result {
-                    self.v.push_all(buf);
-                    Ok(())
-                }
-            }
+            let mut line = String::new();
 
             let width = 32;
             let raw::TraitObject { data: msgptr, vtable: _ } = mem::transmute(msg);
@@ -197,13 +187,12 @@ fn on_unwind(msg: &(Any + Send), file: &'static str, line: uint) {
             let poscounter = iter::count(msgptr as u32, width as u32);
             for (chunk, pos) in msgslice.chunks(width).zip(poscounter) {
                 {
-                    let mut writer = VecWriter { v: &mut line };
-                    let _ = write!(&mut writer, "{:08x}: ", pos);
+                    let _ = write!(&mut line, "{:08x}: ", pos);
                     for byte in chunk.iter() {
-                        let _ = write!(&mut writer, "{} ", byte);
+                        let _ = write!(&mut line, "{} ", byte);
                     }
                 }
-                loge!("{}", ::core::str::from_utf8_unchecked(line.as_slice().init()));
+                loge!("{}", line);
                 line.clear();
             }
         }
@@ -225,7 +214,7 @@ pub unsafe extern "C" fn JNI_OnLoad(vm: *mut JavaVM, reserved: *mut c_void) -> j
         return -1;
     }
     let env = env as *mut JNIEnv;
-    logi!("got environment!: {}", env);
+    logi!("got environment!: {:?}", env);
 
     texturethread::init(env);
     texturethread::init(env);
@@ -236,7 +225,7 @@ pub unsafe extern "C" fn JNI_OnLoad(vm: *mut JavaVM, reserved: *mut c_void) -> j
     GL_EXCEPTION = CaseClass::new(env, cstr!("com/github/wartman4404/gldraw/GLException"), cstr!("(Ljava/lang/String;)V"));
 
     //rustrt::init(1, ["rustjni".as_ptr()].as_ptr());
-    rustrt::unwind::register(on_unwind);
+    std::rt::unwind::register(on_unwind);
 
     logi!("finished jni_onload");
     JNI_VERSION_1_2

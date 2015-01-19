@@ -1,4 +1,6 @@
-#![feature(globs, macro_rules, default_type_params, unboxed_closures, unsafe_destructor)]
+#![feature(unboxed_closures, unsafe_destructor)]
+#![allow(unstable)]
+#![feature(int_uint)]
 #![crate_name = "rustgl"]
 #![crate_type = "staticlib"]
 #![no_std]
@@ -6,13 +8,13 @@
 extern crate libc;
 extern crate opengles;
 extern crate egl;
+//#[macro_use(format, write, println, try, assert, debug_assert, assert_eq, debug_assert_eq)]
 extern crate core;
 extern crate collections;
 extern crate alloc;
 extern crate std;
 extern crate arena;
 extern crate lua;
-extern crate rustrt;
 
 pub mod bindgen_builtins;
 pub mod android;
@@ -21,9 +23,13 @@ pub mod jni_constants;
 pub mod luajit;
 pub mod luajit_constants;
 
+#[macro_use]
 pub mod macros;
+#[macro_use]
 pub mod log;
+#[macro_use]
 pub mod glcommon;
+#[macro_use]
 pub mod rollingaverage;
 
 pub mod glpoint;

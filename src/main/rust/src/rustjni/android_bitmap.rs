@@ -6,7 +6,7 @@ use libc::c_void;
 use jni::{jobject, jclass, jmethodID, JNIEnv};
 use jni_constants::{JNI_TRUE, JNI_FALSE};
 use android::bitmap::{AndroidBitmap_getInfo, AndroidBitmap_lockPixels, AndroidBitmap_unlockPixels, AndroidBitmapInfo};
-use android::bitmap::{Enum_AndroidBitmapFormat, ANDROID_BITMAP_FORMAT_NONE, ANDROID_BITMAP_FORMAT_RGBA_8888, ANDROID_BITMAP_FORMAT_RGB_565, ANDROID_BITMAP_FORMAT_RGBA_4444, ANDROID_BITMAP_FORMAT_A_8};
+use android::bitmap::{ANDROID_BITMAP_FORMAT_NONE, ANDROID_BITMAP_FORMAT_RGBA_8888, ANDROID_BITMAP_FORMAT_RGB_565, ANDROID_BITMAP_FORMAT_RGBA_4444, ANDROID_BITMAP_FORMAT_A_8};
 use gltexture;
 use gltexture::PixelFormat;
 use glcommon::GLResult;
@@ -26,7 +26,7 @@ pub struct AndroidBitmap {
 }
 
 #[repr(i32)]
-#[deriving(Copy)]
+#[derive(Copy)]
 #[allow(non_camel_case_types, dead_code)]
 pub struct AndroidBitmapFormat {
     value: i32,
@@ -50,7 +50,7 @@ impl gltexture::ToPixelFormat for AndroidBitmapFormat {
         match self.value as u32 {
             ANDROID_BITMAP_FORMAT_RGBA_8888 => Ok(PixelFormat::RGBA),
             ANDROID_BITMAP_FORMAT_A_8 => Ok(PixelFormat::ALPHA),
-            _ => Err(format!("Unsupported texture format: {}!", self).into_cow()),
+            _ => Err(format!("Unsupported texture format: {:?}!", self).into_cow()),
         }
     }
 }
@@ -59,7 +59,7 @@ impl AndroidBitmap {
     pub unsafe fn from_jobject(env: *mut JNIEnv, bitmap: jobject) -> AndroidBitmap {
         let mut pixels: *mut c_void = ptr::null_mut();
         AndroidBitmap_lockPixels(env, bitmap, &mut pixels);
-        logi!("locked pixels in {}", pixels);
+        logi!("locked pixels in {:?}", pixels);
         let mut result = AndroidBitmap { env: env, obj: bitmap, pixels: pixels as *mut u8, info: mem::zeroed() };
         AndroidBitmap_getInfo(env, bitmap, &mut result.info);
         result

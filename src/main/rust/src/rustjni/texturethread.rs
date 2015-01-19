@@ -13,6 +13,7 @@ use matrix::Matrix;
 use rustjni::{register_classmethods, CaseClass, get_safe_data, str_to_jstring, GLInitEvents, JNIUndoCallback, JNICallbackClosure, jpointer, GL_EXCEPTION};
 use jni_helpers::ToJValue;
 use jni_constants::*;
+use lua_geom;
 
 static mut LUA_EXCEPTION: CaseClass = CaseClass { constructor: 0 as jmethodID, class: 0 as jclass };
 static mut RUNTIME_EXCEPTION: CaseClass = CaseClass { constructor: 0 as jmethodID, class: 0 as jclass };
@@ -38,14 +39,14 @@ unsafe extern "C" fn init_gl(env: *mut JNIEnv, _: jobject, w: jint, h: jint, cal
     let glinit = GLInit::setup_graphics(w, h);
     let events = Events::new();
     let jni_undo_callback = JNIUndoCallback::new(env, callback);
-    let lua = ::lua_geom::ensure_lua_exists(w, h);
-    mem::transmute(box GLInitEvents {
+    let _ = lua_geom::ensure_lua_exists(w, h);
+    mem::transmute(Box::new(GLInitEvents {
         glinit: glinit,
         events: events,
         jni_undo_callback: jni_undo_callback,
         owning_thread: ::rustjni::gettid(),
         /* lua: lua */
-    })
+    }))
 }
 
 unsafe extern "C" fn finish_gl(env: *mut JNIEnv, _: jobject, data: jpointer) {
@@ -118,7 +119,7 @@ pub unsafe extern "C" fn export_pixels(env: *mut JNIEnv, _: jobject, data: jpoin
     bitmap.obj
 }
 
-pub unsafe extern "C" fn draw_image(env: *mut JNIEnv, _: jobject, data: jpointer, bitmap: jobject) {
+pub unsafe extern "C" fn draw_image(env: *mut JNIEnv, _: jobject, data: jpointer, bitmap: jobject, rotation: jint) {
     let bitmap = AndroidBitmap::from_jobject(env, bitmap);
 
     // This is really dumb.
@@ -129,11 +130,10 @@ pub unsafe extern "C" fn draw_image(env: *mut JNIEnv, _: jobject, data: jpointer
     //  - the match arm consumes it
     //  - Err(_) doesn't even use the bitmap's lifetime anywhere
     //  In conclusion, blargh.
-    let mut exception: Option<jobject> = None;
     let exception = match bitmap.as_slice() {
         Ok(pixels) => {
             let data = get_safe_data(data);
-            data.glinit.draw_image(bitmap.info.width as i32, bitmap.info.height as i32, pixels);
+            data.glinit.draw_image(bitmap.info.width as i32, bitmap.info.height as i32, pixels, mem::transmute(rotation));
             return;
         },
         Err(err) => {
@@ -171,7 +171,7 @@ unsafe extern "C" fn jni_replay_begin(_: *mut JNIEnv, _: jobject, data: jpointer
     let data = get_safe_data(data);
     data.glinit.clear_layers();
     data.glinit.clear_buffer();
-    mem::transmute(box EventStream::new())
+    mem::transmute(Box::new(EventStream::new()))
 }
 
 #[allow(unused)]
@@ -231,7 +231,7 @@ pub unsafe fn init(env: *mut JNIEnv) {
         native_method!("nativeDrawQueuedPoints", "(II[F)V", native_draw_queued_points),
         native_method!("nativeFinishLuaScript", "(II)V", native_finish_lua_script),
         native_method!("nativeClearFramebuffer", "(I)V", clear_framebuffer),
-        native_method!("nativeDrawImage", "(ILandroid/graphics/Bitmap;)V", draw_image),
+        native_method!("nativeDrawImage", "(ILandroid/graphics/Bitmap;I)V", draw_image),
         native_method!("nativeSetAnimShader", "(II)Z", set_anim_shader),
         native_method!("nativeSetCopyShader", "(II)Z", set_copy_shader),
         native_method!("nativeSetPointShader", "(II)Z", set_point_shader),
