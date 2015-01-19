@@ -123,7 +123,7 @@ case class UniBrush(
 
 object UniBrush {
   def logAbort[T](s: String): GLResult[T] = {
-    Log.e("unibrush", s"failed to load: ${s}")
+    Log.e("everybody-draws", s"unibrush: failed to load: ${s}")
     throw new GLException(s)
   }
 

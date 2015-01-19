@@ -83,7 +83,7 @@ object DrawFiles {
           this.compile(gl)
         } catch {
           case e: Exception => {
-            Log.e("drawfiles", s"failed to read ${this}")
+            Log.e("everybody-draws", s"drawfiles: failed to read ${this}")
           }
         }
         compileSafe(gl)
@@ -157,7 +157,7 @@ object DrawFiles {
     Option(BitmapFactory.decodeStream(stream, null, options)) match {
       case None => throw new GLException("unable to load bitmap!")
       case Some(bitmap) => {
-        Log.i("drawfiles", "bitmap: config %s, w: %d, h: %d, alpha: %b".format(
+        Log.i("everybody-draws", "drawfiles: bitmap: config %s, w: %d, h: %d, alpha: %b".format(
           bitmap.getConfig(), bitmap.getHeight(), bitmap.getWidth(), bitmap.hasAlpha()))
         bitmap
       }

@@ -47,7 +47,7 @@ extends Thread with Handler.Callback with AndroidImplicits {
     Looper.prepare()
     handler = new Handler(this)
     handlerCallback(this)
-    Log.i("tst", "entering message loop")
+    Log.i("everybody-draws", "gl thread: entering message loop")
     Looper.loop()
   }
 
@@ -81,7 +81,7 @@ extends Thread with Handler.Callback with AndroidImplicits {
         Looper.myLooper().quit()
       }
       case MSG_BEGIN_GL => {
-        Log.i("tst", "got begin_gl message");
+        Log.i("everybody-draws", "gl thread: got begin_gl message");
         eglHelper = new EGLHelper()
         eglHelper.init(surface)
         val BeginGLArgs(undoCallback, beginGLCallback) = msg.obj.asInstanceOf[BeginGLArgs]
@@ -106,7 +106,7 @@ extends Thread with Handler.Callback with AndroidImplicits {
   def startFrames(): Unit = {
     glinit match {
       case Some(gl) => startFrames(gl)
-      case None => Log.e("tst", "unable to start frames, no gl inited!")
+      case None => Log.e("everybody-draws", "gl thread: unable to start frames, no gl inited!")
     }
   }
   
@@ -165,9 +165,9 @@ extends Thread with Handler.Callback with AndroidImplicits {
   }
 
   def finishLuaScript(gl: GLInit) = {
-    //Log.i("tst", "finishing lua script - final draw")
+    //Log.i("everybody-draws", "gl thread: finishing lua script - final draw")
     nativeDrawQueuedPoints(gl, motionHandler, matrix)
-    //Log.i("tst", "finishing lua script - unloading")
+    //Log.i("everybody-draws", "gl thread: finishing lua script - unloading")
     nativeFinishLuaScript(gl, motionHandler)
   }
 
@@ -184,7 +184,6 @@ extends Thread with Handler.Callback with AndroidImplicits {
   }
 
   def setBrushTexture(gl: GLInit, texture: Texture) {
-    Log.i("tst", s"setting brush texture to ${texture}")
     nativeSetBrushTexture(gl, texture.ptr)
   }
 
