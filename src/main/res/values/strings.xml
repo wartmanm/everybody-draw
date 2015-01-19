@@ -3,5 +3,7 @@
 
     <string name="app_name">Everybody Draw!</string>
     <string name="action_settings">Settings</string>
+    <string name="sidebar_open">Open paint settings drawer</string>
+    <string name="sidebar_close">Close paint settings drawer</string>
 
 </resources>

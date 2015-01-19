@@ -7,6 +7,7 @@ import android.widget._
 import android.view._
 import android.graphics.{SurfaceTexture, Bitmap}
 import android.content.{Context, Intent}
+import android.content.res.Configuration
 import android.opengl.GLException
 
 import java.io.{BufferedInputStream}
@@ -20,7 +21,6 @@ import scala.collection.mutable
 
 import com.ipaulpro.afilechooser.utils.FileUtils
 
-import PaintControls.NamedPicker
 import unibrush.{UniBrush, Layer}
 
 import resource._
@@ -28,6 +28,10 @@ import resource._
 import scala.concurrent.ExecutionContext
 import scala.concurrent.Future
 import java.util.concurrent.Executors
+
+import PaintControls.UnnamedPicker
+import PaintControls.SavedControl
+
 
 
 class MainActivity extends Activity with TypedActivity with AndroidImplicits {
@@ -38,17 +42,19 @@ class MainActivity extends Activity with TypedActivity with AndroidImplicits {
   lazy val content = new TextureView(this)
   lazy val contentframe = findView(TR.textureviewframe)
 
-  lazy val controls = new PaintControls(
-    inbrushpicker = findView(TR.brushpicker).asInstanceOf[AdapterView[Adapter]],
-    inanimpicker = findView(TR.animpicker).asInstanceOf[AdapterView[Adapter]],
-    inpaintpicker = findView(TR.paintpicker).asInstanceOf[AdapterView[Adapter]],
-    ininterppicker = findView(TR.interppicker).asInstanceOf[AdapterView[Adapter]],
-    inunipicker = findView(TR.unipicker).asInstanceOf[AdapterView[Adapter]])
+  lazy val controls = PaintControls(
+    brushpicker = findView(TR.brushpicker),
+    animpicker = findView(TR.animpicker),
+    paintpicker = findView(TR.paintpicker),
+    interppicker = findView(TR.interppicker),
+    unipicker = findView(TR.unipicker))
 
-  lazy val clearbutton = findView(TR.clearbutton)
-  lazy val loadbutton = findView(TR.loadbutton)
-  lazy val savebutton = findView(TR.savebutton)
-  lazy val replaybutton = findView(TR.replaybutton)
+  lazy val drawerParent = findView(TR.drawer_parent)
+  lazy val controlflipper = findView(TR.controlflipper)
+  lazy val controldrawer = findView(TR.control_drawer)
+  lazy val drawerToggle = new android.support.v7.app.ActionBarDrawerToggle(
+      this, drawerParent, R.string.sidebar_open, R.string.sidebar_close)
+  lazy val sidebarAdapter = new SidebarAdapter()
 
   var textureThread: Option[TextureSurfaceThread] = None
 
@@ -102,12 +108,14 @@ class MainActivity extends Activity with TypedActivity with AndroidImplicits {
     super.onCreate(bundle)
     setContentView(R.layout.activity_main)
 
-    clearbutton.setOnClickListener(() => {
-        textureThread.foreach(_.clearScreen())
-      }) 
-    loadbutton.setOnClickListener(() => loadFile())
-    savebutton.setOnClickListener(() => saveFile())
-    replaybutton.setOnClickListener(() => startReplay())
+    controldrawer.setAdapter(sidebarAdapter)
+    controldrawer.setOnItemClickListener((v: View, pos: Int) => {
+        sidebarAdapter.sidebarControls(pos).onClick(pos)
+      })
+
+    drawerParent.setDrawerListener(drawerToggle)
+    getActionBar().setDisplayHomeAsUpEnabled(true)
+    getActionBar().setHomeButtonEnabled(true)
 
     // TODO: deal with rotation better
     Option(bundle) match {
@@ -120,6 +128,28 @@ class MainActivity extends Activity with TypedActivity with AndroidImplicits {
         loadFromFile()
       }
     }
+  }
+
+  override protected def onPostCreate(bundle: Bundle) = {
+    super.onPostCreate(bundle)
+    drawerToggle.syncState()
+  }
+
+  override def onConfigurationChanged(config: Configuration) = {
+    super.onConfigurationChanged(config)
+    drawerToggle.onConfigurationChanged(config)
+  }
+
+  override def onOptionsItemSelected(item: MenuItem): Boolean = {
+    if (drawerToggle.onOptionsItemSelected(item)) true
+    else item.getItemId() match {
+      case R.id.menu_save => saveFile()
+      case R.id.menu_load => loadFile()
+      case R.id.menu_replay => startReplay()
+      case R.id.menu_clear => textureThread.foreach(_.clearScreen())
+      case _ => return super.onOptionsItemSelected(item)
+    }
+    true
   }
 
   override def onStart() = {
@@ -239,32 +269,25 @@ class MainActivity extends Activity with TypedActivity with AndroidImplicits {
     savePickersToFile()
   }
 
-  override def onMenuItemSelected(featureId: Int, item: MenuItem): Boolean = {
-    item.getItemId() match {
-      case _ => false
-    }
-  }
-
-  def disableEntry[U](picker: NamedPicker[U], pos: Int) = {
-  }
-
-  def populatePicker[U, T <: (String, (Unit)=>GLResult[U])](picker: NamedPicker[U], arr: Array[T], cb: (U)=>Unit, thread: TextureSurfaceThread) = {
+  def populatePicker[U, T <: (String, (Unit)=>GLResult[U])](picker: UnnamedPicker[U], arr: Array[T], cb: (U)=>Unit, thread: TextureSurfaceThread) = {
     val adapter = new LazyPicker(this, thread, arr)
-    picker.control.setAdapter(adapter)
-    picker.control.setOnItemSelectedListener(new AdapterView.OnItemSelectedListener() {
-        override def onItemSelected(parent: AdapterView[_], view: View, pos: Int, id: Long) = {
+    picker.setAdapter(adapter)
+    picker.control.setOnItemClickListener(new AdapterView.OnItemClickListener() {
+        override def onItemClick(parent: AdapterView[_], view: View, pos: Int, id: Long) = {
+          picker.selected = pos
+          //Log.i("main", s"Item selected for {picker.name}! {pos}")
           adapter.getState(pos, (result: GLResult[U]) => result match {
               case Right(value) => cb(value)
               case Left(errmsg) => {
-                //adapter.getState(0, (result: GLResult[U]) => cb(result.right.get))
                 MainActivity.this.runOnUiThread(() => {
                   Toast.makeText(MainActivity.this, "unable to load item!\n" + errmsg, Toast.LENGTH_LONG).show()
-                  picker.control.setSelection(0)
+                  picker.control.performItemClick(null, 0, 0)
+                  adapter.notifyDataSetChanged()
+                  ()
                 })
               }
             })
         }
-        override def onNothingSelected(parent: AdapterView[_]) = { }
       })
     picker.restoreState()
   }
@@ -290,6 +313,7 @@ class MainActivity extends Activity with TypedActivity with AndroidImplicits {
             populatePicker(controls.paintpicker, paints,  thread.setPointShader _, thread)
             populatePicker(controls.interppicker, interpscripts,  thread.setInterpScript _, thread)
             populatePicker(controls.unipicker, unibrushes, loadUniBrush _, thread)
+            controls.copypicker.currentValue = thread.outputShader
           })
       }
     }
@@ -298,27 +322,24 @@ class MainActivity extends Activity with TypedActivity with AndroidImplicits {
   // TODO: fewer callbacks
   def loadUniBrushControls(unibrush: UniBrush) = {
     runOnUiThread(() => {
-      controls.brushpicker.control.setEnabled(unibrush.brush.isEmpty)
-      controls.animpicker.control.setEnabled(unibrush.baseanimshader.isEmpty)
-      controls.paintpicker.control.setEnabled(unibrush.basepointshader.isEmpty)
-      controls.interppicker.control.setEnabled(unibrush.interpolator.isEmpty)
+      sidebarAdapter.updateUnibrush(unibrush)
     })
   }
 
   def loadUniBrush(unibrush: UniBrush) = {
     Log.i("main", "loading unibrush")
-    def getSelectedValue[T](picker: NamedPicker[T]) = {
-      picker.control.getAdapter.asInstanceOf[LazyPicker[T]]
-      .getItem(picker.control.getSelectedItemPosition())._2.cachedValue.flatMap(_.right.toOption)
+    def getSelectedValue[T](picker: SavedControl[T]) = {
+      // return None if the control is already active, or we're trying to restore a missing value
+      // TODO: the missing-value part is probably busted
+      if (picker.enabled) None
+      else picker.currentValue
     }
     for (thread <- textureThread) {
-      // TODO: don't load when nothing changed; perform load from texturethread side
       loadUniBrushControls(unibrush)
-
       val brush = unibrush.brush.orElse(getSelectedValue(controls.brushpicker))
       val anim = unibrush.baseanimshader.orElse(getSelectedValue(controls.animpicker))
       val point = unibrush.basepointshader.orElse(getSelectedValue(controls.paintpicker))
-      val copy = unibrush.basecopyshader
+      val copy = unibrush.basecopyshader.orElse(getSelectedValue(controls.copypicker))
       val interp = unibrush.interpolator.orElse(getSelectedValue(controls.interppicker))
       thread.loadUniBrush(brush, anim, point, copy, interp, unibrush.layers)
     }
@@ -375,7 +396,7 @@ class MainActivity extends Activity with TypedActivity with AndroidImplicits {
       val prefix = (
         e match {
           case _: LuaException => {
-            controls.interppicker.control.setSelection(0)
+            controls.interppicker.control.performItemClick(null, 0, 0)
             "An error occurred in the interpolator:\n" 
           }
           case _ => "An error occurred:\n" 
@@ -387,6 +408,75 @@ class MainActivity extends Activity with TypedActivity with AndroidImplicits {
     for (thread <- textureThread) {
       Log.i("main", "starting replay...")
       thread.beginReplay()
+    }
+  }
+  
+  def showControl(pos: Int) = {
+    controlflipper.setVisibility(View.VISIBLE)
+    controlflipper.setDisplayedChild(pos)
+    drawerParent.closeDrawer(controldrawer)
+  }
+  def hideControls() = {
+    controlflipper.setVisibility(View.INVISIBLE)
+    drawerParent.closeDrawer(controldrawer)
+  }
+
+  class SidebarAdapter() extends BaseAdapter {
+    import SidebarAdapter._
+    val inflater = LayoutInflater.from(MainActivity.this)
+    // must match order of viewflipper children
+    val sidebarControls = Array (
+      new SidebarEntryPicker("Brush Texture", controls.brushpicker, (u: UniBrush) => u.brush),
+      new SidebarEntryPicker("Animation", controls.animpicker, (u: UniBrush) => u.baseanimshader),
+      new SidebarEntryPicker("Paint", controls.paintpicker, (u: UniBrush) => u.basepointshader),
+      new SidebarEntryPicker("Interpolator", controls.interppicker, (u: UniBrush) => u.interpolator),
+      new SidebarEntryPicker("Unibrushes", controls.unipicker, (u: UniBrush) => None),
+      new SidebarEntryHider("Hide Controls")
+    )
+    override def areAllItemsEnabled = false
+    override def isEnabled(pos: Int) = sidebarControls(pos).enabled
+    override def getCount = sidebarControls.length
+    override def getViewTypeCount() = 1
+    override def getItem(pos: Int) = sidebarControls(pos)
+    override def getItemId(pos: Int) = pos
+    override def getView(pos: Int, convertView: View, parent: ViewGroup): View = {
+      val view = if (convertView == null) {
+        inflater.inflate(android.R.layout.simple_list_item_activated_1, parent, false)
+      } else {
+        convertView
+      }
+      val name = view.findViewById(android.R.id.text1).asInstanceOf[TextView]
+      val control = sidebarControls(pos)
+      val enabled = control.enabled
+      name.setText(control.name)
+      name.setEnabled(enabled)
+      view.setEnabled(enabled)
+      view
+    }
+
+    def updateUnibrush(unibrush: UniBrush) = {
+      for (control <- sidebarControls) {
+        control.updateForUnibrush(unibrush)
+      }
+      this.notifyDataSetChanged()
+    }
+  }
+  object SidebarAdapter {
+    trait SidebarEntry {
+      def onClick(pos: Int): Unit
+      def updateForUnibrush(u: UniBrush): Unit
+      def enabled: Boolean
+      def name: String
+    }
+    class SidebarEntryPicker[T](val name: String, picker: UnnamedPicker[_], getUnibrushValue: (UniBrush) => Option[T]) extends SidebarEntry {
+      override def enabled = picker.enabled
+      override def updateForUnibrush(u: UniBrush) = picker.enabled = getUnibrushValue(u).isEmpty
+      override def onClick(pos: Int) = showControl(pos)
+    }
+    class SidebarEntryHider(val name: String) extends SidebarEntry {
+      override def enabled = true
+      override def updateForUnibrush(u: UniBrush) = { }
+      override def onClick(pos: Int) = hideControls()
     }
   }
 }
@@ -412,5 +502,10 @@ object MainActivity {
 
   class FrameListener extends SurfaceTexture.OnFrameAvailableListener {
     def onFrameAvailable(st: android.graphics.SurfaceTexture): Unit = { }
+  }
+
+  abstract class NamedSidebarControl(val name: String) {
+    override def toString() = name
+    def onClick(pos: Int)
   }
 }

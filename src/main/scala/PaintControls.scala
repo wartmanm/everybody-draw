@@ -1,69 +1,122 @@
 package com.github.wartman4404.gldraw
 
 import android.os.Bundle
-import android.widget.{AdapterView, Adapter}
+import android.content.Context
+import android.widget.{AdapterView, Adapter, GridView, ListAdapter}
 
 import java.io.{InputStream, OutputStream, OutputStreamWriter, BufferedWriter}
 
 import unibrush.UniBrush
 
-class PaintControls(inbrushpicker: AdapterView[Adapter], inanimpicker: AdapterView[Adapter], inpaintpicker: AdapterView[Adapter], ininterppicker: AdapterView[Adapter], inunipicker: AdapterView[Adapter]) {
-  import PaintControls._
+import spray.json._
+import PaintControls._
 
-  val animpicker = NamedPicker[CopyShader]("anim", inanimpicker)
-  val brushpicker = NamedPicker[Texture]("brush", inbrushpicker)
-  val paintpicker = NamedPicker[PointShader]("paint", inpaintpicker)
-  val interppicker = NamedPicker[LuaScript]("interp", ininterppicker)
-  val unipicker = NamedPicker[UniBrush]("unib", inunipicker)
+class PaintControls
+  (val animpicker: UP[CopyShader], val brushpicker: UP[Texture], val paintpicker: UP[PointShader], val interppicker: UP[LuaScript], val unipicker: UP[UniBrush], val copypicker: UUP[CopyShader]) 
+extends AutoProductFormat {
 
-  val namedPickers = Array(animpicker, brushpicker, paintpicker, interppicker, unipicker)
+  val namedPickers = Map(
+    "anim" -> animpicker,
+    "brush" -> brushpicker,
+    "paint" -> paintpicker,
+    "interp" -> interppicker,
+    "unibrush" -> unipicker,
+    "copy" -> copypicker
+  )
 
-  def restoreState() = namedPickers.map(_.restoreState())
-  def updateState() = namedPickers.map(_.updateState())
-  def save(b: Bundle): Unit = namedPickers.foreach(_.save(b))
-  def load(b: Bundle): Unit = namedPickers.foreach(_.load(b))
-  def save(m: Map[String, String]): Map[String, String] = namedPickers.foldLeft(m)((m, p) => p.save(m))
-  def load(m: Map[String, String]): Unit = namedPickers.map(_.load(m))
+  def restoreState() = namedPickers.values.map(_.restoreState())
+  def updateState() = namedPickers.values.map(_.updateState())
+  def saveToString(): String = {
+    namedPickers.map({case (k,v) => (k, v.save())}).toJson.toString
+  }
+  def loadFromString(s: String) = {
+    val saved = s.parseJson.convertTo[Map[String, JsValue]]
+    for ((name, state) <- saved) {
+      namedPickers(name).load(state)
+    }
+  }
+  def save(b: Bundle): Unit = b.putString("paintcontrols", saveToString())
+  def load(b: Bundle): Unit = loadFromString(b.getString("paintcontrols"))
   def save(os: OutputStream): Unit = {
     val writer = new BufferedWriter(new OutputStreamWriter(os))
-    writer.write(save(Map[String,String]()).map { case (k, v) => s"$k=$v" }.mkString("\n"))
+    writer.write(saveToString())
     writer.close()
   }
   def load(is: InputStream): Unit = {
-    val reader = scala.io.Source.fromInputStream(is)
-    val map = reader.getLines.foldLeft(Map[String, String]())((m, line) => {
-        val Array(k, v): Array[String] = line.split("=", 2)
-        m + (k -> v)
-      })
-    load(map)
-    reader.close()
+    val state = DrawFiles.readStream(is)
+    loadFromString(state)
   }
-
 }
 object PaintControls {
-
-  case class NamedPicker[T](name: String, control: AdapterView[Adapter]) {
-    private var state: Option[String] = None
-    def restoreState() = {
-      val index = state.map(s => control.getAdapter().asInstanceOf[LazyPicker[T]].lazified.indexWhere(_._1 == s) match {
-          case -1 => 0
-          case  x => x
-        }).getOrElse(0)
-      control.setSelection(index)
-    }
-    def updateState() = state = control.getSelectedItemPosition() match {
-      case AdapterView.INVALID_POSITION => None
-      case x => Some(control.getAdapter().asInstanceOf[LazyPicker[T]].lazified(x)._1)
-    }
-    def save(b: Bundle): Unit = for (value <- state) b.putString(name, value)
-    def load(b: Bundle): Unit = state = Option(b.getString(name))
-    def save(m: Map[String, String]): Map[String, String] = state.map(value => m + (name -> value)).getOrElse(m)
-    def load(m: Map[String, String]): Unit = state = m.get(name)
+  type LAV = AdapterView[ListAdapter]
+  type UP[T] = UnnamedPicker[T]
+  type UUP[T] = UnnamedUnpicker[T]
+  def apply
+  (animpicker: LAV, brushpicker: LAV, paintpicker: LAV, interppicker: LAV, unipicker: LAV) = {
+    new PaintControls (
+      new UnnamedPicker[CopyShader](animpicker),
+      new UnnamedPicker[Texture](brushpicker),
+      new UnnamedPicker[PointShader](paintpicker),
+      new UnnamedPicker[LuaScript](interppicker),
+      new UnnamedPicker[UniBrush](unipicker),
+      new UnnamedUnpicker[CopyShader](None))
   }
+
+  trait SavedControl[T] {
+    def save(): JsValue
+    def load(j: JsValue): Unit
+    def restoreState() { }
+    def updateState() { }
+    var enabled: Boolean = true
+    def currentValue: Option[T]
+  }
+
+  class UnnamedPicker[T](val control: AdapterView[ListAdapter]) extends SavedControl[T] with AutoProductFormat {
+    type U = AdapterView[LazyPicker[T]]
+    var selected = AdapterView.INVALID_POSITION
+    def currentValue = adapter.lazified(selected)._2.getCached()
+    var selectedName = ""
+    private var adapter: LazyPicker[T] = null
+    def setAdapter(a: LazyPicker[T]) = {
+      adapter = a
+      control.setAdapter(a)
+    }
+    override def restoreState(): Unit = {
+      selected = this.adapter.lazified.indexWhere(_._1 == selectedName) match {
+        case -1 => 0
+        case  x => x
+      }
+      if (enabled) this.control.performItemClick(null, selected, selected)
+    }
+    override def updateState() = selectedName = selected match {
+      case AdapterView.INVALID_POSITION => ""
+      case x => adapter.lazified(x)._1
+    }
+    override def save() = SavedState(enabled, selectedName).toJson
+    override def load(j: JsValue) = {
+      val state = j.convertTo[SavedState]
+      enabled = state.enabled
+      selectedName = state.selectedName
+    }
+  }
+
+  class UnnamedUnpicker[T](var currentValue: Option[T] = None) extends SavedControl[T] with AutoProductFormat {
+    override def save() = enabled.toJson
+    override def load(j: JsValue) = enabled = j.convertTo[Boolean]
+  }
+
+  case class SavedState(enabled: Boolean, selectedName: String)
 
   implicit class AdapterSeq(a: Adapter) extends IndexedSeq[Object] {
     def length = a.getCount()
     def apply(pos: Int) = a.getItem(pos)
   }
-
 }
+
+//class SavedGridView[T](c: Context, attrs: AttributeSet, defStyleAttr: Int, defStyleRes: Int)
+//extends PaintControls.GridView(c, attrs, defStyleAttr, defStyleRes) 
+//with UnnamedPicker[T] {
+  //def this(c: Context, attrs: AttributeSet, defStyleAttr: Int) = this(c, attrs, defStyleAttr, 0)
+  //def this(c: Context, attrs: AttributeSet) = this(c, attrs, defStyleAttr, 0, 0)
+  //def this(c: Context) = this(c, attrs, null, 0, 0)
+//}
