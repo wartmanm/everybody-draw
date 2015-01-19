@@ -1,0 +1,32 @@
+// cellular automaton S45678/B5678, a.k.a "majority"
+precision highp float;
+uniform sampler2D texture;
+uniform vec2 texturesize;
+varying vec2 uv;
+
+const float cellmin = 0.5; // channel min
+
+void main() {
+  vec2 px = vec2(1.0, 1.0) / texturesize;
+  vec3 u_r = 
+    vec3(texture2D(texture, uv + vec2(  0.0, -px.y))) +
+    vec3(texture2D(texture, uv + vec2( px.x,   0.0)));
+  vec3 l_b =
+    vec3(texture2D(texture, uv + vec2(-px.x,   0.0))) +
+    vec3(texture2D(texture, uv + vec2(  0.0,  px.y)));
+  vec3 ul_ur =
+    vec3(texture2D(texture, uv - px)) +
+    vec3(texture2D(texture, uv + vec2( px.x, -px.y)));
+  vec3 ll_lr =
+    vec3(texture2D(texture, uv + vec2(-px.x,  px.y))) +
+    vec3(texture2D(texture, uv + px));
+  vec3 u_r_l_b = u_r + l_b;
+  vec3 ul_ur_ll_lr = ul_ur + ll_lr;
+  vec3 sum = u_r_l_b + ul_ur_ll_lr;
+  float fsum = floor(length(sum) + 0.5);
+  vec3 here = vec3(texture2D(texture, uv));
+  float heresum = length(here);
+  float mymin = heresum > cellmin ? 4.0 : 5.0;
+  vec3 color = fsum >= mymin ? normalize(sum) : vec3(0.0);
+  gl_FragColor = vec4(color, 1.0);
+}
