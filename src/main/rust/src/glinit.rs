@@ -71,11 +71,11 @@ pub struct UndoTargets {
 impl UndoTargets {
     pub fn new() -> UndoTargets {
         UndoTargets {
-            targets: unsafe { mem::uninitialized() },
-            start: 0,
-            max: 0,
-            len: 0,
-            pos: 0,
+            targets: unsafe { mem::uninitialized() }, // backing array for ringbuffer
+            start: 0, // offset of first index in ringbuffer
+            max: 0, // highest allocated index in target (anything above this is uninitialized)
+            len: 0, // length of ringbuffer
+            pos: 0, // index after most recent position in ringbuffer (first index that will be cleared by a push)
         }
     }
     #[inline(always)] #[allow(dead_code)]
@@ -87,7 +87,7 @@ impl UndoTargets {
     pub fn push_new_buffer(&mut self, buf: &TextureTarget, copyshader: &CopyShader) {
         let end = self.get_pos(self.pos);
         let target = &mut self.targets[end as uint];
-        if self.pos >= self.max {
+        if end >= self.max {
             let (x, y) = buf.texture.dimensions;
             *target = TextureTarget::new(x, y, PixelFormat::RGBA);
             self.max += 1;
@@ -115,6 +115,12 @@ impl UndoTargets {
         gl2::bind_framebuffer(gl2::FRAMEBUFFER, buf.framebuffer);
         gl2::blend_func(gl2::ONE, gl2::ZERO);
         perform_copy(buf.framebuffer, &src.texture, copyshader, matrix::IDENTITY.as_slice());
+    }
+
+    pub fn clear_buffers(&mut self) {
+        self.start = self.pos;
+        self.len = 0;
+        self.pos = 0;
     }
 }
 
@@ -348,7 +354,7 @@ impl<'a> GLInit<'a> {
     }
 
     pub fn push_undo_frame(&mut self) -> i32 {
-        let source = self.targetdata.get_current_texturesource(); // they should be identical at this point
+        let source = self.targetdata.get_current_texturetarget(); // should be identical when called from within lua callback
         if let Some(copy_shader) = self.paintstate.copyshader {
             self.paintstate.undo_targets.push_new_buffer(source, copy_shader);
         }
@@ -360,6 +366,10 @@ impl<'a> GLInit<'a> {
         if let Some(copy_shader) = self.paintstate.copyshader {
             self.paintstate.undo_targets.load_buffer_at(idx, source, copy_shader);
         }
+    }
+
+    pub fn clear_undo_frames(&mut self) {
+        self.paintstate.undo_targets.clear_buffers();
     }
 
     pub fn draw_queued_points(&mut self, handler: &mut MotionEventConsumer, events: &'a mut Events<'a>, matrix: &matrix::Matrix, undo_callback: &JNICallbackClosure) -> GLResult<()> {

@@ -3,7 +3,7 @@ package com.github.wartman4404.gldraw
 import android.os.Bundle
 import android.content.Context
 import android.view.View
-import android.widget.{AdapterView, Adapter, GridView, ListAdapter}
+import android.widget.{AdapterView, Adapter, GridView, ListAdapter, Spinner, SpinnerAdapter}
 import android.util.Log
 import android.graphics.Bitmap
 
@@ -17,7 +17,7 @@ import java.io.{StringReader, StringWriter}
 import android.util.{JsonReader, JsonWriter}
 
 class PaintControls
-  (val animpicker: UP[CopyShader], val brushpicker: UP[Texture], val paintpicker: UP[PointShader], val interppicker: UP[LuaScript], val unipicker: UP[UniBrush], val copypicker: UUP[CopyShader], val sidebar: FIP) {
+  (val animpicker: UP[CopyShader], val brushpicker: UP[Texture], val paintpicker: UP[PointShader], val interppicker: UP[LuaScript], val unipicker: UP[UniBrush], val copypicker: UUP[CopyShader]) {
 
   val namedPickers = Map(
     "anim" -> animpicker,
@@ -25,8 +25,7 @@ class PaintControls
     "paint" -> paintpicker,
     "interp" -> interppicker,
     "unibrush" -> unipicker,
-    "copy" -> copypicker,
-    "sidebar" -> sidebar
+    "copy" -> copypicker
   )
 
   def restoreState() = namedPickers.values.foreach(_.restoreState())
@@ -70,20 +69,19 @@ class PaintControls
   }
 }
 object PaintControls extends AndroidImplicits {
-  type LAV = AdapterView[ListAdapter]
+  type LAV = AdapterView[SpinnerAdapter]
   type UP[U] = UnnamedPicker[U]
   type UUP[T] = UnnamedUnpicker[T]
   type FIP = FixedIndexPicker
   def apply
-  (animpicker: LAV, brushpicker: LAV, paintpicker: LAV, interppicker: LAV, unipicker: LAV, sidebar: LAV) = {
+  (animpicker: LAV, brushpicker: LAV, paintpicker: LAV, interppicker: LAV, unipicker: LAV) = {
     new PaintControls (
       new UnnamedPicker[CopyShader](animpicker),
       new UnnamedPicker[Texture](brushpicker),
       new UnnamedPicker[PointShader](paintpicker),
       new UnnamedPicker[LuaScript](interppicker),
       new UnnamedPicker[UniBrush](unipicker),
-      new UnnamedUnpicker[CopyShader](None),
-      new FixedIndexPicker(sidebar))
+      new UnnamedUnpicker[CopyShader](None))
   }
 
   trait SavedControl {
@@ -94,12 +92,18 @@ object PaintControls extends AndroidImplicits {
   }
 
   trait SelectedListener {
-    val control: AdapterView[ListAdapter]
+    type AdapterType <: Adapter
+    val control: AdapterView[AdapterType]
     var selected = AdapterView.INVALID_POSITION
     def setListener(cb: (View, Int) => Unit) = {
-      control.setOnItemClickListener((v: View, pos: Int) => {
-        selected = pos
-        cb(v, pos)
+      control.setOnItemSelectedListener(new AdapterView.OnItemSelectedListener() {
+        override def onItemSelected(parent: AdapterView[_], v: View, pos: Int, id: Long) = {
+          selected = pos
+          cb(v, pos)
+        }
+        override def onNothingSelected(parent: AdapterView[_]) = {
+          selected = AdapterView.INVALID_POSITION
+        }
       })
     }
   }
@@ -109,7 +113,8 @@ object PaintControls extends AndroidImplicits {
     def currentValue(gl: GLInit): GLStoredResult[T]
   }
 
-  class UnnamedPicker[V](override val control: AdapterView[ListAdapter]) extends SavedControl with GLControl[V] with SelectedListener {
+  class UnnamedPicker[V](override val control: AdapterView[SpinnerAdapter]) extends SavedControl with GLControl[V] with SelectedListener {
+    override type AdapterType = SpinnerAdapter
     type LP = LazyPicker[V]
     type U = AdapterView[LP]
     override def currentValue(gl: GLInit): GLStoredResult[V] = {
@@ -128,7 +133,7 @@ object PaintControls extends AndroidImplicits {
         case -1 => 0
         case  x => x
       }
-      if (enabled) this.control.performItemClick(null, selected, selected)
+      if (enabled) this.control.setSelection(selected)
     }
     override def updateState() = selectedName = selected match {
       case AdapterView.INVALID_POSITION => ""
@@ -151,9 +156,10 @@ object PaintControls extends AndroidImplicits {
   }
 
   class FixedIndexPicker(override val control: AdapterView[ListAdapter]) extends SavedControl with SelectedListener {
+    override type AdapterType = ListAdapter
     override def restoreState(): Unit = {
       Log.i("picker", s"clicking ${selected} in sidebar")
-      this.control.performItemClick(null, selected, selected)
+      this.control.setSelection(selected)
     }
     override def updateState() = { }
     override def save(j: JsonWriter) = j.value(selected)

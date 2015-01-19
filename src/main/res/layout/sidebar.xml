@@ -1,0 +1,53 @@
+<?xml version="1.0" encoding="utf-8"?>
+<RelativeLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/sidebar_parent"
+    android:layout_width="240dp"
+    android:layout_height="match_parent"
+    android:layout_gravity="start"
+    android:background="#eee" >
+
+    <Button
+        android:id="@+id/load_button"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_alignParentBottom="true"
+        android:text="@string/button_load" />
+
+    <Button
+        android:id="@+id/save_button"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_above="@id/load_button"
+        android:text="@string/button_save" />
+
+    <Button
+        android:id="@+id/clear_button"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_above="@id/save_button"
+        android:layout_marginBottom="15dp"
+        android:text="@string/button_clear" />
+
+    <com.larswerkman.holocolorpicker.ScaleBar
+        android:id="@+id/brush_colorpicker_scalebar"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_above="@id/clear_button"
+        android:paddingBottom="5dp"
+        android:paddingTop="5dp" />
+
+    <com.larswerkman.holocolorpicker.SVBar
+        android:id="@+id/brush_colorpicker_svbar"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_above="@id/brush_colorpicker_scalebar"
+        android:paddingBottom="5dp"
+        android:paddingTop="5dp" />
+
+    <com.larswerkman.holocolorpicker.ColorPicker
+        android:id="@+id/brush_colorpicker_main"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_above="@id/brush_colorpicker_svbar" />
+
+</RelativeLayout>
