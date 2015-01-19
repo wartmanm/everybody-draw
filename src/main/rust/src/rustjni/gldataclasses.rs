@@ -6,8 +6,6 @@ use jni::{jobject, jclass, jmethodID, JNIEnv, jint, jstring, JNINativeMethod};
 use android::native_window_jni::{ANativeWindow_fromSurface};//, ANativeWindow_release};
 use android::native_window::ANativeWindow_release;
 
-use log::logi;
-
 use glstore::DrawObjectIndex;
 use glinit::AndroidBitmapFormat;
 use eglinit;

@@ -7,15 +7,13 @@ use core::any::{Any, AnyRefExt};
 use core::fmt::Show;
 use core::iter;
 use libc::{c_void, c_char};
-use collections::str::IntoMaybeOwned;
+use core::borrow::IntoCow;
 use collections::vec::Vec;
 use collections::str::MaybeOwned;
 
 use jni::{jobject, jclass, jmethodID, jfieldID, JNIEnv, jint, jstring, jvalue, JNINativeMethod, JavaVM};
-#[cfg(test)] use jni::jlong;
+#[cfg(target_word_size = "64")] use jni::jlong;
 use jni_constants::*;
-
-use log::{logi, loge};
 
 use glinit::GLInit;
 use drawevent::Events;
@@ -54,6 +52,7 @@ struct GLInitEvents<'a> {
     owning_thread: pid_t,
 }
 
+#[deriving(Copy)]
 pub struct JNIUndoCallback {
     callback_obj: jobject,
     callback_method: jmethodID,
@@ -95,7 +94,7 @@ impl CaseClass {
     pub unsafe fn construct(&self, env: *mut JNIEnv, arg: &mut [jvalue]) -> jobject {
         ((**env).NewObjectA)(env, self.class, self.constructor, arg.as_mut_ptr())
     }
-    pub unsafe fn destroy(self, env: *mut JNIEnv) {
+    pub unsafe fn destroy(&mut self, env: *mut JNIEnv) {
         ((**env).DeleteGlobalRef)(env, self.class);
     }
 }
@@ -112,7 +111,7 @@ unsafe fn get_string(env: *mut JNIEnv, string: jstring) -> Option<String> {
 
 unsafe fn get_mstring(env: *mut JNIEnv, string: jstring) -> Option<MString> {
     match get_string(env, string) {
-        Some(s) => Some(s.into_maybe_owned()),
+        Some(s) => Some(s.into_cow()),
         None => None,
     }
 }
@@ -158,7 +157,7 @@ unsafe fn get_jpointer(env: *mut JNIEnv, obj: jobject, field: jfieldID) -> jpoin
     //((**env).SetLongField)(env, obj, field)
 //}
 
-fn on_unwind(msg: &Any + Send, file: &'static str, line: uint) {
+fn on_unwind(msg: &(Any + Send), file: &'static str, line: uint) {
     use core::fmt::FormatWriter;
     // as far as I know there's no way to identify traits that can be cast to Show at runtime
     if let Some(s) = msg.downcast_ref::<&Show>() {
@@ -197,10 +196,16 @@ fn on_unwind(msg: &Any + Send, file: &'static str, line: uint) {
                         let _ = write!(&mut writer, "{} ", byte);
                     }
                 }
-                loge!(::core::str::from_utf8_unchecked(line.as_slice().init()));
+                loge!("{}", ::core::str::from_utf8_unchecked(line.as_slice().init()));
                 line.clear();
             }
         }
+    }
+    // Unwinding always fails, but not before messing up android's crash report backtrace.
+    // So, commit suicide before that can happen.
+    unsafe {
+        let null: *mut u16 = ptr::null_mut();
+        *null = 0xdead;
     }
 }
 

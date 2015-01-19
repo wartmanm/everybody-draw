@@ -7,7 +7,7 @@ pub const STARTING: ActiveState = ActiveState(NEWMASK);
 pub const STOPPING: ActiveState  = ActiveState(OLDMASK);
 pub const CONTINUING: ActiveState  = ActiveState(NEWMASK | OLDMASK);
 pub const INACTIVE: ActiveState = ActiveState(0);
-#[deriving(Eq, PartialEq)]
+#[deriving(Eq, PartialEq, Copy)]
 pub struct ActiveState(u8);
 
 impl ActiveState {

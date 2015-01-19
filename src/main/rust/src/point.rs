@@ -1,8 +1,8 @@
 // TODO: more meaningful names
-use std::sync::spsc_queue;
+use std::comm;
 use core::ops::{Add, Div, Sub, Mul};
 
-#[deriving(Clone, Show, PartialEq, Zero)]
+#[deriving(Clone, Show, PartialEq, Zero, Copy)]
 #[repr(C)]
 pub struct Coordinate {
     pub x: f32,
@@ -10,7 +10,7 @@ pub struct Coordinate {
 }
 
 /// Holds data from motionevent entries.
-#[deriving(Clone, Show, PartialEq)]
+#[deriving(Clone, Show, PartialEq, Copy)]
 #[repr(C)]
 pub struct PaintPoint {
     pub pos: Coordinate,
@@ -21,7 +21,7 @@ pub struct PaintPoint {
 /// Holds raw data used for pointshader attribs.
 /// These fields overlap with PaintPoint somewhat but aren't necessarily directly sourced from one
 /// so adding it as a child doesn't seem ideal
-#[deriving(Clone, Show)]
+#[deriving(Clone, Show, Copy)]
 #[repr(C)]
 pub struct ShaderPaintPoint {
     pub pos: Coordinate,
@@ -38,13 +38,14 @@ pub struct ShaderPaintPoint {
 /// it's arguably simpler than ensuring each pointer gets a unique queue for its entire
 /// lifetime and maintaining an up-to-date pointer id -> queue mapping
 /// FrameStop indicates that we should stop reading 
-#[deriving(PartialEq)]
+#[deriving(PartialEq, Copy, Clone)]
 pub enum PointInfo {
     Stop,
     FrameStop,
     Point(PaintPoint),
 }
 
+#[deriving(Copy)]
 pub enum ShaderPointEvent {
     Move(ShaderPaintPoint, ShaderPaintPoint),
     Down(ShaderPaintPoint),
@@ -53,14 +54,14 @@ pub enum ShaderPointEvent {
 }
 
 /// A single entry in the point queue.
-#[deriving(PartialEq)]
+#[deriving(PartialEq, Copy, Clone)]
 pub struct PointEntry {
     pub index: i32,
     pub entry: PointInfo,
 }
 
-pub type PointConsumer = spsc_queue::Consumer<PointEntry>;
-pub type PointProducer = spsc_queue::Producer<PointEntry>;
+pub type PointConsumer = comm::Receiver<PointEntry>;
+pub type PointProducer = comm::Sender<PointEntry>;
 
 impl Add<Coordinate, Coordinate> for Coordinate {
     #[inline(always)]

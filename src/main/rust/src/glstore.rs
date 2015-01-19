@@ -40,12 +40,21 @@ pub struct DrawObjectList<'a, T: 'a, Init: Eq+Hash+'a> {
     arena: TypedArena<T>,
 }
 
-#[deriving(Show)]
+// copy doesn't work, wtf
+#[deriving(Show, Copy)]
 pub struct DrawObjectIndex<T>(i32);
 
 impl<T> DrawObjectIndex<T> {
     pub fn error() -> DrawObjectIndex<T> {
         unsafe { mem::transmute(-1i32) }
+    }
+}
+
+// again, wtf, why is this needed
+impl<T> Clone for DrawObjectIndex<T> {
+    fn clone(&self) -> DrawObjectIndex<T> {
+        let DrawObjectIndex(idx) = *self;
+        DrawObjectIndex(idx)
     }
 }
 
@@ -103,8 +112,8 @@ pub fn init_from_defaults<Unfilled, T: MaybeInitFromCache<Init> + FillDefaults<U
 impl InitFromCache<BrushInitValues> for BrushTexture {
     fn init(value: BrushInitValues) -> BrushTexture {
         let tex = {
-            let (format, (w, h), ref pixels) = value;
-            Texture::with_image(w, h, Some(pixels.as_slice()), format)
+            let (ref format, (w, h), ref pixels) = value;
+            Texture::with_image(w, h, Some(pixels.as_slice()), *format)
         };
         BrushTexture { texture: tex, source: value }
     }
@@ -139,7 +148,7 @@ impl<'a, Unfilled, T: MaybeInitFromCache<Init> + FillDefaults<Unfilled, Init, T>
         let filledref: &'a Init = unsafe { mem::transmute(&filled) };
         // see below -- these are safe, we just can't prove it
         match self.map.entry(filledref) {
-            Occupied(entry) => Ok(*entry.get()),
+            Occupied(entry) => Ok(entry.get().clone()),
             Vacant(entry) => {
                 let inited: T = try!(MaybeInitFromCache::<Init>::maybe_init(filled));
                 // ptr's lifetime is limited to &self's, which is fair but not very useful.
@@ -150,7 +159,7 @@ impl<'a, Unfilled, T: MaybeInitFromCache<Init> + FillDefaults<Unfilled, Init, T>
                 }
                 let index = self.list.len() - 1;
                 let objindex = DrawObjectIndex(index as i32);
-                entry.set(objindex);
+                entry.set(objindex.clone());
                 Ok(objindex)
             }
         }

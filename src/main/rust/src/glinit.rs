@@ -2,9 +2,7 @@ extern crate opengles;
 use core::prelude::*;
 use core::mem;
 use collections::vec::Vec;
-use collections::str::IntoMaybeOwned;
-
-use log::{logi,loge};
+use core::borrow::IntoCow;
 
 use opengles::gl2;
 use opengles::gl2::{GLuint, GLenum, GLubyte};
@@ -36,6 +34,7 @@ const UNDO_BUFFERS: i32 = 5;
 
 //#[deriving(FromPrimitive)]
 #[repr(i32)]
+#[deriving(Copy)]
 #[allow(non_camel_case_types, dead_code)]
 pub enum AndroidBitmapFormat {
     ANDROID_BITMAP_FORMAT_NONE      = 0,
@@ -195,7 +194,7 @@ impl TargetData {
 
 impl<'a> GLInit<'a> {
     pub fn draw_image(&mut self, w: i32, h: i32, pixels: &[u8]) -> () {
-        logi("drawing image...");
+        logi!("drawing image...");
         let target = self.targetdata.get_current_texturetarget();
         let (tw, th) = target.texture.dimensions;
         let heightratio = th as f32 / h as f32;
@@ -230,7 +229,7 @@ impl<'a> GLInit<'a> {
         // The only purpose of the shader copy is to flip the image from gl coords to bitmap coords.
         // it might be better to finagle the output copy matrix so the rest of the targets
         // can stay in bitmap coords?  Or have a dedicated target for this.
-        let saveshader = ::glstore::init_from_defaults((None, Some(include_str!("../includes/shaders/noalpha_copy.fsh").into_maybe_owned()))).unwrap();
+        let saveshader = ::glstore::init_from_defaults((None, Some(include_str!("../includes/shaders/noalpha_copy.fsh").into_cow()))).unwrap();
         let newtarget = TextureTarget::new(x, y, PixelFormat::RGB);
         let matrix = [1f32,  0f32,  0f32,  0f32,
                       0f32, -1f32,  0f32,  0f32,
@@ -244,24 +243,24 @@ impl<'a> GLInit<'a> {
 
     // TODO: make an enum for these with a scala counterpart
     pub fn set_copy_shader(&mut self, shader: &'a CopyShader) -> () {
-        logi("setting copy shader");
+        logi!("setting copy shader");
         self.paintstate.copyshader = Some(shader);
     }
 
     // these can also be null to unset the shader
     // TODO: document better from scala side
     pub fn set_anim_shader(&mut self, shader: &'a CopyShader) -> () {
-        logi("setting anim shader");
+        logi!("setting anim shader");
         self.paintstate.animshader = Some(shader);
     }
 
     pub fn set_point_shader(&mut self, shader: &'a PointShader) -> () {
-        logi("setting point shader");
+        logi!("setting point shader");
         self.paintstate.pointshader = Some(shader);
     }
 
     pub fn set_interpolator(&mut self, interpolator: &'a LuaScript) -> () {
-        logi("setting interpolator");
+        logi!("setting interpolator");
         self.paintstate.interpolator = Some(interpolator);
     }
 
@@ -280,7 +279,7 @@ impl<'a> GLInit<'a> {
     }
 
     pub fn add_layer(&mut self, layer: PaintLayer<'a>) -> () {
-        logi("adding layer");
+        logi!("adding layer");
         let extra: i32 = (layer.pointidx as i32 + 1) - self.points.len() as i32;
         if extra > 0 {
             self.points.grow(extra as uint, Vec::new());
@@ -300,7 +299,7 @@ impl<'a> GLInit<'a> {
             0 => self.targetdata.get_current_texturetarget().framebuffer,
             _ => match self.paintstate.layers.as_slice().get((layer - 1) as uint) {
                 Some(layer) => layer.target.framebuffer,
-                None => return Err(format!("tried to erase layer {} of {}", layer - 1, self.paintstate.layers.len()).into_maybe_owned()),
+                None => return Err(format!("tried to erase layer {} of {}", layer - 1, self.paintstate.layers.len()).into_cow()),
             },
         };
         gl2::bind_framebuffer(gl2::FRAMEBUFFER, target);
@@ -467,7 +466,7 @@ impl gltexture::ToPixelFormat for AndroidBitmapFormat {
         match *self {
             AndroidBitmapFormat::ANDROID_BITMAP_FORMAT_RGBA_8888 => Ok(PixelFormat::RGBA),
             AndroidBitmapFormat::ANDROID_BITMAP_FORMAT_A_8 => Ok(PixelFormat::ALPHA),
-            _ => Err("Unsupported texture format!".into_maybe_owned()),
+            _ => Err("Unsupported texture format!".into_cow()),
         }
     }
 }

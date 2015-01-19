@@ -10,7 +10,6 @@ use glpoint;
 use glpoint::MotionEventConsumer;
 use glinit::GLInit;
 use drawevent::Events;
-use log::loge;
 use lua_geom::rust_raise_lua_err;
 use rustjni::JNICallbackClosure;
 
@@ -100,7 +99,7 @@ pub unsafe extern "C" fn lua_log(message: *const c_char) {
 #[no_mangle]
 pub unsafe extern "C" fn lua_clearlayer(data: &mut LuaCallbackType, layer: i32) {
     if let Err(msg) = data.glinit.erase_layer(layer) {
-        loge!(msg.as_slice());
+        loge!("{}", msg.as_slice());
         rust_raise_lua_err(None, msg.as_slice());
     }
 }

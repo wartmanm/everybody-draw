@@ -1,10 +1,9 @@
 use core::prelude::*;
 use core::fmt;
 use core::fmt::Show;
-use log::logi;
 use glcommon::{GLResult, FillDefaults, Defaults, MString};
 use lua_geom::{load_lua_script, destroy_lua_script};
-use collections::str::{IntoMaybeOwned};
+use core::borrow::IntoCow;
 
 static DEFAULT_SCRIPT: &'static str = include_str!("../includes/lua/default_interpolator.lua");
 
@@ -44,7 +43,7 @@ impl Show for LuaScript {
 
 impl FillDefaults<Option<MString>, MString, LuaScript> for LuaScript {
     fn fill_defaults(init: Option<MString>) -> Defaults<MString, LuaScript> {
-        Defaults { val: init.unwrap_or_else(|| DEFAULT_SCRIPT.into_maybe_owned()) }
+        Defaults { val: init.unwrap_or_else(|| DEFAULT_SCRIPT.into_cow()) }
     }
 }
 

@@ -1,4 +1,4 @@
-#![feature(globs, macro_rules, default_type_params, if_let, unboxed_closures, unsafe_destructor)]
+#![feature(globs, macro_rules, default_type_params, unboxed_closures, unsafe_destructor)]
 #![crate_name = "rustgl"]
 #![crate_type = "staticlib"]
 #![no_std]
@@ -43,5 +43,4 @@ pub mod paintlayer;
 pub mod rustjni;
 pub mod lua_geom;
 pub mod lua_callbacks;
-pub mod redirect_stderr;
 pub mod jni_helpers;

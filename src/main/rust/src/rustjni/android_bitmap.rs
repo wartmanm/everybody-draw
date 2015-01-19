@@ -4,7 +4,6 @@ use core::{ptr, mem};
 use libc::c_void;
 use jni::{jobject, jclass, jmethodID, JNIEnv};
 use jni_constants::{JNI_TRUE, JNI_FALSE};
-use log::logi;
 use android::bitmap::{AndroidBitmap_getInfo, AndroidBitmap_lockPixels, AndroidBitmap_unlockPixels, AndroidBitmapInfo};
 use android::bitmap::{ANDROID_BITMAP_FORMAT_RGBA_8888, ANDROID_BITMAP_FORMAT_A_8};
 static mut BITMAP_CLASS: jclass = 0 as jclass;

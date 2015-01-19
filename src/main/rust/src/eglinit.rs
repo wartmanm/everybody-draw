@@ -1,5 +1,4 @@
 use egl::egl::*;
-use log::{logi, loge};
 use core::prelude::*;
 use libc::{c_void, c_uint};
 use core::mem;
@@ -102,17 +101,17 @@ fn init_context(surface_texture: *mut c_void) -> Option<EGLStatus> {
     logi!("creating context...");
     let context = CreateContext(display, config, EGL_NO_CONTEXT, get_context_attribs());
     logi!("got context: 0x{:x}", context as uint);
-    logi("creating window surface...");
+    logi!("creating window surface...");
     let surface = CreateWindowSurface(display, config, surface_texture, get_no_attribs());
     if surface == EGL_NO_SURFACE {
-        logi("getting error...");
+        logi!("getting error...");
         let error = GetError();
         match error {
             EGL_BAD_NATIVE_WINDOW => {
                 loge!("createwindowsurface returned EGL_BAD_NATIVE_WINDOW :(");
             },
             x => {
-                loge!(format!("createwindowsurface failed: {}", x).as_slice());
+                loge!("createwindowsurface failed: {}", x);
             },
         }
         return None;

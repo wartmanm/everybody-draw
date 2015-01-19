@@ -1,12 +1,10 @@
 use core::prelude::*;
 use core::{mem, fmt};
 use core::fmt::Show;
-use collections::str::IntoMaybeOwned;
+use core::borrow::IntoCow;
 
 use opengles::gl2;
 use opengles::gl2::{GLint, GLuint, GLfloat};
-
-use log::logi;
 
 use glcommon;
 use glcommon::{check_gl_error, get_shader_handle, get_uniform_handle_option, Shader, GLResult, FillDefaults, Defaults, MString};
@@ -63,7 +61,7 @@ impl Shader for CopyShader {
             }
             _ => {
                 gl2::delete_program(program);
-                Err("copy shader missing vPosition, vTexCoord, or texture".into_maybe_owned())
+                Err("copy shader missing vPosition, vTexCoord, or texture".into_cow())
             }
         }
     }
@@ -105,8 +103,8 @@ impl Show for CopyShader {
 impl FillDefaults<(Option<MString>, Option<MString>), (MString, MString), CopyShader> for CopyShader {
     fn fill_defaults(init: (Option<MString>, Option<MString>)) -> Defaults<(MString, MString), CopyShader> {
         let (vertopt, fragopt) = init;
-        let vert = vertopt.unwrap_or_else(|| { logi("point shader: using default vertex shader"); DEFAULT_VERTEX_SHADER.into_maybe_owned()});
-        let frag = fragopt.unwrap_or_else(|| { logi("point shader: using default fragment shader"); DEFAULT_FRAGMENT_SHADER.into_maybe_owned()});
+        let vert = vertopt.unwrap_or_else(|| { logi!("point shader: using default vertex shader"); DEFAULT_VERTEX_SHADER.into_cow()});
+        let frag = fragopt.unwrap_or_else(|| { logi!("point shader: using default fragment shader"); DEFAULT_FRAGMENT_SHADER.into_cow()});
         Defaults { val: (vert, frag) }
     }
 }

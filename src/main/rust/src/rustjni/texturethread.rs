@@ -4,7 +4,6 @@ use alloc::boxed::Box;
 use jni::{jobject, jclass, jmethodID, JNIEnv, jint, jfloat, jboolean, jfloatArray, JNINativeMethod};
 
 use glcommon::GLResult;
-use log::logi;
 use glinit::GLInit;
 use drawevent::event_stream::EventStream;
 use rustjni::android_bitmap::AndroidBitmap;

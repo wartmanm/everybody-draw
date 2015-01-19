@@ -2,11 +2,11 @@
 use core::prelude::*;
 use opengles::gl2;
 use opengles::gl2::{GLuint, GLint};
-use log::{logi, loge};
-use collections::str::{MaybeOwned, IntoMaybeOwned};
+use core::borrow::{Cow, IntoCow};
+use collections::string::String;
 
 pub type GLResult<T> = Result<T, MString>;
-pub type MString = MaybeOwned<'static>;
+pub type MString = Cow<'static, String, str>;
 
 fn get_gl_error_name(error: u32) -> &'static str {
     match error {
@@ -52,13 +52,13 @@ pub fn load_shader(shader_type: gl2::GLenum, source: &str) -> GLResult<GLuint> {
         if compiled != 0 {
             Ok(shader)
         } else {
-            let log = gl2::get_shader_info_log(shader).into_maybe_owned();
+            let log = gl2::get_shader_info_log(shader).into_cow();
             loge!("Could not compile shader {}:\n{}\n", shader_type, log);
             gl2::delete_shader(shader);
             Err(log)
         }
     } else {
-        Err(format!("Unknown error initializing shader type {}", shader_type).into_maybe_owned())
+        Err(format!("Unknown error initializing shader type {}", shader_type).into_cow())
     }
 }
 
@@ -67,7 +67,7 @@ pub fn create_program(vertex_source: &str, fragment_source: &str) -> GLResult<GL
     let pixel_shader = try!(load_shader(gl2::FRAGMENT_SHADER, fragment_source));
     let program = gl2::create_program();
     if program == 0 {
-        return Err("Unknown error creating shader program".into_maybe_owned());
+        return Err("Unknown error creating shader program".into_cow());
     }
     gl2::attach_shader(program, vert_shader);
     check_gl_error("glAttachShader");
@@ -77,7 +77,7 @@ pub fn create_program(vertex_source: &str, fragment_source: &str) -> GLResult<GL
     if gl2::get_program_iv(program, gl2::LINK_STATUS) as u8 == gl2::TRUE {
         Ok(program)
     } else {
-        let log = gl2::get_program_info_log(program).into_maybe_owned();
+        let log = gl2::get_program_info_log(program).into_cow();
         loge!("Could not link program: \n{}\n", log);
         gl2::delete_program(program);
         Err(log)
