@@ -33,8 +33,7 @@ import scala.util.{Success,Failure}
 import java.util.concurrent.Executors
 
 import PaintControls.UnnamedPicker
-import PaintControls.GLControl
-
+import PaintControls.{GLControl, SelectedListener}
 
 
 class MainActivity extends Activity with TypedActivity with AndroidImplicits {
@@ -50,7 +49,9 @@ class MainActivity extends Activity with TypedActivity with AndroidImplicits {
     animpicker = findView(TR.animpicker),
     paintpicker = findView(TR.paintpicker),
     interppicker = findView(TR.interppicker),
-    unipicker = findView(TR.unipicker)
+    unipicker = findView(TR.unipicker),
+    colorpicker = colorPicker,
+    scalebar = findView(TR.brush_colorpicker_scalebar)
   )
 
   lazy val drawerParent = findView(TR.drawer_parent)
@@ -135,7 +136,8 @@ class MainActivity extends Activity with TypedActivity with AndroidImplicits {
   // runs on gl thread
   def onTextureCreated(thread: TextureSurfaceThread, producer: MotionEventProducer, undoCallback: MainUndoListener)(gl: GLInit) = {
     try {
-      val rotation = Rotation.fromSurfaceOrientation(controls.rotation.value, newRotation)
+      //val rotation = Rotation.fromSurfaceOrientation(controls.rotation.value, newRotation)
+      val rotation = NoRotation
       controls.rotation.value = newRotation
       thread.initScreen(gl, savedBitmap, rotation)
     } catch {
@@ -198,8 +200,9 @@ class MainActivity extends Activity with TypedActivity with AndroidImplicits {
     loadButton.setOnClickListener(loadFile _)
     clearButton.setOnClickListener(() => this.clearScreen())
 
-    colorPicker.addSVBar(findView(TR.brush_colorpicker_svbar))
-    val scaleBar = findView(TR.brush_colorpicker_scalebar)
+    val scaleBar = controls.scalebar.scale
+    colorPicker.addSaturationBar(findView(TR.brush_colorpicker_saturationbar))
+    colorPicker.addValueBar(findView(TR.brush_colorpicker_valuebar))
     colorPicker.addScaleBar(scaleBar)
     colorPicker.setShowOldCenterColor(false)
     colorPicker.setOnColorChangedListener(new ColorPicker.OnColorChangedListener() {
@@ -245,11 +248,11 @@ class MainActivity extends Activity with TypedActivity with AndroidImplicits {
     else item.getItemId() match {
       case R.id.menu_save => saveFile()
       case R.id.menu_load => loadFile()
-      case R.id.menu_replay => startReplay()
+      //case R.id.menu_replay => startReplay()
       case R.id.menu_clear => this.clearScreen()
-      case R.id.menu_credits => Toast.makeText(this, "Soon.", Toast.LENGTH_LONG).show()
+      case R.id.menu_credits => Toast.makeText(this, "Not yet added :(", Toast.LENGTH_LONG).show()
       case R.id.menu_debug => showDebugMessagebox()
-      case R.id.menu_rotate => debugRotate()
+      //case R.id.menu_rotate => debugRotate()
       case _ => return super.onOptionsItemSelected(item)
     }
     true
@@ -739,7 +742,7 @@ class MainActivity extends Activity with TypedActivity with AndroidImplicits {
       new SidebarEntryPicker(names(4), controls.unipicker, (u: UniBrush) => None),
       new SidebarEntryHider(names(5))
     )
-    val copyShaderControl = new SidebarEntryPicker(names(6), controls.copypicker, (u: UniBrush) => u.basecopyshader)
+    val copyShaderControl = new SidebarHiddenEntryPicker(names(6), controls.copypicker, (u: UniBrush) => u.basecopyshader)
     override def areAllItemsEnabled = false
     override def isEnabled(pos: Int) = sidebarControls(pos).enabled
     override def getCount = sidebarControls.length
@@ -776,7 +779,7 @@ class MainActivity extends Activity with TypedActivity with AndroidImplicits {
       def enabled: Boolean
       def name: String
     }
-    class SidebarEntryPicker[T](val name: String, picker: GLControl[_], getUnibrushValue: (UniBrush) => Option[T]) extends SidebarEntry {
+    class SidebarHiddenEntryPicker[T](val name: String, picker: GLControl[_], getUnibrushValue: (UniBrush) => Option[T]) extends SidebarEntry {
       override def enabled = picker.enabled
       override def updateForUnibrush(u: UniBrush) = {
         val oldstate = enabled
@@ -784,6 +787,14 @@ class MainActivity extends Activity with TypedActivity with AndroidImplicits {
         Log.i("main", s"${if (enabled) "enabling" else "disabling"} control ${name} for unibrush (was: ${if (oldstate) "enabled" else "disabled"})")
       }
     }
+    class SidebarEntryPicker[T](name: String, picker: GLControl[_] with SelectedListener, getUnibrushValue: (UniBrush) => Option[T])
+    extends SidebarHiddenEntryPicker[T](name, picker, getUnibrushValue) {
+      override def updateForUnibrush(u: UniBrush) = {
+        super.updateForUnibrush(u)
+        picker.control.setEnabled(enabled)
+      }
+    }
+
     class SidebarEntryHider(val name: String) extends SidebarEntry {
       override def enabled = true
       override def updateForUnibrush(u: UniBrush) = { }

@@ -66,6 +66,6 @@ object SyntaxHighlightListAdapter {
   case class LuaSource(name: String, source: String) extends Sources
   case class ShaderSource(name: String, vert: String, frag: String) extends Sources
 
-  case class LuaHolder(title: TextView, code: SyntaxHighlightEditText)
-  case class ShaderHolder(title: TextView, vert: SyntaxHighlightEditText, frag: SyntaxHighlightEditText)
+  case class LuaHolder(title: TextView, code: SyntaxHighlightTextView)
+  case class ShaderHolder(title: TextView, vert: SyntaxHighlightTextView, frag: SyntaxHighlightTextView)
 }

@@ -8,9 +8,9 @@
     <item
         android:id="@+id/menu_load"
         android:title="@string/button_load"/>
-    <item
-        android:id="@+id/menu_replay"
-        android:title="@string/button_replay"/>
+    <!--<item-->
+        <!--android:id="@+id/menu_replay"-->
+        <!--android:title="@string/button_replay"/>-->
     <item
         android:id="@+id/menu_clear"
         android:title="@string/button_clear"/>
@@ -20,9 +20,9 @@
 	  <item
 		  android:id="@+id/menu_credits"
 		  android:title="@string/button_credits"/>
-	  <item
-		  android:id="@+id/menu_rotate"
-		  android:title="rotate"/>
+		<!--<item-->
+			<!--android:id="@+id/menu_rotate"-->
+			<!--android:title="rotate"/>-->
     <item
         android:id="@+id/action_settings"
         android:orderInCategory="100"

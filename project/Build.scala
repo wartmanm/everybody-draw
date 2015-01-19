@@ -77,7 +77,7 @@ object General {
     versionCode := 0,
     scalaVersion := "2.11.2",
     platformName := "android-21",
-    javacOptions ++= Seq("-encoding", "UTF-8", "-source", "1.6", "-target", "1.6"),
+    javacOptions ++= Seq("-encoding", "UTF-8", "-source", "1.6", "-target", "1.6", "-Xlint:all"),
     scalacOptions ++= Seq("-feature", "-language:implicitConversions", "-deprecation", "-Xlint")
   ) ++ debugSettings
 
@@ -117,6 +117,9 @@ object General {
         }
         -keepclassmembers class com.github.wartman4404.gldraw.MainActivity$MainUndoListener {
           void undoBufferChanged(int);
+        }
+        -keepclassmembers class com.github.wartman4404.gldraw.Replay$ {
+          native int init(int);
         }
         """
       )

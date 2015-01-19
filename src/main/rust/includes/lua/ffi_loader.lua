@@ -62,7 +62,6 @@ function create_sandbox()
     savelayers = savelayers,
     saveundo = saveundo,
     ShaderPaintPoint = ShaderPaintPoint,
-    ShaderPaintPointArray = ShaderPaintPointArray,
   }
   return sandboxed
 end
