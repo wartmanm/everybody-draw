@@ -51,7 +51,6 @@ class MainActivity extends Activity with TypedActivity with AndroidImplicits {
   lazy val replaybutton = findView(TR.replaybutton)
 
   var textureThread: Option[TextureSurfaceThread] = None
-  var outputShader: Option[CopyShader] = None
 
   private var savedBitmap: Option[Bitmap] = None
 
@@ -310,17 +309,18 @@ class MainActivity extends Activity with TypedActivity with AndroidImplicits {
     Log.i("main", "loading unibrush")
     def getSelectedValue[T](picker: NamedPicker[T]) = {
       picker.control.getAdapter.asInstanceOf[LazyPicker[T]]
-      .getItem(picker.control.getSelectedItemPosition())._2.cachedValue.get.right.get
+      .getItem(picker.control.getSelectedItemPosition())._2.cachedValue.flatMap(_.right.toOption)
     }
     for (thread <- textureThread) {
       // TODO: don't load when nothing changed; perform load from texturethread side
       loadUniBrushControls(unibrush)
 
-      val brush = unibrush.brush.getOrElse(getSelectedValue(controls.brushpicker))
-      val anim = unibrush.baseanimshader.getOrElse(getSelectedValue(controls.animpicker))
-      val point = unibrush.basepointshader.getOrElse(getSelectedValue(controls.paintpicker))
-      val interp = unibrush.interpolator.getOrElse(getSelectedValue(controls.interppicker))
-      thread.loadUniBrush(brush, anim, point, interp, unibrush.layers)
+      val brush = unibrush.brush.orElse(getSelectedValue(controls.brushpicker))
+      val anim = unibrush.baseanimshader.orElse(getSelectedValue(controls.animpicker))
+      val point = unibrush.basepointshader.orElse(getSelectedValue(controls.paintpicker))
+      val copy = unibrush.basecopyshader
+      val interp = unibrush.interpolator.orElse(getSelectedValue(controls.interppicker))
+      thread.loadUniBrush(brush, anim, point, copy, interp, unibrush.layers)
     }
   }
 

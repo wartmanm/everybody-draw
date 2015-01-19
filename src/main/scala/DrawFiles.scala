@@ -107,7 +107,7 @@ def withFilename[T](reader: MaybeRead[T]): ((String, (Unit)=>ManagedResource[Inp
 
   def loadUniBrushes(c: Context, data: GLInit): Seq[(String, (Unit)=>GLResult[UniBrush])] = {
     val constructor = UniBrush.compile(data, _: InputStream)
-    val defaultbrush = UniBrush(None, None, None, None, Array.empty)
+    val defaultbrush = UniBrush(None, None, None, None, None, Array.empty)
     loadShader(c, constructor, "unibrushes", "Nothing", Some(defaultbrush))
   }
 

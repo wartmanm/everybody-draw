@@ -34,6 +34,7 @@ pub struct CopyShader {
     tex_coord_handle: GLuint,
     texture_handle: GLint,
     matrix_handle: GLint,
+    texture_size_handle: Option<GLint>,
 }
 
 impl Shader for CopyShader {
@@ -46,6 +47,7 @@ impl Shader for CopyShader {
         let tex_coord_option = get_shader_handle(program, "vTexCoord");
         let texture_option = get_uniform_handle_option(program, "texture");
         let matrix_option = get_uniform_handle_option(program, "textureMatrix");
+        let texturesize_option = get_uniform_handle_option(program, "texturesize");
         match (position_option, tex_coord_option, texture_option, matrix_option) {
             (Some(position), Some(tex_coord), Some(texture), Some(matrix)) => {
                 let shader = CopyShader {
@@ -54,6 +56,7 @@ impl Shader for CopyShader {
                     tex_coord_handle: tex_coord,
                     texture_handle: texture,
                     matrix_handle: matrix,
+                    texture_size_handle: texturesize_option,
                 };
                 logi!("created {}", shader);
                 Ok(shader)
@@ -76,6 +79,11 @@ impl CopyShader {
 
         gl2::uniform_matrix_4fv(self.matrix_handle, false, matrix);
         check_gl_error("uniform_matrix_4fv(textureMatrix)");
+
+        self.texture_size_handle.map(|ts| {
+            let (w, h) = texture.dimensions;
+            gl2::uniform_2f(ts, w as f32, h as f32);
+        });
 
         gl_bindtexture!(0, gl2::TEXTURE_2D, texture.texture, self.texture_handle as GLint);
     }

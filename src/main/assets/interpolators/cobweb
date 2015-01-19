@@ -2,7 +2,7 @@ local backlogx = {}
 local backlogy = {}
 local backlogpos = {}
 local backlogcounter = {}
-function ondown(a)
+function ondown(a, output)
   loglua("in ondown")
   local counter = a.counter
   loglua(string.format("got counter: %d", counter))

@@ -1,5 +1,3 @@
-local bit = require("bit")
-
 local kStop = 0 -- Jare is cleaning.
 local kJare = 1
 local kKaki = 2 -- Kaki is scratching the ear.
@@ -220,7 +218,7 @@ end
 function onframe(x, y, points)
   local nekoX, nekoY, imgIndex = think(mNeko, mMickey, x, y)
   local imgX = imgIndex % 4
-  local imgY = bit.bor(imgIndex / 4, 0)
+  local imgY = math.floor(imgIndex / 4)
   local nekopoint = ShaderPaintPoint(nekoX, nekoY, 0, 0, imgX / 4, imgY / 9, 0, 0)
   local mickeypoint = ShaderPaintPoint(mMickey.x, mMickey.y, 0, 0, 3/4, 8/9, 0, 0)
   --loglua("neko is at " .. mNeko.x .. ", " .. mNeko.y .. "; state: " .. mStateNames[mNeko.mState])
@@ -232,4 +230,8 @@ end
 function main(a, b, x, y, points)
   mMickey.x = a.x
   mMickey.y = a.y
+end
+
+function onup(pointer, output)
+  -- don't copy neko down
 end

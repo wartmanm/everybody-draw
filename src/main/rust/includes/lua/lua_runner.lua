@@ -1,34 +1,46 @@
-local _main = main
-local _onframe = onframe
-local _ondown = ondown
-local _onup = onup
-if type(main) ~= "function" then
+local _main = callbacks.main
+local _onframe = callbacks.onframe
+local _ondown = callbacks.ondown
+local _onup = callbacks.onup
+if type(_main) ~= "function" then
   loglua("main not defined for runmain()!!")
   return
+end
+
+if _onup == nil and _ondown == nil then
+  loglua("setting default pointer callbacks")
+  local downcount = 0
+  function default_ondown(pointer, output)
+    downcount = downcount + 1
+  end
+  function default_onup(pointer, output)
+    downcount = downcount - 1
+    if downcount == 0 then
+      savelayers(output)
+    end
+  end
+  _ondown = default_ondown
+  _onup = default_onup
 end
 
 function runmain(x, y, output)
   if type(_onframe) == "function" then
     _onframe(x, y, output)
   end
-  if type(_main) ~= "function" then
-    loglua("main doesn't exist!!")
-    return
-  end
   local pointpair = ffi.new("struct ShaderPaintPoint[2]")
   while true do
     local pointstatus = ffi.C.lua_nextpoint(output, pointpair)
     local status = bit.band(0xff00, pointstatus)
-    if status == 0x0000 then
+    if status == 0x0000 then -- pointer move
       _main(pointpair[0], pointpair[1], x, y, output)
-    elseif status == 0x0100 then
+    elseif status == 0x0100 then -- no more points
       break
-    elseif status == 0x0200 then
-      if type(_ondown) == "function" then _ondown(pointpair[0]) end
-    else
+    elseif status == 0x0200 then -- pointer down
+      if type(_ondown) == "function" then _ondown(pointpair[0], output) end
+    else -- pointer up
       if type(_onup) == "function" then
         local pointer = bit.band(0x00ff, pointstatus)
-        _onup(pointer)
+        _onup(pointer, output)
       end
     end
   end

@@ -186,7 +186,6 @@ impl<'a> GLInit<'a> {
 
     pub fn set_interpolator(&mut self, interpolator: &'a LuaScript) -> () {
         logi("setting interpolator");
-        interpolator.prep();
         self.paintstate.interpolator = Some(interpolator);
     }
 
@@ -253,15 +252,11 @@ impl<'a> GLInit<'a> {
                 gl2::enable(gl2::BLEND);
                 gl2::blend_func(gl2::ONE, gl2::ONE_MINUS_SRC_ALPHA);
 
-                let (interp_error, should_copy) =
-                if self.paintstate.interpolator.is_some() {
-                    let interp_error = unsafe {
-                        do_interpolate_lua(self.dimensions, &mut LuaCallbackType::new(self, events, handler))
-                    };
-                    let should_copy = handler.frame_done();
-                    (interp_error, should_copy)
-                } else {
-                    (Ok(()), false)
+                let interp_error = match self.paintstate.interpolator {
+                    Some(interpolator) => unsafe {
+                        do_interpolate_lua(interpolator, self.dimensions, &mut LuaCallbackType::new(self, events, handler))
+                    },
+                    None => Ok(())
                 };
 
                 let (target, source) = self.targetdata.get_texturetargets();
@@ -280,15 +275,6 @@ impl<'a> GLInit<'a> {
                     let completed = layer.complete(copy_shader, point_shader);
                     let points = drawvecs[layer.pointidx as uint].as_slice();
                     draw_layer(completed, matrix, color, brush, back_buffer, points);
-
-                    if should_copy {
-                        let copymatrix = matrix::IDENTITY.as_slice();
-                        perform_copy(target.framebuffer, &layer.target.texture, completed.copyshader, copymatrix);
-                        gl2::bind_framebuffer(gl2::FRAMEBUFFER, layer.target.framebuffer);
-                        gl2::clear_color(0f32, 0f32, 0f32, 0f32);
-                        gl2::clear(gl2::COLOR_BUFFER_BIT);
-                        logi!("copied brush layer down");
-                    }
                 }
 
                 for drawvec in drawvecs.iter_mut() {
@@ -298,6 +284,21 @@ impl<'a> GLInit<'a> {
                 interp_error
             },
             _ => { Ok(()) }
+        }
+    }
+
+    pub fn copy_layers_down(&mut self) {
+        if let (Some(copy_shader), Some(point_shader)) = (self.paintstate.copyshader, self.paintstate.pointshader) {
+            let copymatrix = matrix::IDENTITY.as_slice();
+            let target = self.targetdata.get_current_texturetarget();
+            for layer in self.paintstate.layers.iter() {
+                let completed = layer.complete(copy_shader, point_shader);
+                perform_copy(target.framebuffer, &layer.target.texture, completed.copyshader, copymatrix);
+                gl2::bind_framebuffer(gl2::FRAMEBUFFER, layer.target.framebuffer);
+                gl2::clear_color(0f32, 0f32, 0f32, 0f32);
+                gl2::clear(gl2::COLOR_BUFFER_BIT);
+                logi!("copied brush layer down");
+            }
         }
     }
 
