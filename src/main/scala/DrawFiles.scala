@@ -14,8 +14,7 @@ import GLResultTypeDef._
 
 object DrawFiles {
   trait NamedSource {
-    val filename: String
-    def read(): InputStream
+    def read(filename: String): InputStream
   }
 
   trait PartialReader[T, U] {
@@ -23,22 +22,25 @@ object DrawFiles {
     def compile(g: GLInit, source: T): GLResult[U]
   }
 
-  sealed trait ReadState[U] {
-    val name: String
-  }
-  class Readable[U](private var state: ReadState[U]) {
+  sealed trait ReadState[U] { }
+  class Readable[U](path: String, private var state: ReadState[U]) {
+    val name = {
+      val pathsep = path.lastIndexOf('/')
+      val extsep = path.lastIndexOf('.')
+      val end = if (extsep == -1 || extsep < pathsep) path.length else extsep
+      path.substring(pathsep + 1, end)
+    }
     type BaseUnread = DrawFiles.BaseUnread[_, U]
     type PartiallyRead = DrawFiles.PartiallyRead[_, U]
     type FullyRead = DrawFiles.FullyRead[U]
     type FailedRead = DrawFiles.FailedRead[U]
-    val name = state.name
     def read() = {
       state = state match {
         case s: BaseUnread => try {
-          s.read()
+          s.read(path)
         } catch {
           case e: Exception => {
-            new FailedRead(s.name, e)
+            new FailedRead(e)
           }
         }
         case other => other
@@ -58,7 +60,7 @@ object DrawFiles {
             s.compile(gl)
           } catch {
             case e: Exception => {
-              state = new FailedRead(s.name, e)
+              state = new FailedRead(e)
               throw e
             }
           }
@@ -88,17 +90,15 @@ object DrawFiles {
   }
 
   abstract class BaseUnread[T, U] extends ReadState[U] {
-    val name: String
-    def read(): PartiallyRead[T, U]
-    def toReadable: Readable[U] = new Readable(this)
+    def read(path: String): PartiallyRead[T, U]
+    def toReadable(name: String): Readable[U] = new Readable(name, this)
   }
 
   class Unread[T, U](source: NamedSource, reader: PartialReader[T, U]) extends BaseUnread[T,U] {
-    val name = source.filename
-    def read() = {
-      val stream = source.read()
+    def read(path: String) = {
+      val stream = source.read(path)
       try {
-        new PartiallyRead(name, reader, reader.readSource(stream))
+        new PartiallyRead(reader, reader.readSource(stream))
       } catch {
         case e: Exception => {
           stream.close()
@@ -107,34 +107,26 @@ object DrawFiles {
       }
     }
   }
-  class DefaultUnread[T <: AnyRef, U](val name: String, reader: PartialReader[T, U]) extends BaseUnread[T, U] {
-    def read() = {
+  class DefaultUnread[T <: AnyRef, U](reader: PartialReader[T, U]) extends BaseUnread[T, U] {
+    def read(path: String) = {
       val content: T = null.asInstanceOf[T]
-      new PartiallyRead(name, reader, content)
+      new PartiallyRead(reader, content)
     }
   }
 
-  class PartiallyRead[T, U](val name: String, reader: PartialReader[T, U], val content: T) extends ReadState[U] {
-    def compile(g: GLInit) = new FullyRead(name, reader.compile(g, content))
+  class PartiallyRead[T, U](reader: PartialReader[T, U], val content: T) extends ReadState[U] {
+    def compile(g: GLInit) = new FullyRead(reader.compile(g, content))
   }
-  //object PartiallyRead {
-    //def default[T <: AnyRef, U](name: String, reader: PartialReader[T, U]) = {
-      //new PartiallyRead(name, reader, null)
-    //}
-  //}
 
-  class FullyRead[U](val name: String, val content: U) extends ReadState[U]
-  class FailedRead[U](val name: String, val error: Exception) extends ReadState[U]
+  class FullyRead[U](val content: U) extends ReadState[U]
+  class FailedRead[U](val error: Exception) extends ReadState[U]
 
-
-  class AssetStreamSource(c: Context, path: String) extends NamedSource {
-    val filename = path
-    def read() = c.getAssets().open(path)
+  class AssetStreamSource(c: Context) extends NamedSource {
+    def read(path: String) = c.getAssets().open(path)
   }
   
-  class FileSource(file: File) extends NamedSource {
-    val filename = file.getName()
-    def read() = new BufferedInputStream(new FileInputStream(file))
+  object FileSource extends NamedSource {
+    def read(path: String) = new BufferedInputStream(new FileInputStream(path))
   }
 
   def externalfiles(c: Context, path: String): Array[File] = {
@@ -238,7 +230,8 @@ object DrawFiles {
 
 class LoadedDrawFiles(c: Context, useExternal: Boolean) {
   import DrawFiles._
-  private def allfiles[T](builtins: PreinstalledPaintResources.Dir, constructor: PartialReader[_, T], default: DefaultUnread[_, T]): Array[Readable[T]] = {
+  private val assetStreamSource = new AssetStreamSource(c)
+  private def allfiles[T](builtins: PreinstalledPaintResources.Dir, constructor: PartialReader[_, T], default: Readable[T]): Array[Readable[T]] = {
     // type must be specified or Array() will return an Array[Object], this is probably a compiler bug
     val userfiles: Array[File] =
       if (useExternal) externalfiles(c, builtins.name)
@@ -246,16 +239,16 @@ class LoadedDrawFiles(c: Context, useExternal: Boolean) {
     var i = if (default != null) 1 else 0
     val builtinpaths = builtins.builtin
     val readers = new Array[Readable[T]](builtinpaths.length + userfiles.length + i)
-    readers(0) = if (default != null) default.toReadable else null
+    readers(0) = default
     var bi = 0
     while (bi < builtinpaths.length) {
-      readers(i) = new Unread(new AssetStreamSource(c, builtinpaths(bi)), constructor).toReadable
+      readers(i) = new Unread(assetStreamSource, constructor).toReadable(builtinpaths(bi))
       bi += 1
       i += 1
     }
     var fi = 0
     while (fi < userfiles.length) {
-      readers(i) = new Unread(new FileSource(userfiles(fi)), constructor).toReadable
+      readers(i) = new Unread(FileSource, constructor).toReadable(userfiles(fi).getAbsolutePath())
       fi += 1
       i += 1
     }
@@ -269,26 +262,26 @@ class LoadedDrawFiles(c: Context, useExternal: Boolean) {
   // TODO: make these safe
   val paints: Array[Readable[PointShader]] = {
     val constructor = new ShaderReader(PointShader.apply _)
-    val default = new DefaultUnread("Default Paint", constructor)
+    val default = new DefaultUnread(constructor).toReadable("Default Paint")
     val files = allfiles[PointShader](PreinstalledPaintResources.pointshaders, constructor, default)
     files
   }
 
   val anims: Array[Readable[CopyShader]] = {
     val constructor = new ShaderReader(CopyShader.apply _)
-    val default = new DefaultUnread("Default Animation", constructor)
+    val default = new DefaultUnread(constructor).toReadable("Default Animation")
     val files = allfiles[CopyShader](PreinstalledPaintResources.animshaders, constructor, default)
     files
   }
 
   val interpscripts: Array[Readable[LuaScript]] = {
-    val default = new DefaultUnread("Default Interpolator", LuaReader)
+    val default = new DefaultUnread(LuaReader).toReadable("Default Interpolator")
     val files = allfiles[LuaScript](PreinstalledPaintResources.interpolators, LuaReader, default)
     files
   }
 
   val unibrushes: Array[Readable[UniBrush]] = {
-    val default = new DefaultUnread("Nothing", DefaultUniBrush)
+    val default = new DefaultUnread(DefaultUniBrush).toReadable("Nothing")
     val files = allfiles[UniBrush](PreinstalledPaintResources.unibrushes, UniBrushReader, default)
     files
   }
