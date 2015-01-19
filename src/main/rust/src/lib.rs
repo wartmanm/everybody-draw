@@ -1,4 +1,4 @@
-#![feature(globs, macro_rules, default_type_params)]
+#![feature(globs, macro_rules, default_type_params, if_let)]
 #![crate_name = "rustgl"]
 #![crate_type = "staticlib"]
 #![no_std]
@@ -11,15 +11,17 @@ extern crate collections;
 extern crate alloc;
 extern crate std;
 extern crate arena;
+extern crate lua;
 
 pub mod bindgen_builtins;
 pub mod android;
 pub mod jni;
 pub mod jni_constants;
-
-pub mod log;
+pub mod luajit;
+pub mod luajit_constants;
 
 pub mod macros;
+pub mod log;
 pub mod glcommon;
 pub mod rollingaverage;
 
@@ -38,3 +40,5 @@ pub mod glstore;
 pub mod luascript;
 pub mod paintlayer;
 pub mod rustjni;
+pub mod lua_geom;
+pub mod lua_callbacks;

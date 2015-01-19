@@ -7,7 +7,7 @@ import android.util.Log
 import android.graphics.Bitmap
 import unibrush.Layer
 
-class TextureSurfaceThread(surface: SurfaceTexture, private var motionHandler: MotionEventHandler, handlerCallback: (TextureSurfaceThread)=>Unit)
+class TextureSurfaceThread(surface: SurfaceTexture, private var motionHandler: MotionEventHandler, handlerCallback: (TextureSurfaceThread)=>Unit, errorCallback: (Exception)=>Unit)
 extends Thread with Handler.Callback with AndroidImplicits {
   import TextureSurfaceThread.Constants._
 
@@ -46,7 +46,14 @@ extends Thread with Handler.Callback with AndroidImplicits {
         if (running.get()){
           val next = SystemClock.uptimeMillis() + 1000 / targetFramerate
           val gl: GLInit = GLInit.fromMessage(msg)
-          drawQueuedPoints(gl)
+          try {
+            drawQueuedPoints(gl)
+          } catch {
+            case e: LuaException => {
+              nativeSetInterpolator(gl, LuaScript(gl, null).right.get)
+              errorCallback(e)
+            }
+          }
           updateGL(gl)
           val newmessage = gl.toMessage(handler.obtainMessage(MSG_NEW_FRAME))
           handler.sendMessageAtTime(newmessage, next)

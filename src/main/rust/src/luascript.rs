@@ -1,15 +1,9 @@
 use core::prelude::*;
-use core::{ptr, fmt};
+use core::fmt;
 use core::fmt::Show;
-use collections::str::StrAllocating;
 use log::logi;
 use glcommon::GLResult;
-
-extern "C" {
-    fn loadLuaScript(script: *const u8) -> i32;
-    fn unloadLuaScript(key: i32) -> ();
-    fn useLuaScript(key: i32) -> ();
-}
+use lua_geom::{load_lua_script, unload_lua_script, use_lua_script};
 
 pub struct LuaScript {
     registry_id: i32,
@@ -17,19 +11,16 @@ pub struct LuaScript {
 
 impl LuaScript {
     pub fn new(script: Option<&str>) -> GLResult<LuaScript> {
-        match unsafe { loadLuaScript(script.map_or(ptr::null(), |x| x.as_bytes().as_ptr())) } {
-            -1 => Err("something went wrong loading the script!".into_string()),
-            x  => {
-                let script = LuaScript { registry_id: x };
-                logi!("created {}", script);
-                Ok(script)
-            }
-        }
+        //let (ptr, len) = script.map_or((ptr::null(), 0), |x| (x.as_bytes().as_ptr(), x.as_bytes().len()));
+        let registry_id = unsafe { try!(load_lua_script(script)) };
+        let script = LuaScript { registry_id: registry_id };
+        logi!("created {}", script);
+        Ok(script)
     }
 
     pub fn prep(&self) {
         unsafe {
-            useLuaScript(self.registry_id);
+            use_lua_script(self.registry_id);
         }
     }
 }
@@ -38,7 +29,7 @@ impl Drop for LuaScript {
     fn drop(&mut self) {
         logi!("dropping {}", self);
         unsafe {
-            unloadLuaScript(self.registry_id);
+            unload_lua_script(self.registry_id);
         }
     }
 }

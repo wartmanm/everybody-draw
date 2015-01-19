@@ -1,0 +1,40 @@
+local backlogx = {}
+local backlogy = {}
+local backlogpos = {}
+local backlogcounter = {}
+function ondown(a)
+  loglua("in ondown")
+  local counter = a.counter
+  loglua(string.format("got counter: %d", counter))
+  backlogx[counter] = {[0] = a.x}
+  backlogy[counter] = {[0] = a.y}
+  backlogpos[counter] = 0
+  backlogcounter[counter] = 0
+  loglua("done ondown")
+end
+
+function main(a, b, screenx, screeny, points)
+  pushline(points, 0, a, b)
+  local counter = a.counter
+  local olddist = backlogcounter[counter]
+  if b.distance - olddist >= 10 then
+    backlogcounter[counter] = olddist + 25
+    local pos = (backlogpos[counter] + 1) % 16
+    backlogpos[counter] = pos
+    local logx = backlogx[counter]
+    local logy = backlogy[counter]
+    local curpos = pos
+    local poscounter = 0
+    repeat
+      pos = (pos + 2) % 16
+      if logx[pos] ~= nil and logy[pos] ~= nil then
+        a.x = logx[pos]
+        a.y = logy[pos]
+        pushline(points, 0, a, b)
+      end
+      poscounter = poscounter + 1
+    until poscounter == 8
+    logx[pos] = b.x
+    logy[pos] = b.y
+  end
+end

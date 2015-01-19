@@ -20,3 +20,4 @@ Cargo.lock
 src/main/assets/unibrushes
 src/main/rust/src/bindgen_builtins.rs
 src/main/rust/src/jni.rs
+src/main/rust/src/luajit.rs

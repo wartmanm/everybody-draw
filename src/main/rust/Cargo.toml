@@ -11,6 +11,9 @@ path = "./deps/rust-egl"
 [dependencies.opengles]
 path = "./deps/rust-opengles"
 
+[dependencies.lua]
+path = "./deps/rust-lua"
+
 [lib]
 name = "rustgl"
 path = "src/lib.rs"

@@ -6,7 +6,7 @@ use collections::str::StrAllocating;
 use opengles::gl2;
 use opengles::gl2::{GLint, GLuint, GLfloat};
 
-use log::{logi,loge};
+use log::logi;
 
 use glcommon;
 use glcommon::{check_gl_error, get_shader_handle, get_uniform_handle_option, Shader, GLResult};
@@ -25,31 +25,8 @@ static TEXTURE_VERTICES: [GLfloat, ..8] = [
     1.0, 1.0
 ];
 
-static DEFAULT_VERTEX_SHADER: &'static str =
-   "attribute vec4 vPosition;
-    attribute vec4 vTexCoord;
-    uniform mat4 textureMatrix;
-    varying vec2 uv;
-    void main() {
-        uv = (textureMatrix * vTexCoord).xy;
-        gl_Position = vPosition;
-    }\n";
-
-static DEFAULT_FRAGMENT_SHADER: &'static str =
-   "precision lowp float;
-    uniform sampler2D texture;
-    varying vec2 uv;
-    void main() {
-        gl_FragColor = texture2D(texture, uv);
-    }\n";
-
-pub static NOALPHA_FRAGMENT_SHADER: &'static str =
-   "precision lowp float;
-    uniform sampler2D texture;
-    varying vec2 uv;
-    void main() {
-        gl_FragColor = vec4(vec3(texture2D(texture, uv)), 1.0);
-    }\n";
+static DEFAULT_VERTEX_SHADER: &'static str = include_str!("../includes/shaders/default_copy.vsh");
+static DEFAULT_FRAGMENT_SHADER: &'static str = include_str!("../includes/shaders/default_copy.fsh");
 
 pub struct CopyShader {
     program: GLuint,

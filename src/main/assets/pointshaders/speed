@@ -4,7 +4,7 @@ attribute float vSize;
 attribute float vTime;
 attribute vec4 vPosition;
 attribute float vPointer;
-attribute float vSpeed;
+attribute vec2 vSpeed;
 attribute float vDistance;
 uniform vec3 vColor;
 varying float time;
@@ -23,5 +23,5 @@ void main() {
     size = tmpSize;
     color = hsv2rgb(vec3(fract(vPointer / 33.0), 1.0, 1.0));
     gl_Position = (textureMatrix * vPosition);
-    gl_PointSize = clamp(vSpeed, 7.5, 60.0);
+    gl_PointSize = clamp(distance(vec2(0, 0), vSpeed), 7.5, 60.0);
 }

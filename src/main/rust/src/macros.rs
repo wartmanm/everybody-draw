@@ -50,3 +50,9 @@ macro_rules! fail(
 macro_rules! try(
     ($e:expr) => (match $e { Ok(e) => e, Err(e) => return Err(e) })
 )
+
+macro_rules! cstr(
+    ($str:expr) => (
+        concat!($str, "\0").as_ptr() as *const ::libc::c_char
+    )
+)

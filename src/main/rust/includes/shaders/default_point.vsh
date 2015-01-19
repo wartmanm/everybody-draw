@@ -1,5 +1,5 @@
-uniform mat4 textureMatrix;
 precision lowp float;
+uniform mat4 textureMatrix;
 attribute float vSize;
 attribute float vTime;
 attribute vec4 vPosition;
@@ -10,18 +10,14 @@ uniform vec3 vColor;
 varying float time;
 varying float size;
 varying vec3 color;
-
-vec3 hsv2rgb(vec3 c) {
-    vec4 K = vec4(1.0, 2.0 / 3.0, 1.0 / 3.0, 3.0);
-    vec3 p = abs(fract(c.xxx + K.xyz) * 6.0 - K.www);
-    return c.z * mix(K.xxx, clamp(p - K.xxx, 0.0, 1.0), c.y);
-}
+varying vec2 position;
 
 void main() {
     time = vTime;
     float tmpSize = vSize * 1500.0;
-    size = tmpSize;
-    color = hsv2rgb(vec3(fract(vPointer / 33.0), 1.0, 1.0));
+    size = clamp(tmpSize, 7.5, 60.0);
+    color = vec3(1.0, 1.0, 0.0);
+    gl_PointSize = 30.0;
     gl_Position = (textureMatrix * vPosition);
-    gl_PointSize = clamp(tmpSize, 7.5, 60.0);
+    position = vec2(textureMatrix * vPosition);
 }

@@ -5,10 +5,9 @@ use core::prelude::*;
 use std::c_str::ToCStr;
 
 pub fn log(rustmsg: &str, level: u32) {
-  let tag = "rust\0".as_ptr() as *const ::libc::c_char;
   let msg = rustmsg.to_c_str();
   unsafe {
-    __android_log_write(level as ::libc::c_int, tag, msg.as_ptr());
+    __android_log_write(level as ::libc::c_int, cstr!("rust"), msg.as_ptr());
   }
 }
 

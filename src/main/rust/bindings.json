@@ -14,7 +14,12 @@
     }, {
         "path": "android/native_window"
     }, {
-        "path": "jni",
+        "path": "jni", 
         "remove_fnptr_opts": true
+    }, {
+        "deps": [ "lua::raw" ], 
+        "match": [ "luajit" ], 
+        "path": "luajit", 
+        "root": "../jni/lua"
     }
 ]

@@ -12,11 +12,10 @@ use opengles::gl2;
 use opengles::gl2::{GLuint, GLenum, GLubyte};
 
 use glcommon::{Shader, check_gl_error, GLResult};
-use glpoint::{MotionEventConsumer, run_interpolators, create_motion_event_handler, destroy_motion_event_handler};
+use glpoint::{MotionEventConsumer, create_motion_event_handler, destroy_motion_event_handler};
 use point::ShaderPaintPoint;
 use pointshader::PointShader;
 use paintlayer::{TextureTarget, CompletedLayer};
-use copyshader;
 use copyshader::*;
 use gltexture;
 use gltexture::Texture;
@@ -26,6 +25,8 @@ use drawevent::Events;
 use glstore::DrawObjectIndex;
 use luascript::LuaScript;
 use paintlayer::PaintLayer;
+use lua_callbacks::LuaCallbackType;
+use lua_geom::do_interpolate_lua;
 
 
 static DRAW_INDEXES: [GLubyte, ..6] = [
@@ -49,10 +50,10 @@ pub enum AndroidBitmapFormat {
 pub struct GLInit<'a> {
     #[allow(dead_code)]
     dimensions: (i32, i32),
-    events: Events<'a>,
+    pub events: Events<'a>,
     pub paintstate: PaintState<'a>,
     targetdata: TargetData,
-    points: Vec<Vec<ShaderPaintPoint>>,
+    pub points: Vec<Vec<ShaderPaintPoint>>,
 }
 
 pub struct TargetData {
@@ -153,7 +154,7 @@ impl<'a> GLInit<'a> {
         // The only purpose of the shader copy is to flip the image from gl coords to bitmap coords.
         // it might be better to finagle the output copy matrix so the rest of the targets
         // can stay in bitmap coords?  Or have a dedicated target for this.
-        let saveshader = Shader::new(None, Some(copyshader::NOALPHA_FRAGMENT_SHADER)).unwrap();
+        let saveshader = Shader::new(None, Some(include_str!("../includes/shaders/noalpha_copy.fsh"))).unwrap();
         let newtarget = TextureTarget::new(x, y, gltexture::RGB);
         let matrix = [1f32,  0f32,  0f32,  0f32,
                       0f32, -1f32,  0f32,  0f32,
@@ -200,7 +201,9 @@ impl<'a> GLInit<'a> {
 
     pub fn set_interpolator(&mut self, interpolator: DrawObjectIndex<LuaScript>) -> () {
         logi("setting interpolator");
-        self.paintstate.interpolator = Some(self.events.use_interpolator(interpolator));
+        let interpolator = self.events.use_interpolator(interpolator);
+        interpolator.prep();
+        self.paintstate.interpolator = Some(interpolator);
     }
 
     pub fn set_brush_texture(&mut self, texture: DrawObjectIndex<Texture>) {
@@ -222,6 +225,17 @@ impl<'a> GLInit<'a> {
         self.events.clear_layers();
         self.paintstate.layers.clear();
         self.points.truncate(1);
+    }
+
+    #[inline]
+    pub fn erase_layer(&mut self, layer: i32) {
+        let target = match layer {
+            0 => self.targetdata.get_current_texturetarget().framebuffer,
+            _ => self.paintstate.layers[(layer - 1) as uint].target.framebuffer
+        };
+        gl2::bind_framebuffer(gl2::FRAMEBUFFER, target);
+        gl2::clear_color(0f32, 0f32, 0f32, 0f32);
+        gl2::clear(gl2::COLOR_BUFFER_BIT);
     }
 
     pub fn setup_graphics<'a>(w: i32, h: i32) -> GLInit<'a> {
@@ -252,23 +266,28 @@ impl<'a> GLInit<'a> {
         data
     }
 
-    pub fn draw_queued_points(&mut self, handler: &mut MotionEventConsumer, matrix: &matrix::Matrix) {
+    pub fn draw_queued_points(&mut self, handler: &mut MotionEventConsumer, matrix: &matrix::Matrix) -> GLResult<()> {
         match (self.paintstate.pointshader, self.paintstate.copyshader, self.paintstate.brush) {
             (Some(point_shader), Some(copy_shader), Some(brush)) => {
                 gl2::enable(gl2::BLEND);
                 gl2::blend_func(gl2::ONE, gl2::ONE_MINUS_SRC_ALPHA);
+
+                let (interp_error, should_copy) =
+                if self.paintstate.interpolator.is_some() {
+                    let interp_error = unsafe {
+                        do_interpolate_lua(self.dimensions, &mut LuaCallbackType::new(self, handler))
+                    };
+                    let should_copy = handler.frame_done();
+                    (interp_error, should_copy)
+                } else {
+                    (Ok(()), false)
+                };
+
                 let (target, source) = self.targetdata.get_texturetargets();
-
-                let matrix = matrix.as_slice();
-                let drawvecs = self.points.as_mut_slice();
-                let color = [1f32, 1f32, 0f32]; // TODO: brush color selection
                 let back_buffer = &source.texture;
-
-                for drawvec in drawvecs.iter_mut() {
-                    drawvec.clear();
-                }
-                let should_copy = run_interpolators(self.dimensions, handler, &mut self.events, self.paintstate.interpolator, drawvecs);
-
+                let drawvecs = self.points.as_mut_slice();
+                let matrix = matrix.as_slice();
+                let color = [1f32, 1f32, 0f32]; // TODO: brush color selection
                 let baselayer = CompletedLayer {
                     copyshader: copy_shader,
                     pointshader: point_shader,
@@ -290,8 +309,14 @@ impl<'a> GLInit<'a> {
                         logi!("copied brush layer down");
                     }
                 }
+
+                for drawvec in drawvecs.iter_mut() {
+                    drawvec.clear();
+                }
+
+                interp_error
             },
-            _ => { }
+            _ => { Ok(()) }
         }
     }
 
@@ -345,7 +370,7 @@ impl<'a> GLInit<'a> {
     }
 }
 
-#[allow(dead_code)]
+#[allow(dead_code, unused_must_use)]
 fn test_all() {
     {
         let mut data = GLInit::setup_graphics(0, 0);
@@ -364,9 +389,15 @@ fn test_all() {
         data.clear_layers();
         data.add_layer(copyshader, pointshader, 0);
         data.draw_image(1, 1, brushpixels);
+        //let point = ShaderPaintPoint { pos: ::point::Coordinate { x: 0f32, y: 0f32 }, time: 0f32, size: 0f32, speed: ::point::Coordinate { x: 0f32, y: 0f32 }, distance: 0f32, counter: 0f32 };
+        //data.points[0].push(point);
         
         data.clear_buffer();
-        data.draw_queued_points(&mut *consumer, &matrix::IDENTITY);
+        let result = data.draw_queued_points(&mut *consumer, &matrix::IDENTITY);
+        match result {
+            Err(err) => logi!("error drawing points: {}", err),
+            Ok(_)    => logi!("drew points successfully)"),
+        };
         data.render_frame();
         unsafe {
             destroy_motion_event_handler(consumer, producer);
