@@ -41,33 +41,36 @@ local function copytable(t)
   return out
 end
 
-local stringbox = copytable(string)
-local mathbox = copytable(math)
-local tablebox = copytable(table)
-sandboxed = {
-  assert = assert,
-  error = error,
-  ipairs = ipairs,
-  next = next,
-  pairs = pairs,
-  pcall = pcall,
-  print = loglua,
-  select = select,
-  tonumber = tonumber,
-  tostring = tostring,
-  type = type,
-  unpack = unpack,
-  string = stringbox,
-  math = mathbox,
-  table = tablebox,
-  pushpoint = pushpoint,
+function create_sandbox()
+  local stringbox = copytable(string)
+  local mathbox = copytable(math)
+  local tablebox = copytable(table)
+  local sandboxed = {
+    assert = assert,
+    error = error,
+    ipairs = ipairs,
+    next = next,
+    pairs = pairs,
+    pcall = pcall,
+    print = loglua,
+    select = select,
+    tonumber = tonumber,
+    tostring = tostring,
+    type = type,
+    unpack = unpack,
+    string = stringbox,
+    math = mathbox,
+    table = tablebox,
+    pushpoint = pushpoint,
 
-  pushline = pushline,
-  pushcatmullrom = pushcatmullrom,
-  pushcubicbezier = pushcubicbezier,
-  loglua = loglua,
-  clearlayer = clearlayer,
-  savelayers = savelayers,
-  saveundo = saveundo,
-  ShaderPaintPoint = ShaderPaintPoint,
-}
+    pushline = pushline,
+    pushcatmullrom = pushcatmullrom,
+    pushcubicbezier = pushcubicbezier,
+    loglua = loglua,
+    clearlayer = clearlayer,
+    savelayers = savelayers,
+    saveundo = saveundo,
+    ShaderPaintPoint = ShaderPaintPoint,
+  }
+  return sandboxed
+end

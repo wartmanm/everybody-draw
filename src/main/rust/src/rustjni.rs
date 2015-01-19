@@ -453,9 +453,9 @@ unsafe fn done_forward_stdout() {
 #[no_mangle]
 pub unsafe extern "C" fn JNI_OnLoad(vm: *mut JavaVM, reserved: *mut c_void) -> jint {
     logi!("jni onload!!");
-    println!("testing before forwarding");
-    forward_stdout();
-    println!("testing after forwarding");
+    //println!("testing before forwarding");
+    //forward_stdout();
+    //println!("testing after forwarding");
     let mut env: *mut c_void = ptr::null_mut();
     if ((**vm).GetEnv)(vm, (&mut env as *mut *mut c_void), JNI_VERSION_1_6) != JNI_OK {
         return -1;

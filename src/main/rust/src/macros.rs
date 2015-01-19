@@ -16,6 +16,12 @@ macro_rules! println(
     ($($arg:tt)*) => (format_args!(::std::io::stdio::println_args, $($arg)*))
 )
 
+macro_rules! cstr(
+    ($str:expr) => (
+        concat!($str, "\0").as_ptr() as *const ::libc::c_char
+    )
+)
+
 macro_rules! panic(
     () => ({
         panic!("explicit panic")
@@ -23,6 +29,8 @@ macro_rules! panic(
     ($msg:expr) => ({
         // static requires less code at runtime, more constant data
         static _FILE_LINE: (&'static str, uint) = (file!(), line!());
+        ::android::log::__android_log_write(::android::log::ANDROID_LOG_FATAL as ::libc::c_int,
+            cstr!("rust"), cstr!(concat!(file!(), ":", line!(), ": ", $msg, "\0")));
         ::std::rt::begin_unwind($msg, &_FILE_LINE)
     });
     ($fmt:expr, $($arg:tt)*) => ({
@@ -47,6 +55,9 @@ macro_rules! panic(
             static _FILE_LINE: (&'static str, uint) = (file!(), line!());
             ::std::rt::begin_unwind_fmt(fmt, &_FILE_LINE)
         }
+        ::android::log::__android_log_write(::android::log::ANDROID_LOG_FATAL as ::libc::c_int,
+            cstr!("rust"),
+            format!(concat!("{}:{}: ", $fmt, "\0"), file!(), line!(), $($arg)*).as_ptr() as *const i8);
         format_args!(_run_fmt, $fmt, $($arg)*)
     });
 )
@@ -55,8 +66,34 @@ macro_rules! try(
     ($e:expr) => (match $e { Ok(e) => e, Err(e) => return Err(e) })
 )
 
-macro_rules! cstr(
-    ($str:expr) => (
-        concat!($str, "\0").as_ptr() as *const ::libc::c_char
-    )
+macro_rules! assert(
+    ($cond:expr) => (
+        if !$cond {
+            panic!(concat!(": assertion failed: ", stringify!($cond)))
+        }
+    );
+    ($cond:expr, $($arg:expr),+) => (
+        if !$cond {
+            panic!($($arg),+)
+        }
+    );
+)
+
+macro_rules! debug_assert(
+    ($($arg:tt)*) => (if cfg!(not(ndebug)) { assert!($($arg)*); })
+)
+
+macro_rules! assert_eq(
+    ($given:expr , $expected:expr) => ({
+        match (&($given), &($expected)) {
+            (given_val, expected_val) => {
+                // check both directions of equality....
+                if !((*given_val == *expected_val) &&
+                     (*expected_val == *given_val)) {
+                    panic!("assertion failed: `(left == right) && (right == left)` \
+                           (left: `{}`, right: `{}`)", *given_val, *expected_val)
+                }
+            }
+        }
+    })
 )
