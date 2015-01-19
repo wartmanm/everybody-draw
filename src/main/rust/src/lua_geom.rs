@@ -90,7 +90,7 @@ unsafe extern "C" fn panic_wrapper(L: *mut lua_State) -> i32 {
     loge!("error is {}", errorstr);
     let panicfn: lua_CFunction = mem::transmute(LUA_ORIGINAL_PANICFN);
     panicfn(L); // should never return
-    panic!("lua panic");
+    -1
 }
 
 unsafe fn init_lua() -> GLResult<*mut lua_State> {
