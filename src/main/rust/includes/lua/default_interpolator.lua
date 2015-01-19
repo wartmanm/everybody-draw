@@ -1,4 +1,5 @@
 function onmove(a, b)
-  pushpoint(0, a)
-  pushpoint(0, b)
+  pushline(0, a, b)
 end
+
+

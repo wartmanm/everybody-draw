@@ -281,13 +281,13 @@ class LoadedDrawFiles(c: Context, useExternal: Boolean) {
 
   val anims: Array[Readable[CopyShader]] = {
     val constructor = new ShaderReader(CopyShader.apply _)
-    val default = new DefaultUnread(constructor).toReadable("Default Animation")
+    val default = new DefaultUnread(constructor).toReadable("No Animation")
     val files = allfiles[CopyShader](PreinstalledPaintResources.animshaders, constructor, default)
     files
   }
 
   val interpscripts: Array[Readable[LuaScript]] = {
-    val default = new DefaultUnread(LuaReader).toReadable("Default Interpolator")
+    val default = new DefaultUnread(LuaReader).toReadable("Line")
     val files = allfiles[LuaScript](PreinstalledPaintResources.interpolators, LuaReader, default)
     files
   }
