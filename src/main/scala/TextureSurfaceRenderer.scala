@@ -216,7 +216,6 @@ extends Thread with Handler.Callback with AndroidImplicits {
         for (layer <- layers) {
           nativeAddLayer(gl, layer.copyshader, layer.pointshader, layer.pointsrc)
         }
-        Log.i("tst", "cleared layers!")
         nativeSetAnimShader(gl, baseanim)
         nativeSetPointShader(gl, basepoint)
         nativeSetInterpolator(gl, script)

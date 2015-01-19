@@ -3,7 +3,7 @@ use core::fmt;
 use core::fmt::Show;
 use log::logi;
 use glcommon::GLResult;
-use lua_geom::{load_lua_script, unload_lua_script, use_lua_script};
+use lua_geom::{load_lua_script, unload_lua_script, push_lua_script};
 
 pub struct LuaScript {
     registry_id: i32,
@@ -18,9 +18,10 @@ impl LuaScript {
         Ok(script)
     }
 
-    pub fn prep(&self) {
+    #[inline]
+    pub fn push_self(&self) {
         unsafe {
-            use_lua_script(self.registry_id);
+            push_lua_script(self.registry_id);
         }
     }
 }

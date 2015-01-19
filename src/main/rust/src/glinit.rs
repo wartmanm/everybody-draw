@@ -186,7 +186,6 @@ impl<'a> GLInit<'a> {
 
     pub fn set_interpolator(&mut self, interpolator: &'a LuaScript) -> () {
         logi("setting interpolator");
-        interpolator.prep();
         self.paintstate.interpolator = Some(interpolator);
     }
 
@@ -253,10 +252,9 @@ impl<'a> GLInit<'a> {
                 gl2::enable(gl2::BLEND);
                 gl2::blend_func(gl2::ONE, gl2::ONE_MINUS_SRC_ALPHA);
 
-                let (interp_error, should_copy) =
-                if self.paintstate.interpolator.is_some() {
+                let (interp_error, should_copy) = if let Some(interpolator) = self.paintstate.interpolator {
                     let interp_error = unsafe {
-                        do_interpolate_lua(self.dimensions, &mut LuaCallbackType::new(self, events, handler))
+                        do_interpolate_lua(interpolator, self.dimensions, &mut LuaCallbackType::new(self, events, handler))
                     };
                     let should_copy = handler.frame_done();
                     (interp_error, should_copy)

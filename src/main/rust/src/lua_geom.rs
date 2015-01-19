@@ -144,21 +144,21 @@ pub unsafe fn unload_lua_script(key: i32) {
     lua_settable(L, LUA_REGISTRYINDEX);
 }
 
-pub unsafe fn use_lua_script(key: i32) {
-    let L = get_lua().unwrap();
-    lua_pushlightuserdata(L, key as *mut c_void);
-    lua_gettable(L, LUA_REGISTRYINDEX);
-    lua_setglobal(L, cstr!("runmain"));
-}
-
 fn log_err<T>(message: String) -> GLResult<T> {
     loge(message.as_slice());
     Err(message)
 }
 
-pub unsafe fn do_interpolate_lua(dimensions: (i32, i32), output: &mut LuaCallbackType) -> GLResult<()> {
+#[inline]
+pub unsafe fn push_lua_script(key: i32) {
+    let L = get_lua().unwrap();
+    lua_pushlightuserdata(L, key as *mut c_void);
+    lua_gettable(L, LUA_REGISTRYINDEX);
+}
+
+pub unsafe fn do_interpolate_lua(script: &::luascript::LuaScript, dimensions: (i32, i32), output: &mut LuaCallbackType) -> GLResult<()> {
     if let Some(L) = STATIC_LUA {
-        lua_getglobal(L, cstr!("runmain"));
+        script.push_self();
         
         let (x, y) = dimensions;
         lua_pushnumber(L, x as f64);
