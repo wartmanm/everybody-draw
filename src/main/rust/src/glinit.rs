@@ -1,6 +1,7 @@
 extern crate opengles;
 use core::prelude::*;
 use core::mem;
+use core::iter;
 use collections::vec::Vec;
 use core::borrow::IntoCow;
 
@@ -13,7 +14,6 @@ use point::ShaderPaintPoint;
 use pointshader::PointShader;
 use paintlayer::{TextureTarget, CompletedLayer};
 use copyshader::*;
-use gltexture;
 use gltexture::{Texture, PixelFormat};
 use matrix;
 use eglinit;
@@ -25,7 +25,7 @@ use drawevent::Events;
 use rustjni::JNICallbackClosure;
 
 
-static DRAW_INDEXES: [GLubyte, ..6] = [
+static DRAW_INDEXES: [GLubyte; 6] = [
     0, 1, 2,
     0, 2, 3
 ];
@@ -33,17 +33,6 @@ static DRAW_INDEXES: [GLubyte, ..6] = [
 const UNDO_BUFFERS: i32 = 5;
 
 //#[deriving(FromPrimitive)]
-#[repr(i32)]
-#[deriving(Copy)]
-#[allow(non_camel_case_types, dead_code)]
-pub enum AndroidBitmapFormat {
-    ANDROID_BITMAP_FORMAT_NONE      = 0,
-    ANDROID_BITMAP_FORMAT_RGBA_8888 = 1,
-    ANDROID_BITMAP_FORMAT_RGB_565   = 4,
-    ANDROID_BITMAP_FORMAT_RGBA_4444 = 7,
-    ANDROID_BITMAP_FORMAT_A_8       = 8,
-}
-
 
 /// struct for storage of data that stays on rust side
 /// should probably be given a meaningful name like PaintContext, but w/e
@@ -56,12 +45,12 @@ pub struct GLInit<'a> {
 }
 
 pub struct TargetData {
-    targets: [TextureTarget, ..2],
+    targets: [TextureTarget; 2],
     current_target: u8,
 }
 
 pub struct UndoTargets {
-    targets: [TextureTarget, ..UNDO_BUFFERS as uint],
+    targets: [TextureTarget; UNDO_BUFFERS as uint],
     start: i32,
     len: i32,
     max: i32,
@@ -141,7 +130,7 @@ pub struct PaintState<'a> {
     pub interpolator: Option<&'a LuaScript>,
     pub layers: Vec<PaintLayer<'a>>,
     pub undo_targets: UndoTargets,
-    pub brush_color: [f32, ..3],
+    pub brush_color: [f32; 3],
     pub brush_size: f32,
 }
 
@@ -174,7 +163,7 @@ fn perform_copy(dest_framebuffer: GLuint, source_texture: &Texture, shader: &Cop
     check_gl_error("drew elements");
 }
 
-fn draw_layer(layer: CompletedLayer, matrix: &[f32], color: [f32, ..3], size: f32
+fn draw_layer(layer: CompletedLayer, matrix: &[f32], color: [f32; 3], size: f32
               , brush: &Texture, back_buffer: &Texture, points: &[ShaderPaintPoint]) {
     if points.len() > 0 {
         gl2::bind_framebuffer(gl2::FRAMEBUFFER, layer.target.framebuffer);
@@ -199,7 +188,7 @@ impl TargetData {
 }
 
 impl<'a> GLInit<'a> {
-    pub fn draw_image(&mut self, w: i32, h: i32, pixels: &[u8]) -> () {
+    pub fn draw_image(&mut self, w: i32, h: i32, pixels: &[u8], rotation: matrix::Rotation) -> () {
         logi!("drawing image...");
         let target = self.targetdata.get_current_texturetarget();
         let (tw, th) = target.texture.dimensions;
@@ -210,10 +199,7 @@ impl<'a> GLInit<'a> {
         // account for gl's own scaling
         let (glratiox, glratioy) = (widthratio / ratio, heightratio / ratio);
 
-        let matrix = [ glratiox,                 0f32,                    0f32, 0f32,
-                       0f32,                    -glratioy,                0f32, 0f32,
-                       0f32,                     0f32,                    1f32, 0f32,
-                      (1f32 - glratiox) / 2f32, (1f32 + glratioy) / 2f32, 0f32, 0f32];
+        let matrix = matrix::fit_inside((w, h), target.texture.dimensions, rotation);
         logi!("drawing with ratio: {:5.3}, glratio {:5.3}, {:5.3}, matrix:\n{}", ratio, glratiox, glratioy, matrix::log(matrix.as_slice()));
 
         self.paintstate.copyshader.map(|shader| {
@@ -288,7 +274,8 @@ impl<'a> GLInit<'a> {
         logi!("adding layer");
         let extra: i32 = (layer.pointidx as i32 + 1) - self.points.len() as i32;
         if extra > 0 {
-            self.points.grow(extra as uint, Vec::new());
+            //self.points.extend(iter::repeat(Vec::new()).take(extra as uint));
+            self.points.extend(iter::range(0, extra).map(|_| Vec::new()));
         }
         self.paintstate.layers.push(layer);
     }
@@ -314,7 +301,7 @@ impl<'a> GLInit<'a> {
         Ok(())
     }
 
-    pub fn setup_graphics<'a>(w: i32, h: i32) -> GLInit<'a> {
+    pub fn setup_graphics(w: i32, h: i32) -> GLInit<'a> {
         print_gl_string("Version", gl2::VERSION);
         print_gl_string("Vendor", gl2::VENDOR);
         print_gl_string("Renderer", gl2::RENDERER);
@@ -343,7 +330,7 @@ impl<'a> GLInit<'a> {
 
     pub fn unload_interpolator(&mut self, handler: &mut MotionEventConsumer, events: &'a mut Events<'a>, undo_callback: &JNICallbackClosure) -> GLResult<()> {
         if let Some(interpolator) = self.paintstate.interpolator {
-            logi!("finishing {}", interpolator);
+            logi!("finishing {:?}", interpolator);
             unsafe {
                 let mut callback = LuaCallbackType::new(self, events, handler, undo_callback);
                 finish_lua_script(&mut callback, interpolator)
@@ -377,9 +364,8 @@ impl<'a> GLInit<'a> {
             (Some(point_shader), Some(copy_shader), Some(brush)) => {
                 let interp_error = match self.paintstate.interpolator {
                     Some(interpolator) => unsafe {
-                        let dimensions = self.dimensions;
                         let mut callback = LuaCallbackType::new(self, events, handler, undo_callback);
-                        do_interpolate_lua(interpolator, dimensions, &mut callback)
+                        do_interpolate_lua(interpolator, &mut callback)
                     },
                     None => Ok(())
                 };
@@ -461,23 +447,13 @@ impl<'a> GLInit<'a> {
                 eglinit::egl_swap();
             },
             (x, y) => {
-                logi!("skipped frame! copyshader is {}, animshader is {}", x, y);
+                logi!("skipped frame! copyshader is {:?}, animshader is {:?}", x, y);
             }
         }
     }
 
     pub unsafe fn destroy(&mut self) {
         gl2::finish();
-    }
-}
-
-impl gltexture::ToPixelFormat for AndroidBitmapFormat {
-    fn to_pixelformat(&self) -> GLResult<PixelFormat> {
-        match *self {
-            AndroidBitmapFormat::ANDROID_BITMAP_FORMAT_RGBA_8888 => Ok(PixelFormat::RGBA),
-            AndroidBitmapFormat::ANDROID_BITMAP_FORMAT_A_8 => Ok(PixelFormat::ALPHA),
-            _ => Err("Unsupported texture format!".into_cow()),
-        }
     }
 }
 

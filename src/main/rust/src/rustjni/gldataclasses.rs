@@ -7,16 +7,14 @@ use android::native_window_jni::{ANativeWindow_fromSurface};//, ANativeWindow_re
 use android::native_window::ANativeWindow_release;
 
 use glstore::DrawObjectIndex;
-use glinit::AndroidBitmapFormat;
 use eglinit;
 use jni_helpers::ToJValue;
 use gltexture::{ToPixelFormat, BrushTexture};
 use glcommon::{GLResult, MString};
-use rustjni::{register_classmethods, CaseClass, get_safe_data, str_to_jstring, get_mstring, jpointer};
+use rustjni::{register_classmethods, CaseClass, get_safe_data, str_to_jstring, get_mstring, jpointer, GL_EXCEPTION};
 use rustjni::android_bitmap::AndroidBitmap;
 
 static mut SCALA_TUPLE2: CaseClass = CaseClass { constructor: 0 as jmethodID, class: 0 as jclass };
-static mut GL_EXCEPTION: CaseClass = CaseClass { constructor: 0 as jmethodID, class: 0 as jclass };
 
 unsafe fn glresult_or_exception<T>(env: *mut JNIEnv, result: GLResult<DrawObjectIndex<T>>) -> jint {
     logi!("in glresult_or_exception");
@@ -34,9 +32,9 @@ unsafe fn glresult_or_exception<T>(env: *mut JNIEnv, result: GLResult<DrawObject
 unsafe fn safe_create_texture(env: *mut JNIEnv, data: jpointer, bitmap: jobject) -> GLResult<DrawObjectIndex<BrushTexture>> {
     let bitmap = AndroidBitmap::from_jobject(env, bitmap);
     let (w, h) = (bitmap.info.width, bitmap.info.height);
-    let format: AndroidBitmapFormat = mem::transmute(bitmap.info.format);
-    let texformat = try!(format.to_pixelformat());
-    Ok(get_safe_data(data).events.load_brush(w as i32, h as i32, bitmap.as_slice(), texformat))
+    let texformat = try!(bitmap.get_format().to_pixelformat());
+    let pixels = try!(bitmap.as_slice());
+    Ok(get_safe_data(data).events.load_brush(w as i32, h as i32, pixels, texformat))
 }
 
 unsafe extern "C" fn compile_copyshader(env: *mut JNIEnv, _: jobject, data: jpointer, vec: jstring, frag: jstring) -> jint {
@@ -49,7 +47,10 @@ unsafe extern "C" fn compile_pointshader(env: *mut JNIEnv, _: jobject, data: jpo
 
 unsafe extern "C" fn jni_lua_compile_script(env: *mut JNIEnv, _: jobject, data: jpointer, script: jstring) -> jint {
     let scriptstr = get_mstring(env, script);
-    glresult_or_exception(env, get_safe_data(data).events.load_interpolator(scriptstr))
+    let data = get_safe_data(data);
+    // FIXME: this will retrieve a script from cache if there is one already
+    // this may not be whatwe want, since the old one may have state already
+    glresult_or_exception(env, data.events.load_interpolator(scriptstr))
 }
 
 unsafe extern "C" fn create_texture(env: *mut JNIEnv, _: jobject, data: jpointer, bitmap: jobject) -> jint {
@@ -97,7 +98,6 @@ unsafe extern "C" fn jni_egl_finish(_: *mut JNIEnv, _: jobject) {
 
 pub unsafe fn init(env: *mut JNIEnv) {
     SCALA_TUPLE2 = CaseClass::new(env, cstr!("scala/Tuple2"), cstr!("(Ljava/lang/Object;Ljava/lang/Object;)V"));
-    GL_EXCEPTION = CaseClass::new(env, cstr!("com/github/wartman4404/gldraw/GLException"), cstr!("(Ljava/lang/String;)V"));
 
     let pointshaderstaticmethods = [
         native_method!("compile", "(ILjava/lang/String;Ljava/lang/String;)I", compile_pointshader),
@@ -128,5 +128,4 @@ pub unsafe fn init(env: *mut JNIEnv) {
 
 pub unsafe fn destroy(env: *mut JNIEnv) {
     SCALA_TUPLE2.destroy(env);
-    GL_EXCEPTION.destroy(env);
 }

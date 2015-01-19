@@ -1,10 +1,12 @@
-function main(a, b, screenx, screeny, points)
+local screenx = width
+local screeny = height
+function onmove(a, b)
   local ax, ay, bx, by = a.x, a.y, b.x, b.y
-  pushline(points, 0, a, b)
+  pushline(0, a, b)
   a.x = screenx - ax; b.x = screenx - bx
-  pushline(points, 0, a, b)
+  pushline(0, a, b)
   a.y = screeny - ay; b.y = screeny - by
-  pushline(points, 0, a, b)
+  pushline(0, a, b)
   a.x = ax; b.x = bx
-  pushline(points, 0, a, b)
+  pushline(0, a, b)
 end

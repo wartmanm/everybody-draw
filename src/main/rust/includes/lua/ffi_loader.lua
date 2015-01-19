@@ -15,24 +15,16 @@ ffi.cdef[[
   short lua_nextpoint(void *output, struct ShaderPaintPoint *points);
   void lua_log(const char *message);
   void lua_pushline(void *output, int queue, struct ShaderPaintPoint *pointa, struct ShaderPaintPoint *pointb);
-  void lua_pushcatmullrom(void *output, int queue, struct ShaderPaintPoint points[4]);
-  void lua_pushcubicbezier(void *output, int queue, struct ShaderPaintPoint points[4]);
+  void lua_pushcatmullrom(void *output, int queue, struct ShaderPaintPoint *a, struct ShaderPaintPoint *b, struct ShaderPaintPoint *c, struct ShaderPaintPoint *d);
+  void lua_pushcubicbezier(void *output, int queue, struct ShaderPaintPoint *a, struct ShaderPaintPoint *b, struct ShaderPaintPoint *c, struct ShaderPaintPoint *d);
   void lua_clearlayer(void *output, int layer);
   void lua_savelayers(void *output);
   void lua_saveundobuffer(void *output);
 ]]
 
-pushpoint=ffi.C.lua_pushpoint
-pushline=ffi.C.lua_pushline
-pushcatmullrom=ffi.C.lua_pushcatmullrom
-pushcubicbezier=ffi.C.lua_pushcubicbezier
 loglua=ffi.C.lua_log
-clearlayer=ffi.C.lua_clearlayer
-savelayers=ffi.C.lua_savelayers
-saveundo=ffi.C.lua_saveundobuffer
 
 ShaderPaintPoint=ffi.typeof("struct ShaderPaintPoint")
-ShaderPaintPointArray=ffi.typeof("struct ShaderPaintPoint[?]")
 
 local function copytable(t)
   out = {}
@@ -66,7 +58,6 @@ function create_sandbox()
     pushline = pushline,
     pushcatmullrom = pushcatmullrom,
     pushcubicbezier = pushcubicbezier,
-    loglua = loglua,
     clearlayer = clearlayer,
     savelayers = savelayers,
     saveundo = saveundo,

@@ -39,10 +39,13 @@ impl<'a, 'b, 'c, 'd> LuaCallbackType<'a, 'b, 'c, 'd> {
             undo_callback: undo_callback,
         }
     }
+    pub fn get_dimensions(&self) -> (i32, i32) {
+        self.glinit.dimensions
+    }
 }
 
 #[no_mangle]
-pub extern "C" fn lua_nextpoint(data: &mut LuaCallbackType, points: &mut (ShaderPaintPoint, ShaderPaintPoint)) -> u16 {
+pub extern "C" fn lua_nextpoint(data: &mut &mut LuaCallbackType, points: &mut (ShaderPaintPoint, ShaderPaintPoint)) -> u16 {
     let events: &mut Events = data.events;
     let (state, pointer) = glpoint::next_point(data.consumer, events);
     let (newpoints, luastate) = match state {
@@ -59,7 +62,7 @@ macro_rules! rust_raise_lua_err(
     ($L:expr, $fmt:expr, $($arg:tt)*) => ({
         rust_raise_lua_err($L, (format!($fmt, $($arg)*).as_slice()));
     })
-)
+);
 
 fn get_queue_or_raise_err<'a, 'b, 'c, 'd>(data: &'d mut LuaCallbackType, queue: i32) -> &'d mut Vec<ShaderPaintPoint> {
     let points = &mut data.glinit.points;
@@ -69,18 +72,18 @@ fn get_queue_or_raise_err<'a, 'b, 'c, 'd>(data: &'d mut LuaCallbackType, queue: 
             rust_raise_lua_err!(None, "tried to push point to queue {} of {}", queue + 1, points.len());
         }
     }
-    unsafe { points.as_mut_slice().unsafe_mut(queue as uint) }
+    unsafe { points.as_mut_slice().get_unchecked_mut(queue as uint) }
 }
 
 #[no_mangle]
-pub unsafe extern "C" fn lua_pushpoint(data: &mut LuaCallbackType, queue: i32, point: *const ShaderPaintPoint) {
-    let points = get_queue_or_raise_err(data, queue);
+pub unsafe extern "C" fn lua_pushpoint(data: &mut &mut LuaCallbackType, queue: i32, point: *const ShaderPaintPoint) {
+    let points = get_queue_or_raise_err(*data, queue);
     glpoint::push_point(points, &*point);
 }
 
 #[no_mangle]
-pub unsafe extern "C" fn lua_pushline(data: &mut LuaCallbackType, queue: i32, a: *const ShaderPaintPoint, b: *const ShaderPaintPoint) {
-    let points = get_queue_or_raise_err(data, queue);
+pub unsafe extern "C" fn lua_pushline(data: &mut &mut LuaCallbackType, queue: i32, a: *const ShaderPaintPoint, b: *const ShaderPaintPoint) {
+    let points = get_queue_or_raise_err(*data, queue);
     glpoint::push_line(points, &*a, &*b);
 }
 
@@ -97,7 +100,7 @@ pub unsafe extern "C" fn lua_log(message: *const c_char) {
 }
 
 #[no_mangle]
-pub unsafe extern "C" fn lua_clearlayer(data: &mut LuaCallbackType, layer: i32) {
+pub unsafe extern "C" fn lua_clearlayer(data: &mut &mut LuaCallbackType, layer: i32) {
     if let Err(msg) = data.glinit.erase_layer(layer) {
         loge!("{}", msg.as_slice());
         rust_raise_lua_err(None, msg.as_slice());
@@ -105,22 +108,26 @@ pub unsafe extern "C" fn lua_clearlayer(data: &mut LuaCallbackType, layer: i32) 
 }
 
 #[no_mangle]
-pub unsafe extern "C" fn lua_savelayers(data: &mut LuaCallbackType) {
+pub unsafe extern "C" fn lua_savelayers(data: &mut &mut LuaCallbackType) {
     data.glinit.copy_layers_down();
 }
 
 #[no_mangle]
-pub unsafe extern "C" fn lua_pushcatmullrom(data: &mut LuaCallbackType, queue: i32, points: &[ShaderPaintPoint, ..4]) {
-    glpoint::push_catmullrom(&mut data.glinit.points.as_mut_slice()[queue as uint], points);
+pub unsafe extern "C" fn lua_pushcatmullrom(data: &mut &mut LuaCallbackType, queue: i32, a: &ShaderPaintPoint, b: &ShaderPaintPoint, c: &ShaderPaintPoint, d: &ShaderPaintPoint) {
+    let points = [*a, *b, *c, *d];
+    let queue = get_queue_or_raise_err(*data, queue);
+    glpoint::push_catmullrom(queue, &points);
 }
 
 #[no_mangle]
-pub unsafe extern "C" fn lua_pushcubicbezier(data: &mut LuaCallbackType, queue: i32, points: &[ShaderPaintPoint, ..4]) {
-    glpoint::push_cubicbezier(&mut data.glinit.points.as_mut_slice()[queue as uint], points);
+pub unsafe extern "C" fn lua_pushcubicbezier(data: &mut &mut LuaCallbackType, queue: i32, a: &ShaderPaintPoint, b: &ShaderPaintPoint, c: &ShaderPaintPoint, d: &ShaderPaintPoint) {
+    let points = [*a, *b, *c, *d];
+    let queue = get_queue_or_raise_err(*data, queue);
+    glpoint::push_cubicbezier(queue, &points);
 }
 
 #[no_mangle]
-pub unsafe extern "C" fn lua_saveundobuffer(data: &mut LuaCallbackType) -> () {
+pub unsafe extern "C" fn lua_saveundobuffer(data: &mut &mut LuaCallbackType) -> () {
     let result = data.glinit.push_undo_frame();
     (*data.undo_callback)(result);
 }

@@ -1,19 +1,21 @@
 use core::prelude::*;
 use core::fmt;
 use core::fmt::Show;
+use core::hash::Hash;
 
 use opengles::gl2;
 use opengles::gl2::GLuint;
 
-use glcommon::{check_gl_error, GLResult, FillDefaults, Defaults};
+use glcommon::{check_gl_error, GLResult, UsingDefaults, UsingDefaultsSafe};
 
 use collections::vec::Vec;
 
-#[deriving(PartialEq, Eq, Hash, Show, Copy)]
+#[derive(PartialEq, Eq, Hash, Show, Copy)]
+#[repr(u32)]
 pub enum PixelFormat {
-    RGBA = gl2::RGBA as int,
-    RGB = gl2::RGB as int,
-    ALPHA = gl2::ALPHA as int,
+    RGBA = gl2::RGBA,
+    RGB = gl2::RGB,
+    ALPHA = gl2::ALPHA,
 }
 
 pub trait ToPixelFormat {
@@ -60,24 +62,31 @@ impl Texture {
 impl Drop for Texture {
     fn drop(&mut self) {
         gl2::delete_textures([self.texture].as_slice());
-        logi!("deleted {} texture", self.dimensions);
+        logi!("deleted {:?} texture", self.dimensions);
     }
 }
 
 impl Show for Texture {
     fn fmt(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
-        write!(formatter, "texture 0x{:x}, dimensions {}", self.texture, self.dimensions)
+        write!(formatter, "texture 0x{:x}, dimensions {:?}", self.texture, self.dimensions)
     }
 }
 
 impl Show for BrushTexture {
     fn fmt(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
-        write!(formatter, "brushtexture 0x{:x}, dimensions {}", self.texture.texture, self.texture.dimensions)
+        write!(formatter, "brushtexture 0x{:x}, dimensions {:?}", self.texture.texture, self.texture.dimensions)
     }
 }
 
-impl FillDefaults<(PixelFormat, (i32, i32), Vec<u8>), (PixelFormat, (i32, i32), Vec<u8>), BrushTexture> for BrushTexture {
-    fn fill_defaults(init: (PixelFormat, (i32, i32), Vec<u8>)) -> Defaults<(PixelFormat, (i32, i32), Vec<u8>), BrushTexture> {
-        Defaults { val: init }
+impl UsingDefaultsSafe for BrushTexture { }
+impl UsingDefaults<(PixelFormat, (i32, i32), Vec<u8>)> for BrushTexture {
+    type Defaults = (PixelFormat, (i32, i32), Vec<u8>);
+    fn maybe_init(init: (PixelFormat, (i32, i32), Vec<u8>)) -> GLResult<BrushTexture> {
+        let tex = {
+            let (ref format, (w, h), ref pixels) = init;
+            Texture::with_image(w, h, Some(pixels.as_slice()), *format)
+        };
+        Ok(BrushTexture { texture: tex, source: init })
     }
+    fn get_source(&self) -> &(PixelFormat, (i32, i32), Vec<u8>) { &self.source }
 }

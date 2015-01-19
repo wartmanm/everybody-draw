@@ -17,7 +17,7 @@ import java.io.{StringReader, StringWriter}
 import android.util.{JsonReader, JsonWriter}
 
 class PaintControls
-  (val animpicker: UP[CopyShader], val brushpicker: UP[Texture], val paintpicker: UP[PointShader], val interppicker: UP[LuaScript], val unipicker: UP[UniBrush], val copypicker: UUP[CopyShader]) {
+  (val animpicker: UP[CopyShader], val brushpicker: UP[Texture], val paintpicker: UP[PointShader], val interppicker: UP[LuaScript], val unipicker: UP[UniBrush], val copypicker: UUP[CopyShader], val rotation: RotationUnpicker) {
 
   val namedPickers = Map(
     "anim" -> animpicker,
@@ -25,7 +25,8 @@ class PaintControls
     "paint" -> paintpicker,
     "interp" -> interppicker,
     "unibrush" -> unipicker,
-    "copy" -> copypicker
+    "copy" -> copypicker,
+    "rotation" -> rotation
   )
 
   def restoreState() = namedPickers.values.foreach(_.restoreState())
@@ -81,7 +82,8 @@ object PaintControls extends AndroidImplicits {
       new UnnamedPicker[PointShader](paintpicker),
       new UnnamedPicker[LuaScript](interppicker),
       new UnnamedPicker[UniBrush](unipicker),
-      new UnnamedUnpicker[CopyShader](None))
+      new UnnamedUnpicker[CopyShader](None),
+      new RotationUnpicker(-1))
   }
 
   trait SavedControl {
@@ -177,6 +179,12 @@ object PaintControls extends AndroidImplicits {
         case Some(x) => Right(x)
       }
     }
+  }
+
+  class RotationUnpicker(var value: Int = -1) extends SavedControl {
+    override def save(j: JsonWriter) = j.value(value)
+    override def load(j: JsonReader) = { value = j.nextInt() }
+    override def restoreState() = { }
   }
 
   implicit class AdapterSeq(a: Adapter) extends IndexedSeq[Object] {

@@ -6,6 +6,7 @@ import android.os.{Handler, Looper, Message, SystemClock}
 import android.util.Log
 import android.graphics.Bitmap
 import unibrush.Layer
+import MainActivity.Rotation
 
 class TextureSurfaceThread(surface: SurfaceTexture, private var motionHandler: MotionEventHandler, handlerCallback: (TextureSurfaceThread)=>Unit, errorCallback: (Exception)=>Unit)
 extends Thread with Handler.Callback with AndroidImplicits {
@@ -26,7 +27,7 @@ extends Thread with Handler.Callback with AndroidImplicits {
   @native protected def nativeDrawQueuedPoints(data: GLInit, handler: MotionEventHandler, transformMatrix: Array[Float]): Unit
   @native protected def nativeFinishLuaScript(data: GLInit, handler: MotionEventHandler): Unit
   @native protected def nativeClearFramebuffer(data: GLInit): Unit
-  @native protected def nativeDrawImage(data: GLInit, bitmap: Bitmap): Unit
+  @native protected def nativeDrawImage(data: GLInit, bitmap: Bitmap, rotation: Rotation): Unit
   @native protected def nativeSetAnimShader(data: GLInit, shader: CopyShader): Boolean
   @native protected def nativeSetCopyShader(data: GLInit, shader: CopyShader): Boolean
   @native protected def nativeSetPointShader(data: GLInit, shader: PointShader): Boolean
@@ -131,11 +132,11 @@ extends Thread with Handler.Callback with AndroidImplicits {
     handler.post(() => { fn; () })
   }
 
-  def initScreen(gl: GLInit, bitmap: Option[Bitmap]) = {
+  def initScreen(gl: GLInit, bitmap: Option[Bitmap], rotation: Rotation) = {
     Log.i("tst", "initing output shader")
     Log.i("tst", s"drawing bitmap: ${bitmap}")
     for (b <- bitmap) {
-      nativeDrawImage(gl, b)
+      nativeDrawImage(gl, b, rotation)
       b.recycle()
     }
   }
@@ -165,7 +166,7 @@ extends Thread with Handler.Callback with AndroidImplicits {
   }
 
   def drawBitmap(gl: GLInit, bitmap: Bitmap) = {
-    nativeDrawImage(gl, bitmap)
+    nativeDrawImage(gl, bitmap, MainActivity.NoRotation)
   }
 
   // private

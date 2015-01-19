@@ -2,23 +2,23 @@ local backlogx = {}
 local backlogy = {}
 local backlogpos = {}
 local backlogcounter = {}
-function ondown(a, output)
-  loglua("in ondown")
+function ondown(a)
+  print("in ondown")
   local counter = a.counter
-  loglua(string.format("got counter: %d", counter))
+  print(string.format("got counter: %d", counter))
   backlogx[counter] = {[0] = a.x}
   backlogy[counter] = {[0] = a.y}
   backlogpos[counter] = 0
   backlogcounter[counter] = 0
-  loglua("done ondown")
-  default_ondown(a, output)
+  print("done ondown")
+  default_ondown(a)
 end
 onup = default_onup
 onframe = default_onframe
 ondone = default_ondone
 
-function main(a, b, screenx, screeny, points)
-  pushline(points, 0, a, b)
+function onmove(a, b)
+  pushline(0, a, b)
   local counter = a.counter
   local olddist = backlogcounter[counter]
   if b.distance - olddist >= 10 then
@@ -34,7 +34,7 @@ function main(a, b, screenx, screeny, points)
       if logx[pos] ~= nil and logy[pos] ~= nil then
         a.x = logx[pos]
         a.y = logy[pos]
-        pushline(points, 0, a, b)
+        pushline(0, a, b)
       end
       poscounter = poscounter + 1
     until poscounter == 8

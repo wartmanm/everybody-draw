@@ -9,23 +9,24 @@
 // TODO: remove all this duplication
 
 use core::prelude::*;
-use collections::slice::CloneSliceAllocPrelude;
+use core::borrow::ToOwned;
 use collections::vec::Vec;
 use point::PointEntry;
 use glstore::{DrawObjectIndex, DrawObjectList};
 use glstore::{ShaderInitValues, BrushInitValues, LuaInitValues};
 use glstore::{BrushUnfilledValues, LuaUnfilledValues};
-use glstore::MaybeInitFromCache; // FIXME separate out get_source()
+//use glstore::MaybeInitFromCache; // FIXME separate out get_source()
 use gltexture::{BrushTexture, PixelFormat};
 use pointshader::PointShader;
 use copyshader::CopyShader;
 use luascript::LuaScript;
 use paintlayer::PaintLayer;
-use glcommon::{GLResult, MString};
+use glcommon::{GLResult, MString, UsingDefaults};
 use drawevent::event_stream::EventState;
+//use collections::slice::CloneSliceExt;
 
 // can't use Copy, wtf
-#[deriving(Clone)]
+#[derive(Clone)]
 enum DrawEvent {
     UseAnimShader(DrawObjectIndex<CopyShader>),
     UseCopyShader(DrawObjectIndex<CopyShader>),
@@ -82,7 +83,7 @@ impl<'a> Events<'a> {
         self.pointshaders.maybe_get_object(idx)
     }
     pub fn load_brush(&mut self, w: i32, h: i32, pixels: &[u8], format: PixelFormat) -> DrawObjectIndex<BrushTexture> {
-        let ownedpixels = pixels.to_vec();
+        let ownedpixels = pixels.to_owned();
         let init: BrushUnfilledValues = (format, (w, h), ownedpixels);
         self.textures.safe_push_object(init)
     }
@@ -134,15 +135,17 @@ impl<'a> Events<'a> {
     pub fn clear(&mut self) {
         self.eventlist.clear();
     }
-    fn get_event(&self, idx: uint) -> Option<&DrawEvent> {
-        self.eventlist.as_slice().get(idx)
-    }
+    //fn get_event(&self, idx: uint) -> Option<&DrawEvent> {
+        //self.eventlist.as_slice().get(idx)
+    //}
 }
 
 #[inline]
+#[allow(unused)]
 pub fn handle_event<'a>(gl: &mut ::glinit::GLInit<'a>, events: &mut Events<'a>, queue: &mut ::point::PointProducer, eventidx: i32) -> event_stream::EventState {
 
     // FIXME do this without exposing Events or GLInit internal details
+    /*
     match events.get_event(eventidx as uint) {
         Some(event) => match event.clone() {
             DrawEvent::UseAnimShader(idx) => gl.set_anim_shader(events.copyshaders.get_object(idx)),
@@ -162,6 +165,7 @@ pub fn handle_event<'a>(gl: &mut ::glinit::GLInit<'a>, events: &mut Events<'a>, 
         },
         None => return EventState::Done,
     }
+    */
     return EventState::NoFrame;
 }
 
@@ -169,7 +173,7 @@ pub mod event_stream {
     use core::prelude::*;
     use drawevent::{Events, handle_event};
 
-    #[deriving(Copy)]
+    #[derive(Copy)]
     pub enum EventState {
         Done,
         Frame,

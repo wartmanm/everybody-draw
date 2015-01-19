@@ -12,35 +12,38 @@ use core::prelude::*;
 use core::mem;
 use core::fmt::Show;
 use collections::vec::Vec;
-use collections::hash::Hash;
-use collections::hash::sip::SipHasher;
+use std::hash::Hash;
 
 use std::collections::HashMap;
-use std::collections::hash_map::{Vacant, Occupied};
+use std::collections::hash_map::Entry;
 use copyshader::CopyShader;
-use gltexture::{PixelFormat, Texture, BrushTexture};
+use gltexture::{PixelFormat, Texture};
 use pointshader::PointShader;
-use glcommon::Shader;
 use luascript::LuaScript;
 use arena::TypedArena;
 use glcommon::GLResult;
-use glcommon::{FillDefaults, MString};
+use glcommon::{UsingDefaults, UsingDefaultsSafe, MString};
+use std::collections::hash_state::DefaultState;
+use std::hash::SipHasher;
 
 use core::borrow::IntoCow;
+
+//type HashType=::std::collections::hash_map::Hasher;
+pub type HashType=SipHasher;
 
 /// Holds GL objects that can be inited using the given keys.
 /// The list is to avoid having to pass those keys around, and serialize more easily.
 /// The arena doesn't relocate its entries, so we can pass back longer-lived pointers,
 /// even if it needs some encouragement to do so.
 /// There ought to be a better way.
-pub struct DrawObjectList<'a, T: 'a, Init: Eq+Hash+'a> {
-    map: HashMap<&'a Init, DrawObjectIndex<T>, SipHasher>,
+pub struct DrawObjectList<'a, T: 'a, Init: Eq+Hash<HashType>+'a> {
+    map: HashMap<&'a Init, DrawObjectIndex<T>, DefaultState<HashType>>,
     list: Vec<&'a T>,
     arena: TypedArena<T>,
 }
 
 // copy doesn't work, wtf
-#[deriving(Show, Copy)]
+#[derive(Show, Copy)]
 pub struct DrawObjectIndex<T>(i32);
 
 impl<T> DrawObjectIndex<T> {
@@ -57,9 +60,11 @@ impl<T> Clone for DrawObjectIndex<T> {
     }
 }
 
-pub type ShaderInitValues = (MString, MString);
+//pub type ShaderInitValues = (MString, MString);
+pub type ShaderInitValues = (Option<MString>, Option<MString>);
 pub type BrushInitValues = (PixelFormat, (i32, i32), Vec<u8>);
-pub type LuaInitValues = MString;
+//pub type LuaInitValues = MString;
+pub type LuaInitValues = Option<MString>;
 //pub type ShaderKeyValues = &(String, String);
 //pub type BrushKeyValues = (PixelFormat, (i32, i32), Vec<u8>>);
 //pub type LuaKeyValues = &String;
@@ -74,66 +79,67 @@ pub type LuaIndex = DrawObjectIndex<LuaScript>;
 pub trait InitFromCache<Init> {
     fn init(Init) -> Self;
 }
-pub trait MaybeInitFromCache<Init> {
-    fn maybe_init(Init) -> GLResult<Self>;
-    fn get_source(&self) -> &Init;
-}
+//pub trait MaybeInitFromCache<Init> {
+    //fn maybe_init(Init) -> GLResult<Self>;
+    //fn get_source(&self) -> &Init;
+//}
+
 
 // this and the two shader impls were originally a single
 // impl<T: Shader> InitFromCache<ShaderInitValues> for Option<T>
 // but that counts as the impl for all of Option, not just Option<Shader>
-fn _init_copy_shader<T: Shader>(value: (MString, MString)) -> GLResult<T> {
-    let (vert, frag) = value;
-    Shader::new(vert, frag)
-}
-impl MaybeInitFromCache<ShaderInitValues> for CopyShader {
-    fn maybe_init(value: (MString, MString)) -> GLResult<CopyShader> { _init_copy_shader(value) }
-    fn get_source(&self) -> &(MString, MString) { &self.source }
-}
-impl MaybeInitFromCache<ShaderInitValues> for PointShader {
-    fn maybe_init(value: (MString, MString)) -> GLResult<PointShader> { _init_copy_shader(value) }
-    fn get_source(&self) -> &(MString, MString) { &self.source }
-}
-// TODO: use this as the impl for all InitFromCache<Init>
-impl MaybeInitFromCache<BrushInitValues> for BrushTexture {
-    fn maybe_init(value: BrushInitValues) -> GLResult<BrushTexture> {
-        Ok(InitFromCache::init(value))
-    }
-    fn get_source(&self) -> &BrushInitValues { &self.source }
-}
+//fn _init_copy_shader<T: Shader>(value: (MString, MString)) -> GLResult<T> {
+    //let (vert, frag) = value;
+    //Shader::new(vert, frag)
+//}
+//impl MaybeInitFromCache<ShaderInitValues> for CopyShader {
+    //fn maybe_init(value: (MString, MString)) -> GLResult<CopyShader> { _init_copy_shader(value) }
+    //fn get_source(&self) -> &(MString, MString) { &self.source }
+//}
+//impl MaybeInitFromCache<ShaderInitValues> for PointShader {
+    //fn maybe_init(value: (MString, MString)) -> GLResult<PointShader> { _init_copy_shader(value) }
+    //fn get_source(&self) -> &(MString, MString) { &self.source }
+//}
+//// TODO: use this as the impl for all InitFromCache<Init>
+//impl MaybeInitFromCache<BrushInitValues> for BrushTexture {
+    //fn maybe_init(value: BrushInitValues) -> GLResult<BrushTexture> {
+        //Ok(InitFromCache::init(value))
+    //}
+    //fn get_source(&self) -> &BrushInitValues { &self.source }
+//}
 
-pub fn init_from_defaults<Unfilled, T: MaybeInitFromCache<Init> + FillDefaults<Unfilled, Init, T>, Init>(init: Unfilled) -> GLResult<T> {
-    let filled = FillDefaults::fill_defaults(init).val;
-    MaybeInitFromCache::<Init>::maybe_init(filled)
+pub fn init_from_defaults<T: UsingDefaults<Init>, Init: Hash<HashType>+Eq+Show>(init: Init) -> GLResult<T> {
+    UsingDefaults::maybe_init(init)
 }
 
 // FIXME maybe a BrushTexture wrapper?
-impl InitFromCache<BrushInitValues> for BrushTexture {
-    fn init(value: BrushInitValues) -> BrushTexture {
-        let tex = {
-            let (ref format, (w, h), ref pixels) = value;
-            Texture::with_image(w, h, Some(pixels.as_slice()), *format)
-        };
-        BrushTexture { texture: tex, source: value }
-    }
-}
+//impl InitFromCache<BrushInitValues> for BrushTexture {
+    //fn init(value: BrushInitValues) -> BrushTexture {
+        //let tex = {
+            //let (ref format, (w, h), ref pixels) = value;
+            //Texture::with_image(w, h, Some(pixels.as_slice()), *format)
+        //};
+        //BrushTexture { texture: tex, source: value }
+    //}
+//}
 
-impl MaybeInitFromCache<LuaInitValues> for LuaScript {
-    fn maybe_init(value: MString) -> GLResult<LuaScript> {
-        LuaScript::new(value)
-    }
-    fn get_source(&self) -> &MString { &self.source }
-}
+//impl MaybeInitFromCache<LuaInitValues> for LuaScript {
+    //fn maybe_init(value: MString) -> GLResult<LuaScript> {
+        //LuaScript::new(value)
+    //}
+    //fn get_source(&self) -> &MString { &self.source }
+//}
 
-impl<'a, Unfilled, T: MaybeInitFromCache<Init> + FillDefaults<Unfilled, Init, T>, Init: Hash+Eq+Show> DrawObjectList<'a, T, Init> {
+impl<'a, T: UsingDefaults<Init>, Init: Hash<HashType>+Eq+Show> DrawObjectList<'a, T, Init> {
     pub fn new() -> DrawObjectList<'a, T, Init> {
         // the default hasher is keyed off of the task-local rng,
         // which would blow up since we don't have a task
         //let mut rng = rand::weak_rng();
         //let hasher = SipHasher::new_with_keys(rng.next_u64(), rng.next_u64());
         // FIXME weak_rng also blows up? can it not find /dev/urandom?
-        let hasher = SipHasher::new_with_keys(0, 0);
-        let map = HashMap::with_hasher(hasher);
+        //let hasher = SipHasher::new_with_keys(0, 0);
+        let hasher = DefaultState;
+        let map = HashMap::with_hash_state(hasher);
         DrawObjectList {
             map: map,
             list: Vec::new(),
@@ -141,15 +147,15 @@ impl<'a, Unfilled, T: MaybeInitFromCache<Init> + FillDefaults<Unfilled, Init, T>
         }
     }
 
-    pub fn push_object(&mut self, init: Unfilled) -> GLResult<DrawObjectIndex<T>> {
+    pub fn push_object(&mut self, init: Init) -> GLResult<DrawObjectIndex<T>> {
         // Can't use map.entry() here as it consumes the key
-        let filled = FillDefaults::fill_defaults(init).val;
-        let filledref: &'a Init = unsafe { mem::transmute(&filled) };
+        //let filled = FillDefaults::<Init>::fill_defaults(init).val;
+        let filledref: &'a Init = unsafe { mem::transmute(&init) };
         // see below -- these are safe, we just can't prove it
         match self.map.entry(filledref) {
-            Occupied(entry) => Ok(entry.get().clone()),
-            Vacant(entry) => {
-                let inited: T = try!(MaybeInitFromCache::<Init>::maybe_init(filled));
+            Entry::Occupied(entry) => Ok(entry.get().clone()),
+            Entry::Vacant(entry) => {
+                let inited: T = try!(UsingDefaults::<Init>::maybe_init(init));
                 // ptr's lifetime is limited to &self's, which is fair but not very useful.
                 // smart ptrs involve individual allocs but are probably better
                 let ptr = self.arena.alloc(inited);
@@ -158,7 +164,7 @@ impl<'a, Unfilled, T: MaybeInitFromCache<Init> + FillDefaults<Unfilled, Init, T>
                 }
                 let index = self.list.len() - 1;
                 let objindex = DrawObjectIndex(index as i32);
-                entry.set(objindex.clone());
+                entry.insert(objindex.clone());
                 Ok(objindex)
             }
         }
@@ -178,8 +184,8 @@ impl<'a, Unfilled, T: MaybeInitFromCache<Init> + FillDefaults<Unfilled, Init, T>
     }
 }
 
-impl<'a, Unfilled, T: InitFromCache<Init> + MaybeInitFromCache<Init> + FillDefaults<Unfilled, Init, T>, Init: Hash+Eq+Show> DrawObjectList<'a, T, Init> {
-    pub fn safe_push_object(&mut self, init: Unfilled) -> DrawObjectIndex<T> {
+impl<'a, T: UsingDefaults<Init> + UsingDefaultsSafe, Init: Hash<HashType>+Eq+Show> DrawObjectList<'a, T, Init> {
+    pub fn safe_push_object(&mut self, init: Init) -> DrawObjectIndex<T> {
         self.push_object(init).unwrap()
     }
 }

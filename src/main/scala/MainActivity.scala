@@ -66,6 +66,8 @@ class MainActivity extends Activity with TypedActivity with AndroidImplicits {
   lazy val colorPicker = findView(TR.brush_colorpicker_main)
   lazy val controlholder = findView(TR.controlholder)
 
+  var newRotation = -1
+
   var textureThread: Option[TextureSurfaceThread] = None
 
   private var savedBitmap: Option[Bitmap] = None
@@ -132,7 +134,20 @@ class MainActivity extends Activity with TypedActivity with AndroidImplicits {
 
   // runs on gl thread
   def onTextureCreated(thread: TextureSurfaceThread, producer: MotionEventProducer, undoCallback: MainUndoListener)(gl: GLInit) = {
-    thread.initScreen(gl, savedBitmap)
+    try {
+      val rotation = Rotation.fromSurfaceOrientation(controls.rotation.value, newRotation)
+      controls.rotation.value = newRotation
+      thread.initScreen(gl, savedBitmap, rotation)
+    } catch {
+      case e: GLException => {
+        val message = "got exception while loading saved bitmap, this should never happen!\n" + e
+        Log.i("main", message)
+        this.runOnUiThread(() => {
+          Toast.makeText(MainActivity.this, message, Toast.LENGTH_LONG).show()
+        })
+      }
+    }
+
     val undoframes = thread.pushUndoFrame(gl)
     undoCallback.undoBufferChanged(undoframes)
 
@@ -164,6 +179,7 @@ class MainActivity extends Activity with TypedActivity with AndroidImplicits {
     val density  = getResources().getDisplayMetrics().density
     val dpHeight = (outMetrics.heightPixels / density).asInstanceOf[Int]
     val dpWidth  = (outMetrics.widthPixels / density).asInstanceOf[Int]
+    newRotation = display.getRotation()
 
     handlers = Some(MotionEventHandlerPair.init(dpHeight, dpWidth))
 
@@ -233,9 +249,18 @@ class MainActivity extends Activity with TypedActivity with AndroidImplicits {
       case R.id.menu_clear => this.clearScreen()
       case R.id.menu_credits => Toast.makeText(this, "Soon.", Toast.LENGTH_LONG).show()
       case R.id.menu_debug => showDebugMessagebox()
+      case R.id.menu_rotate => debugRotate()
       case _ => return super.onOptionsItemSelected(item)
     }
     true
+  }
+
+  def debugRotate() = {
+    for (thread <- textureThread) {
+      thread.getBitmap((gl, bitmap) => {
+        thread.initScreen(gl, Some(bitmap), new Rotation(1))
+      })
+    }
   }
 
   override def onStart() = {
@@ -576,19 +601,34 @@ class MainActivity extends Activity with TypedActivity with AndroidImplicits {
       if (resultCode == Activity.RESULT_OK) {
         val path = FileUtils.getPath(this, data.getData())
         val bitmap = (try {
-          val unread = new DrawFiles.Unread(DrawFiles.FileSource, DrawFiles.BitmapReader)
+          val unread = new DrawFiles.Unread(DrawFiles.FileSource, new DrawFiles.BitmapReader(Bitmap.Config.ARGB_8888))
           Some(unread.read(path).content)
         } catch {
-          case e: Exception => None
+          case e: Exception => {
+            Toast.makeText(MainActivity.this, s"Unable to load image ${path}: ${e.getMessage()}", Toast.LENGTH_LONG).show()
+            None
+          }
         })
         Log.i("main", s"got bitmap ${bitmap}")
         for (b <- bitmap; thread <- textureThread) {
           Log.i("main", "drawing bitmap...")
           thread.withGL(gl => {
-            thread.drawBitmap(gl, b)
-            thread.clearUndoFrames(gl)
-            val frames = thread.pushUndoFrame(gl)
-            undoListener.foreach(_.undoBufferChanged(frames))
+            val success = try {
+              thread.drawBitmap(gl, b)
+              true
+            } catch {
+              case e: GLException => {
+                runOnUiThread(() => {
+                  Toast.makeText(MainActivity.this, s"Unable to load image ${path}: ${e.getMessage()}", Toast.LENGTH_LONG).show()
+                })
+                false
+              }
+            }
+            if (success) {
+              thread.clearUndoFrames(gl)
+              val frames = thread.pushUndoFrame(gl)
+              undoListener.foreach(_.undoBufferChanged(frames))
+            }
           })
         }
       }
@@ -831,4 +871,17 @@ object MainActivity {
   }
 
   val StateSaveLock = new Object()
+
+  val NoRotation = new Rotation(0)
+  class Rotation(private val i: Int) extends AnyVal { }
+  object Rotation {
+    def fromSurfaceOrientation(oldOrientation: Int, newOrientation: Int) = {
+      Log.i("main", s"old rotation: ${oldOrientation}, new rotation: ${newOrientation}")
+      if (oldOrientation == -1) {
+        new Rotation(newOrientation)
+      }
+      val rot = newOrientation - oldOrientation
+      new Rotation((rot + 4) & 0x3)
+    }
+  }
 }
