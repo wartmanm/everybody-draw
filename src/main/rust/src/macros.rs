@@ -69,7 +69,7 @@ macro_rules! assert {
 }
 
 macro_rules! debug_assert {
-    ($($arg:tt)*) => (if cfg!(not(ndebug)) { assert!($($arg)*); })
+    ($($arg:tt)*) => (if cfg!(debug) { assert!($($arg)*); })
 }
 
 macro_rules! assert_eq {

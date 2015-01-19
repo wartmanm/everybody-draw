@@ -59,7 +59,7 @@ impl AndroidBitmap {
     pub unsafe fn from_jobject(env: *mut JNIEnv, bitmap: jobject) -> AndroidBitmap {
         let mut pixels: *mut c_void = ptr::null_mut();
         AndroidBitmap_lockPixels(env, bitmap, &mut pixels);
-        logi!("locked pixels in {:?}", pixels);
+        debug_logi!("locked pixels in {:?}", pixels);
         let mut result = AndroidBitmap { env: env, obj: bitmap, pixels: pixels as *mut u8, info: mem::zeroed() };
         AndroidBitmap_getInfo(env, bitmap, &mut result.info);
         result
@@ -67,7 +67,7 @@ impl AndroidBitmap {
 
     pub unsafe fn new(env: *mut JNIEnv, w: i32, h: i32) -> AndroidBitmap {
         let bitmap = ((**env).CallStaticObjectMethod)(env, BITMAP_CLASS, CREATE_BITMAP, w, h, CONFIG_ARGB_8888);
-        logi!("created bitmap");
+        debug_logi!("created bitmap");
         AndroidBitmap::from_jobject(env, bitmap)
     }
     
@@ -115,7 +115,7 @@ impl Drop for AndroidBitmap {
         unsafe {
             AndroidBitmap_unlockPixels(self.env, self.obj);
         }
-        logi!("unlocked pixels");
+        debug_logi!("unlocked pixels");
     }
 }
 

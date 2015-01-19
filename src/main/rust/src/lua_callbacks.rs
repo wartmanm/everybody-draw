@@ -90,13 +90,15 @@ pub unsafe extern "C" fn lua_pushline(data: &mut &mut LuaCallbackType, queue: i3
 #[no_mangle]
 #[cfg(target_os = "android")]
 pub unsafe extern "C" fn lua_log(message: *const c_char) {
-    ::log::raw_log(ANDROID_LOG_INFO as c_int, cstr!("luascript"), message);
+    ::android::log::__android_log_print(ANDROID_LOG_INFO as c_int, cstr!("everybody-draws"), cstr!("script: %s"), message);
 }
 
 #[no_mangle]
 #[cfg(not(target_os = "android"))]
 pub unsafe extern "C" fn lua_log(message: *const c_char) {
-    ::log::raw_log(ANDROID_LOG_INFO as c_int, cstr!("luascript"), message);
+    let messagestr = str::from_utf8_unchecked(::std::ffi::c_str_to_bytes(message));
+    let fullmsg = format!("script: {}", messagestr);
+    ::log::raw_log(ANDROID_LOG_INFO as c_int, cstr!("everybody-draws"), fullmsg.as_slice().as_ptr() as *const c_char);
 }
 
 #[no_mangle]

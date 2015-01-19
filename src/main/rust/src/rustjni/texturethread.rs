@@ -53,7 +53,7 @@ unsafe extern "C" fn finish_gl(env: *mut JNIEnv, _: jobject, data: jpointer) {
     let mut data: Box<GLInitEvents> = mem::transmute(data);
     data.jni_undo_callback.destroy(env);
     data.glinit.destroy();
-    logi!("finished deinit");
+    debug_logi!("finished deinit");
 }
 
 unsafe extern "C" fn native_draw_queued_points(env: *mut JNIEnv, _: jobject, data: jpointer, handler: jpointer, java_matrix: jfloatArray) {
@@ -247,7 +247,7 @@ pub unsafe fn init(env: *mut JNIEnv) {
         native_method!("nativeSetBrushSize", "(IF)V", jni_set_brush_size),
     ];
     register_classmethods(env, cstr!("com/github/wartman4404/gldraw/TextureSurfaceThread"), &texturemethods);
-    logi!("registered texture thread methods!");
+    debug_logi!("registered texture thread methods!");
 
     let replayhandlerstaticmethods = [
         native_method!("init", "(I)I", jni_replay_begin),
@@ -255,7 +255,7 @@ pub unsafe fn init(env: *mut JNIEnv) {
         native_method!("advanceFrame", "(II[F)Z", jni_replay_advance_frame),
     ];
     register_classmethods(env, cstr!("com/github/wartman4404/gldraw/Replay$"), &replayhandlerstaticmethods);
-    logi!("registered replay methods!");
+    debug_logi!("registered replay methods!");
 }
 
 pub unsafe fn destroy(env: *mut JNIEnv) {

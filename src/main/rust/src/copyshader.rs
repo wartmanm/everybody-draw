@@ -56,7 +56,7 @@ impl Shader for CopyShader {
                     texture_size_handle: texturesize_option,
                     source: (vert, frag),
                 };
-                logi!("created {:?}", shader);
+                debug_logi!("created {:?}", shader);
                 Ok(shader)
             }
             _ => {
@@ -89,7 +89,7 @@ impl CopyShader {
 
 impl Drop for CopyShader {
     fn drop(&mut self) {
-        logi!("dropping {:?}", self);
+        debug_logi!("dropping {:?}", self);
         gl2::delete_program(self.program);
     }
 }

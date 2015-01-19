@@ -38,7 +38,7 @@ pub fn check_framebuffer_complete() -> bool {
         gl2::FRAMEBUFFER_UNSUPPORTED => ("FRAMEBUFFER_UNSUPPORTED", false),
         _ => ("unknown error!", false)
     };
-    logi!("framebuffer status: {}", err);
+    debug_logi!("framebuffer status: {}", err);
     result
 }
 

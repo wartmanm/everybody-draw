@@ -45,7 +45,7 @@ fn choose_egl_config(display: EGLDisplay) -> Option<EGLConfig> {
     let mut config_count = 0;
     let mut config: EGLConfig = 0 as EGLConfig;
     let configattrs = get_config();
-    logi!("choosing config... attrs = {}", configattrs as uint);
+    debug_logi!("choosing config... attrs = {}", configattrs as uint);
     if EGL_TRUE != ChooseConfig(display, get_config(), &mut config, 1, &mut config_count) {
         loge!("eglChooseConfig returned false :(");
         None
@@ -53,7 +53,7 @@ fn choose_egl_config(display: EGLDisplay) -> Option<EGLConfig> {
         loge!("no matching configs found :(");
         None
     } else {
-        logi!("got {} configs", config_count);
+        debug_logi!("got {} configs", config_count);
         Some(config)
     }
 }
@@ -80,13 +80,13 @@ fn init_context(surface_texture: *mut c_void) -> Option<EGLStatus> {
         return None;
     }
     let display = displayopt.unwrap();
-    logi!("got display: {:?}", display);
+    debug_logi!("got display: {:?}", display);
     let (mut vermajor, mut verminor) = (0, 0);
     if Initialize(display, &mut vermajor, &mut verminor) != EGL_TRUE {
         loge!("failed to initialize display :(");
         return None;
     }
-    logi!("initialized display!");
+    debug_logi!("initialized display!");
     loge!("egl {}.{}\n", vermajor, verminor);
     loge!("extensions: {}\n", QueryString(display, EGL_EXTENSIONS));
     loge!("vendor: {}\n", QueryString(display, EGL_VENDOR));
@@ -98,13 +98,13 @@ fn init_context(surface_texture: *mut c_void) -> Option<EGLStatus> {
     }
     let config = configopt.unwrap();
     //logi!("got config: 0x{:x}", config);
-    logi!("creating context...");
+    debug_logi!("creating context...");
     let context = CreateContext(display, config, EGL_NO_CONTEXT, get_context_attribs());
-    logi!("got context: 0x{:x}", context as uint);
-    logi!("creating window surface...");
+    debug_logi!("got context: 0x{:x}", context as uint);
+    debug_logi!("creating window surface...");
     let surface = CreateWindowSurface(display, config, surface_texture, get_no_attribs());
     if surface == EGL_NO_SURFACE {
-        logi!("getting error...");
+        debug_logi!("getting error...");
         let error = GetError();
         match error {
             EGL_BAD_NATIVE_WINDOW => {
@@ -116,13 +116,13 @@ fn init_context(surface_texture: *mut c_void) -> Option<EGLStatus> {
         }
         return None;
     }
-    logi!("got surface: 0x{:x}", surface as uint);
+    debug_logi!("got surface: 0x{:x}", surface as uint);
 
     if MakeCurrent(display, surface, surface, context) != EGL_TRUE {
         loge!("eglMakeCurrent failed");
         return None
     }
-    logi!("made egl surface current!");
+    debug_logi!("made egl surface current!");
     Some(EGLStatus { display: display, context: context, surface: surface })
 }
 
@@ -146,13 +146,13 @@ pub fn egl_finish() -> () {
     unsafe {
         match data {
             Some(EGLStatus { display, context, surface }) => {
-                logi!("running finish_egl");
+                debug_logi!("running finish_egl");
                 MakeCurrent(display, EGL_NO_SURFACE, EGL_NO_SURFACE, EGL_NO_CONTEXT);
-                logi!("detached from egl");
+                debug_logi!("detached from egl");
                 DestroySurface(display, surface);
-                logi!("destroyed surface");
+                debug_logi!("destroyed surface");
                 DestroyContext(display, context);
-                logi!("destroyed context");
+                debug_logi!("destroyed context");
                 Terminate(display);
                 logi!("finished egl");
             },

@@ -33,7 +33,7 @@ callbacks.saveundo = function()
 end
 
 if _onup == nil and _ondown == nil and _onframe == nil and _ondone == nil then
-  loglua("setting default pointer callbacks")
+  loglua("using default pointer event callbacks")
   _ondown = callbacks.default_ondown
   _onup = callbacks.default_onup
   _onframe = callbacks.default_onframe
@@ -58,10 +58,8 @@ function runmain()
     elseif status == 0x0100 then -- no more points
       break
     elseif status == 0x0200 then -- pointer down
-      loglua("got down evt")
       if type(_ondown) == "function" then _ondown(pointpair[0]) end
     else -- pointer up
-      loglua("got up evt")
       if type(_onup) == "function" then
         _onup(pointpair[0].counter)
       end

@@ -165,9 +165,9 @@ extends Thread with Handler.Callback with AndroidImplicits {
   }
 
   def finishLuaScript(gl: GLInit) = {
-    Log.i("tst", "finishing lua script - final draw")
+    //Log.i("tst", "finishing lua script - final draw")
     nativeDrawQueuedPoints(gl, motionHandler, matrix)
-    Log.i("tst", "finishing lua script - unloading")
+    //Log.i("tst", "finishing lua script - unloading")
     nativeFinishLuaScript(gl, motionHandler)
   }
 

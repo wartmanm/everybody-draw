@@ -81,7 +81,7 @@ unsafe extern "C" fn jni_get_luascript_source(env: *mut JNIEnv, _: jobject, data
 
 unsafe extern "C" fn jni_egl_init(env: *mut JNIEnv, _: jobject, surface: jobject) {
     let window = ANativeWindow_fromSurface(env, surface);
-    logi!("got ANAtiveWindow: 0x{:x}", window as u32);
+    debug_logi!("got ANAtiveWindow: 0x{:x}", window as u32);
     eglinit::egl_init(window as *mut c_void);
     ANativeWindow_release(window);
 }
@@ -117,7 +117,7 @@ pub unsafe fn init(env: *mut JNIEnv) {
     register_classmethods(env, cstr!("com/github/wartman4404/gldraw/TexturePtr$"), &texturestaticmethods);
     register_classmethods(env, cstr!("com/github/wartman4404/gldraw/EGLHelper"), &eglhelpermethods);
     register_classmethods(env, cstr!("com/github/wartman4404/gldraw/LuaScript$"), &luastaticmethods);
-    logi!("registered point|copy|texture|lua|egl static methods!");
+    debug_logi!("registered point|copy|texture|lua|egl static methods!");
 }
 
 pub unsafe fn destroy(env: *mut JNIEnv) {
