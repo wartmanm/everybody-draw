@@ -65,7 +65,7 @@ pub extern fn create_motion_event_handler() -> (*mut MotionEventConsumer, *mut M
         current_points: SmallIntMap::new(),
         point_counter: 0, // unique value for each new pointer
         point_count: 0, // # of currently active pointers
-        all_pointer_state: activestate::inactive,
+        all_pointer_state: activestate::INACTIVE,
     };
     let producer = box MotionEventProducer {
         producer: producer,
@@ -114,7 +114,7 @@ pub fn run_interpolators(dimensions: (i32, i32), s: *mut MotionEventConsumer, ev
         None => { },
     };
     s.all_pointer_state = s.all_pointer_state.push(s.point_count > 0);
-    s.all_pointer_state == activestate::stopping
+    s.all_pointer_state == activestate::STOPPING
 }
 
 #[no_mangle]

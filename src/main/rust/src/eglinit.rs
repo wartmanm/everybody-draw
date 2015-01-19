@@ -4,7 +4,7 @@ use core::prelude::*;
 use libc::{c_void, c_uint};
 use core::mem;
 
-static default_egl_config: [u32, ..15] = [
+static DEFAULT_EGL_CONFIG: [u32, ..15] = [
     EGL_RENDERABLE_TYPE, EGL_OPENGL_ES2_BIT,
     EGL_RED_SIZE, 8,
     EGL_GREEN_SIZE, 8,
@@ -15,12 +15,12 @@ static default_egl_config: [u32, ..15] = [
     EGL_NONE
 ];
 
-static default_context_attribs: [u32, ..3] = [
+static DEFAULT_CONTEXT_ATTRIBS: [u32, ..3] = [
     EGL_CONTEXT_CLIENT_VERSION, 2,
     EGL_NONE
 ];
 
-static no_attribs: [u32, ..1] = [ EGL_NONE ];
+static NO_ATTRIBS: [u32, ..1] = [ EGL_NONE ];
 
 struct EGLStatus {
     display: EGLDisplay,
@@ -31,15 +31,15 @@ struct EGLStatus {
 static mut data: Option<EGLStatus> = None;
 
 fn get_config() -> *const i32 {
-    unsafe { mem::transmute(default_egl_config.as_slice().as_ptr()) }
+    unsafe { mem::transmute(DEFAULT_EGL_CONFIG.as_slice().as_ptr()) }
 }
 
 fn get_context_attribs() -> *const i32 {
-    unsafe { mem::transmute(default_context_attribs.as_slice().as_ptr()) }
+    unsafe { mem::transmute(DEFAULT_CONTEXT_ATTRIBS.as_slice().as_ptr()) }
 }
 
 fn get_no_attribs() -> *const i32 {
-    unsafe { mem::transmute(no_attribs.as_slice().as_ptr()) }
+    unsafe { mem::transmute(NO_ATTRIBS.as_slice().as_ptr()) }
 }
 
 fn choose_egl_config(display: EGLDisplay) -> Option<EGLConfig> {

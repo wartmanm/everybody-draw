@@ -12,7 +12,7 @@ use glcommon::{check_gl_error, get_shader_handle, get_uniform_handle_option, Sha
 use point::ShaderPaintPoint;
 use gltexture::Texture;
 
-static default_vertex_shader: &'static str =
+static DEFAULT_VERTEX_SHADER: &'static str =
    "precision lowp float;
     uniform mat4 textureMatrix;
     attribute float vSize;
@@ -36,7 +36,7 @@ static default_vertex_shader: &'static str =
         gl_Position = (textureMatrix * vPosition);
         position = vec2(textureMatrix * vPosition);
     }";
-static default_fragment_shader: &'static str =
+static DEFAULT_FRAGMENT_SHADER: &'static str =
    "precision lowp float;
     varying float time;
     varying float size;
@@ -67,8 +67,8 @@ pub struct PointShader {
 
 impl Shader for PointShader {
     fn new(vertopt: Option<&str>, fragopt: Option<&str>) -> Option<PointShader> {
-        let vert = vertopt.unwrap_or_else(|| { logi("point shader: using default vertex shader"); default_vertex_shader});
-        let frag = fragopt.unwrap_or_else(|| { logi("point shader: using default fragment shader"); default_fragment_shader});
+        let vert = vertopt.unwrap_or_else(|| { logi("point shader: using default vertex shader"); DEFAULT_VERTEX_SHADER});
+        let frag = fragopt.unwrap_or_else(|| { logi("point shader: using default fragment shader"); DEFAULT_FRAGMENT_SHADER});
         let program_option = glcommon::create_program(vert, frag);
         match program_option {
             None => {

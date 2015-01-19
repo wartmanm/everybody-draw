@@ -14,7 +14,7 @@ pub fn ortho(left: f32, right: f32, bottom: f32, top: f32, near: f32, far: f32) 
       tx,     ty,    tz,  1f32,]
 }
 
-pub static identity: Matrix =
+pub static IDENTITY: Matrix =
     [1f32, 0f32, 0f32, 0f32,
      0f32, 1f32, 0f32, 0f32,
      0f32, 0f32, 1f32, 0f32,

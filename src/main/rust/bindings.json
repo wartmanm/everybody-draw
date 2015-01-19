@@ -1,0 +1,19 @@
+[
+    {
+        "path": "android/input"
+    }, {
+        "path": "android/log"
+    }, {
+        "deps": [ "jni" ], 
+        "match": [ "bitmap", "stdint", "_types", "stddef" ], 
+        "path": "android/bitmap"
+    }, {
+        "deps": [ "jni", "android::native_window" ], 
+        "match": [ "native_window_jni" ], 
+        "path": "android/native_window_jni"
+    }, {
+        "path": "android/native_window"
+    }, {
+        "path": "jni"
+    }
+]
