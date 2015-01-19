@@ -20,7 +20,7 @@ local kTogiDown = 15
 local kTogiLeft = 16
 local kTogiRight = 17
 
-local kSpeed = 8 -- Originally 16
+local kSpeed = 16 -- Originally 16
 local mHalfImage = 16
 local kSinEighthPIM = 383 -- sin(pi/8) * 1000
 local kSinThreeEighthsPIM = 924 -- sin(pi * 3/8) * 1000
@@ -113,7 +113,7 @@ function direction(neko, mMoveDeltaX, mMoveDeltaY)
 end
 
 function setState(neko, state)
-  ffi.C.loglua("setting state to " .. mStateNames[state])
+  loglua("setting state to " .. mStateNames[state])
   neko.mTickCount = 0
   neko.mStateCount = 0
   neko.mState = state
@@ -223,9 +223,10 @@ function onframe(x, y, points)
   local imgY = bit.bor(imgIndex / 4, 0)
   local nekopoint = ShaderPaintPoint(nekoX, nekoY, 0, 0, imgX / 4, imgY / 9, 0, 0)
   local mickeypoint = ShaderPaintPoint(mMickey.x, mMickey.y, 0, 0, 3/4, 8/9, 0, 0)
-  --ffi.C.loglua("neko is at " .. mNeko.x .. ", " .. mNeko.y .. "; state: " .. mStateNames[mNeko.mState])
-  pushpoint(points, 0, mickeypoint)
-  pushpoint(points, 0, nekopoint)
+  --loglua("neko is at " .. mNeko.x .. ", " .. mNeko.y .. "; state: " .. mStateNames[mNeko.mState])
+  clearlayer(points, 1)
+  pushpoint(points, 1, mickeypoint)
+  pushpoint(points, 1, nekopoint)
 end
 
 function main(a, b, x, y, points)
