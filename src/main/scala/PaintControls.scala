@@ -35,10 +35,11 @@ class PaintControls
     val writer = new StringWriter()
     val j = new JsonWriter(writer)
     j.beginObject()
-    for ((k, v) <- namedPickers) {
-      j.name(k)
-      v.save(j)
-    }
+      for ((k, v) <- namedPickers) {
+        j.name(k)
+        v.save(j)
+      }
+    j.endObject()
     writer.close()
     writer.toString()
   }
@@ -46,7 +47,12 @@ class PaintControls
     val reader = new JsonReader(new StringReader(s))
     reader.beginObject()
     while (reader.hasNext()) {
-      namedPickers(reader.nextName()).load(reader)
+      val name = reader.nextName()
+      if (namedPickers.contains(name)) {
+        namedPickers(name).load(reader)
+      } else {
+        reader.skipValue()
+      }
     }
     reader.endObject()
     reader.close()
@@ -117,7 +123,7 @@ object PaintControls extends AndroidImplicits {
       control.setAdapter(a)
     }
     override def restoreState(): Unit = {
-      Log.i("picker", "restoring unnamedpicker state")
+      Log.i("picker", s"restoring unnamedpicker state to '${selectedName}'")
       selected = this.adapter.lazified.indexWhere(_.name == selectedName) match {
         case -1 => 0
         case  x => x

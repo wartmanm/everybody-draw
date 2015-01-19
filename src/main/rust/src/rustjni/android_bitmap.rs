@@ -9,7 +9,7 @@ use android::bitmap::{ANDROID_BITMAP_FORMAT_RGBA_8888, ANDROID_BITMAP_FORMAT_A_8
 static mut BITMAP_CLASS: jclass = 0 as jclass;
 static mut CONFIG_ARGB_8888: jobject = 0 as jobject;
 static mut CREATE_BITMAP: jmethodID = 0 as jmethodID;
-static mut SET_PREMULTIPLIED: jmethodID = 0 as jmethodID;
+static mut SET_PREMULTIPLIED: Option<jmethodID> = None;
 
 pub struct AndroidBitmap {
     env: *mut JNIEnv,
@@ -52,9 +52,14 @@ impl AndroidBitmap {
         self.as_slice_unsafe()
     }
 
-    pub unsafe fn set_premultiplied(&mut self, premultiplied: bool) {
-        let pm = if premultiplied { JNI_TRUE } else { JNI_FALSE };
-        ((**self.env).CallVoidMethod)(self.env, self.obj, SET_PREMULTIPLIED, pm);
+    pub unsafe fn set_premultiplied(&mut self, premultiplied: bool) -> bool {
+        if let Some(set_premultiplied) = SET_PREMULTIPLIED {
+            let pm = if premultiplied { JNI_TRUE } else { JNI_FALSE };
+            ((**self.env).CallVoidMethod)(self.env, self.obj, set_premultiplied, pm);
+            true
+        } else {
+            false
+        }
     }
 }
 
@@ -73,11 +78,17 @@ pub unsafe fn init(env: *mut JNIEnv) {
     let argbfield = ((**env).GetStaticFieldID)(env, configclass, cstr!("ARGB_8888"), cstr!("Landroid/graphics/Bitmap$Config;"));
     let argb = ((**env).GetStaticObjectField)(env, configclass, argbfield);
     let createbitmap = ((**env).GetStaticMethodID)(env, bitmapclass, cstr!("createBitmap"), cstr!("(IILandroid/graphics/Bitmap$Config;)Landroid/graphics/Bitmap;"));
-    let premult = ((**env).GetMethodID)(env, bitmapclass, cstr!("setPremultiplied"), cstr!("(Z)V"));
     BITMAP_CLASS = ((**env).NewGlobalRef)(env, bitmapclass);
     CONFIG_ARGB_8888 = ((**env).NewGlobalRef)(env, argb);
     CREATE_BITMAP = createbitmap;
-    SET_PREMULTIPLIED = premult;
+
+    let premult = ((**env).GetMethodID)(env, bitmapclass, cstr!("setPremultiplied"), cstr!("(Z)V"));
+    SET_PREMULTIPLIED = if premult == ptr::null_mut() {
+        ((**env).ExceptionClear)(env);
+         None
+    } else {
+        Some(premult)
+    }
 }
 
 pub unsafe fn destroy(env: *mut JNIEnv) {

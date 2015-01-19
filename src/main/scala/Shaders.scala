@@ -101,7 +101,7 @@ case class MotionEventHandlerPair(
   val producer: MotionEventProducer)
 
 object MotionEventHandlerPair {
-  @native def init(): MotionEventHandlerPair
+  @native def init(width: Int, height: Int): MotionEventHandlerPair
   @native def destroy(m: MotionEventHandlerPair): Unit
 }
 

@@ -221,8 +221,16 @@ extends Thread with Handler.Callback with AndroidImplicits {
   def setBrushSize(gl: GLInit, size: Float) = nativeSetBrushSize(gl, size)
 
   def withGL(cb: (GLInit) => Unit) = {
+    val stack = new RuntimeException();
     for (gl <- glinit) { runHere {
-      cb(gl)
+      try {
+        cb(gl)
+      } catch {
+        case e: Exception => {
+          stack.initCause(e)
+          throw stack
+        }
+      }
     }}
   }
 }

@@ -1,6 +1,7 @@
 use core::prelude::*;
 use core::mem;
-use jni::{jobject, jclass, jfieldID, JNIEnv, JNINativeMethod};
+use core::cmp::min;
+use jni::{jint, jobject, jclass, jfieldID, JNIEnv, JNINativeMethod};
 use android::input::AInputEvent;
 
 use glpoint;
@@ -9,8 +10,10 @@ use rustjni::{register_classmethods, jpointer, get_jpointer};
 static mut MOTION_CLASS: jclass = 0 as jclass;
 static mut MOTIONEVENT_NATIVE_PTR_FIELD: jfieldID = 0 as jfieldID;
 
-unsafe extern "C" fn init_motion_event_handler(env: *mut JNIEnv, _: jobject) -> jobject {
-    let (consumer, producer) = glpoint::create_motion_event_handler();
+unsafe extern "C" fn init_motion_event_handler(env: *mut JNIEnv, _: jobject, width: jint, height: jint) -> jobject {
+    let left = min(30, width / 10);
+    let _ = height;
+    let (consumer, producer) = glpoint::create_motion_event_handler(left);
     let (consumer, producer) = (box consumer, box producer);
     let pairclass = ((**env).FindClass)(env, cstr!("com/github/wartman4404/gldraw/MotionEventHandlerPair"));
     let constructor = ((**env).GetMethodID)(env, pairclass, cstr!("<init>"), cstr!("(II)V"));
@@ -49,7 +52,7 @@ pub unsafe fn init(env: *mut JNIEnv) {
     register_classmethods(env, cstr!("com/github/wartman4404/gldraw/MotionEventProducer$"), &producermethods);
 
     let motioneventhandlerstaticmethods = [
-        native_method!("init", "()Lcom/github/wartman4404/gldraw/MotionEventHandlerPair;", init_motion_event_handler),
+        native_method!("init", "(II)Lcom/github/wartman4404/gldraw/MotionEventHandlerPair;", init_motion_event_handler),
         native_method!("destroy", "(Lcom/github/wartman4404/gldraw/MotionEventHandlerPair;)V", destroy_motion_event_handler),
     ];
     register_classmethods(env, cstr!("com/github/wartman4404/gldraw/MotionEventHandlerPair$"), &motioneventhandlerstaticmethods);

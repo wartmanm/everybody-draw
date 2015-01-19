@@ -63,41 +63,41 @@ impl<'a> Events<'a> {
         self.copyshaders.push_object(initargs)
     }
 
-    pub fn use_copyshader(&mut self, idx: DrawObjectIndex<CopyShader>) -> &'a CopyShader {
+    pub fn use_copyshader(&mut self, idx: DrawObjectIndex<CopyShader>) -> GLResult<&'a CopyShader> {
         self.eventlist.push(DrawEvent::UseCopyShader(idx.clone()));
-        self.copyshaders.get_object(idx)
+        self.copyshaders.maybe_get_object(idx)
     }
 
-    pub fn use_animshader(&mut self, idx: DrawObjectIndex<CopyShader>) -> &'a CopyShader {
+    pub fn use_animshader(&mut self, idx: DrawObjectIndex<CopyShader>) -> GLResult<&'a CopyShader> {
         self.eventlist.push(DrawEvent::UseAnimShader(idx.clone()));
-        self.copyshaders.get_object(idx)
+        self.copyshaders.maybe_get_object(idx)
     }
 
     pub fn load_pointshader(&mut self, vert: Option<MString>, frag: Option<MString>) -> GLResult<DrawObjectIndex<PointShader>> {
         let initargs = (vert, frag);
         self.pointshaders.push_object(initargs)
     }
-    pub fn use_pointshader(&mut self, idx: DrawObjectIndex<PointShader>) -> &'a PointShader {
+    pub fn use_pointshader(&mut self, idx: DrawObjectIndex<PointShader>) -> GLResult<&'a PointShader> {
         self.eventlist.push(DrawEvent::UsePointShader(idx.clone()));
-        self.pointshaders.get_object(idx)
+        self.pointshaders.maybe_get_object(idx)
     }
     pub fn load_brush(&mut self, w: i32, h: i32, pixels: &[u8], format: PixelFormat) -> DrawObjectIndex<BrushTexture> {
         let ownedpixels = pixels.to_vec();
         let init: BrushUnfilledValues = (format, (w, h), ownedpixels);
         self.textures.safe_push_object(init)
     }
-    pub fn use_brush(&mut self, idx: DrawObjectIndex<BrushTexture>) -> &'a BrushTexture {
+    pub fn use_brush(&mut self, idx: DrawObjectIndex<BrushTexture>) -> GLResult<&'a BrushTexture> {
         self.eventlist.push(DrawEvent::UseBrush(idx.clone()));
-        self.textures.get_object(idx)
+        self.textures.maybe_get_object(idx)
     }
     pub fn load_interpolator(&mut self, script: Option<MString>) -> GLResult<DrawObjectIndex<LuaScript>> {
         let initopt: LuaUnfilledValues = script;
         self.luascripts.push_object(initopt)
     }
 
-    pub fn use_interpolator(&mut self, idx: DrawObjectIndex<LuaScript>) -> &'a LuaScript {
+    pub fn use_interpolator(&mut self, idx: DrawObjectIndex<LuaScript>) -> GLResult<&'a LuaScript> {
         self.eventlist.push(DrawEvent::UseInterpolator(idx.clone()));
-        self.luascripts.get_object(idx)
+        self.luascripts.maybe_get_object(idx)
     }
 
     pub fn add_layer(&mut self, dimensions: (i32, i32)
@@ -179,14 +179,14 @@ pub mod event_stream {
 
     pub struct EventStream {
         position: i32,
-        producer: ::glpoint::MotionEventProducer,
         pub consumer: ::glpoint::MotionEventConsumer,
+        producer: ::glpoint::MotionEventProducer,
     }
 
     impl EventStream {
 
         pub fn new() -> EventStream {
-            let (consumer, producer) = ::glpoint::create_motion_event_handler();
+            let (consumer, producer) = ::glpoint::create_motion_event_handler(0);
             EventStream {
                 position: 0,
                 producer: producer,

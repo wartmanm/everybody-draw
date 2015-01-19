@@ -10,10 +10,11 @@ import android.content.{Context, Intent}
 import android.content.res.Configuration
 import android.app.AlertDialog
 import android.support.v4.widget.DrawerLayout
+import android.util.DisplayMetrics
 
 import java.io.{BufferedInputStream}
 import java.io.{OutputStream, FileOutputStream, BufferedOutputStream}
-import java.io.{File, IOException}
+import java.io.{File, IOException, FileNotFoundException}
 import java.util.Date
 
 import android.util.Log
@@ -28,6 +29,7 @@ import com.larswerkman.holocolorpicker.{ColorPicker, ScaleBar}
 
 import scala.concurrent.ExecutionContext
 import scala.concurrent.Future
+import scala.util.{Success,Failure}
 import java.util.concurrent.Executors
 
 import PaintControls.UnnamedPicker
@@ -72,10 +74,7 @@ class MainActivity extends Activity with TypedActivity with AndroidImplicits {
 
   lazy val saveThread = ExecutionContext.fromExecutor(Executors.newSingleThreadExecutor())
 
-  lazy val loadedDrawFiles = Future {
-    new LoadedDrawFiles(this)
-  }(saveThread)
-
+  var loadedDrawFiles: Future[LoadedDrawFiles] = null
   var drawerIsOpen = false
 
   // TODO: actually clean up
@@ -152,20 +151,25 @@ class MainActivity extends Activity with TypedActivity with AndroidImplicits {
   override def onCreate(bundle: Bundle) {
     Log.i("main", "oncreate")
     System.loadLibrary("gl-stuff")
-    handlers = Some(MotionEventHandlerPair.init())
 
     super.onCreate(bundle)
     setContentView(R.layout.activity_main)
+    
+    val display = getWindowManager().getDefaultDisplay()
+    val outMetrics = new DisplayMetrics()
+    display.getMetrics(outMetrics)
+    val density  = getResources().getDisplayMetrics().density
+    val dpHeight = (outMetrics.heightPixels / density).asInstanceOf[Int]
+    val dpWidth  = (outMetrics.widthPixels / density).asInstanceOf[Int]
+
+    handlers = Some(MotionEventHandlerPair.init(dpHeight, dpWidth))
 
     // Trigger off-thread resource enumeration.
-    // This locks resources required for layout inflation ( in
-    // Resource.loadXmlResourceParser() ), so it needs to take place after
-    // setContentView and maybe setAdapter()
     // TODO: what placement gives the fastest startup time?
     // TODO: consider using resources rather than assets, so no enumeration is needed
     // TODO: consider laziness, only populating the needed views
     // TODO: consider recycling a single gridview, they're not cheap
-    loadedDrawFiles
+    loadDrawFiles()
 
     controls.sidebar.control.setAdapter(sidebarAdapter)
     controls.sidebar.setListener((v: View, pos: Int) => {
@@ -242,6 +246,7 @@ class MainActivity extends Activity with TypedActivity with AndroidImplicits {
   override def onStart() = {
     Log.i("main", "onStart")
     super.onStart()
+    loadDrawFiles()
     handlers.foreach(h => {
         content.setSurfaceTextureListener(new TextureListener(createTextureThread(h) _))
         contentframe.addView(content)
@@ -285,6 +290,7 @@ class MainActivity extends Activity with TypedActivity with AndroidImplicits {
     contentframe.removeAllViews()
     saveLocalState()
     finishEGLCleanup()
+    loadedDrawFiles = null
     // TODO: is this necessary?
     textureThread.foreach(_.join())
     textureThread = None
@@ -308,6 +314,7 @@ class MainActivity extends Activity with TypedActivity with AndroidImplicits {
     try {
       if (!bitmap.isRecycled()) {
         bitmap.compress(Bitmap.CompressFormat.PNG, 90, out)
+        out.flush()
       } else {
         Log.i("main", "tried to save recycled bitmap!")
       }
@@ -331,15 +338,19 @@ class MainActivity extends Activity with TypedActivity with AndroidImplicits {
 
   private def loadFromFile() = {
     Log.i("main", "loading from file")
-    val input = new BufferedInputStream(MainActivity.this.openFileInput("screen"))
     try {
-      DrawFiles.withCloseable(input) {
-        savedBitmap = Some(DrawFiles.decodeBitmap(Bitmap.Config.ARGB_8888)(input))
-        val input2 = MainActivity.this.openFileInput("status")
-        controls.load(input2)
-        input2.close()
+      // TODO: don't do this on the main thread
+      StateSaveLock.synchronized {
+        val input = new BufferedInputStream(MainActivity.this.openFileInput("screen"))
+        DrawFiles.withCloseable(input) {
+          savedBitmap = Some(DrawFiles.decodeBitmap(Bitmap.Config.ARGB_8888)(input))
+          val input2 = MainActivity.this.openFileInput("status")
+          controls.load(input2)
+          input2.close()
+        }
       }
     } catch {
+      case e: FileNotFoundException => { }
       case e @ (_: IOException | _: GLException) => { 
         Log.i("main", "loading from file failed: %s".format(e))
       }
@@ -349,13 +360,17 @@ class MainActivity extends Activity with TypedActivity with AndroidImplicits {
   private def saveLocalState() = {
     savedBitmap.foreach(bitmap => {
         Future {
-          val out = new BufferedOutputStream(
-            MainActivity.this.openFileOutput("screen", Context.MODE_PRIVATE))
-          try {
-            DrawFiles.withCloseable(out) {
-              saveBitmapToFile(bitmap, out)
-            }
-          } catch { case _: Exception => { } }
+          StateSaveLock.synchronized {
+            val out = new BufferedOutputStream(
+              MainActivity.this.openFileOutput("screen", Context.MODE_PRIVATE))
+            try {
+              DrawFiles.withCloseable(out) {
+                saveBitmapToFile(bitmap, out)
+              }
+            } catch { case e: Exception => {
+              Log.i("main", "failed to save screen bitmap: " + e)
+            } }
+          }
         }(saveThread)
       })
     savePickersToFile()
@@ -410,8 +425,7 @@ class MainActivity extends Activity with TypedActivity with AndroidImplicits {
     // TODO: maybe make the save thread load from disk and then hand off to the gl thread?
     // also, have it opportunistically load at least up to that point
 
-    implicit val ec = saveThread
-    for (drawfiles <- loadedDrawFiles) {
+    def populatePickersWithFiles(drawfiles: LoadedDrawFiles) = {
       MainActivity.this.runOnUiThread(() => {
         // TODO: make hardcoded shaders accessible a better way
         val interpLoader = loadInterpolatorSynchronized(thread, producer)
@@ -424,6 +438,34 @@ class MainActivity extends Activity with TypedActivity with AndroidImplicits {
         controls.copypicker.value = thread.outputShader
         controls.restoreState()
       })
+    }
+
+    implicit val executionContext = saveThread
+    loadedDrawFiles.onComplete {
+      case Success(drawfiles) => {
+        populatePickersWithFiles(drawfiles)
+      }
+      case Failure(err) => {
+        val msg = "Something went wrong while loading your custom paint files:\n" + err;
+        Log.e("main", msg)
+        err.printStackTrace()
+        MainActivity.this.runOnUiThread(() => {
+          Toast.makeText(MainActivity.this, msg, Toast.LENGTH_LONG).show()
+        })
+        Future { new LoadedDrawFiles(MainActivity.this, false) }.onComplete {
+          case Success(drawfiles) => {
+            populatePickersWithFiles(drawfiles)
+          }
+          case Failure(err) => {
+            val msg = "Something went wrong while loading the default paint files.  This should never happen!\n" + err;
+            Log.e("main", msg)
+            err.printStackTrace()
+            MainActivity.this.runOnUiThread(() => {
+              Toast.makeText(MainActivity.this, msg, Toast.LENGTH_LONG).show()
+            })
+          }
+        }
+      }
     }
   }
 
@@ -540,7 +582,8 @@ class MainActivity extends Activity with TypedActivity with AndroidImplicits {
       if (resultCode == Activity.RESULT_OK) {
         val path = FileUtils.getPath(this, data.getData())
         val bitmap = (try {
-          Some(new DrawFiles.Unread(new DrawFiles.FileSource(new File(path)), DrawFiles.BitmapReader).read().content)
+          val unread = new DrawFiles.Unread(DrawFiles.FileSource, DrawFiles.BitmapReader)
+          Some(unread.read(path).content)
         } catch {
           case e: Exception => None
         })
@@ -620,6 +663,15 @@ class MainActivity extends Activity with TypedActivity with AndroidImplicits {
        })
     })
   }
+
+  def loadDrawFiles() {
+    if (loadedDrawFiles == null) {
+      loadedDrawFiles = Future {
+        new LoadedDrawFiles(this, true)
+      }(saveThread)
+    }
+  }
+
 
   class SidebarAdapter() extends BaseAdapter {
     import SidebarAdapter._
@@ -712,18 +764,32 @@ object MainActivity {
     def setMotionEventListener(listener: ToggleableMotionEventListener): Unit = {
       motionEventListener = Some(listener)
     }
+    // onDrawerClosed doesn't get called consistently when sliding out the drawer partway and letting go
+    // so we have to track the drawer's current state instead
+    private var drawerClosed = false
     override def onDrawerClosed(view: View) = {
       Log.i("main", "drawer closed")
+      // just to be sure
       motionEventListener.foreach(_.setForwardEvents(true))
+      drawerClosed = true
       super.onDrawerClosed(view)
     }
+    override def onDrawerOpened(view: View) = {
+      Log.i("main", "drawer opened")
+      drawerClosed = false
+    }
+    // onDrawerStateChanged does get called consistently, and always after onDrawerClosed()/onDrawerOpened()
     override def onDrawerStateChanged(newState: Int) = {
-      if (newState != DrawerLayout.STATE_IDLE) {
-        motionEventListener.foreach(_.setForwardEvents(false))
+      val newForwarding = newState match {
+        case DrawerLayout.STATE_IDLE => drawerClosed
+        case _ => false
       }
+      motionEventListener.foreach(_.setForwardEvents(newForwarding))
       val newStateName = newState match {
         case DrawerLayout.STATE_DRAGGING => "STATE_DRAGGING"
-        case DrawerLayout.STATE_IDLE => "STATE_IDLE"
+        case DrawerLayout.STATE_IDLE => {
+          "STATE_IDLE: drawer " + (if (drawerClosed) "closed" else "open")
+        }
         case DrawerLayout.STATE_SETTLING => "STATE_SETTLING"
       }
       Log.i("main", s"drawer state changed to ${newStateName}")
@@ -753,11 +819,5 @@ object MainActivity {
     def onClick(pos: Int)
   }
 
-  class LoadedDrawFiles(c: Context) {
-    val brushes = DrawFiles.loadBrushes(c)
-    val anims = DrawFiles.loadAnimShaders(c)
-    val paints = DrawFiles.loadPointShaders(c)
-    val interpscripts = DrawFiles.loadScripts(c)
-    val unibrushes = DrawFiles.loadUniBrushes(c)
-  }
+  val StateSaveLock = new Object()
 }

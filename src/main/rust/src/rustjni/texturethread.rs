@@ -14,8 +14,8 @@ use rustjni::{register_classmethods, CaseClass, get_safe_data, str_to_jstring, G
 use jni_helpers::ToJValue;
 use jni_constants::*;
 
-
 static mut LUA_EXCEPTION: CaseClass = CaseClass { constructor: 0 as jmethodID, class: 0 as jclass };
+static mut RUNTIME_EXCEPTION: CaseClass = CaseClass { constructor: 0 as jmethodID, class: 0 as jclass };
 
 impl<'a> ::core::ops::Fn<(i32,), ()> for JNICallbackClosure<'a> {
     extern "rust-call" fn call(&self, args: (i32,)) -> () {
@@ -72,27 +72,29 @@ unsafe extern "C" fn native_update_gl(_: *mut JNIEnv, _: jobject, data: jpointer
     data.events.pushframe(); // FIXME make sure a frame was actually drawn! No java exceptions, missing copy shader, etc
 }
 
-unsafe extern "C" fn set_anim_shader(_: *mut JNIEnv, _: jobject, data: jpointer, shader: jint) {
+
+
+unsafe extern "C" fn set_anim_shader(env: *mut JNIEnv, _: jobject, data: jpointer, shader: jint) {
     let data = get_safe_data(data);
-    let shader = data.events.use_animshader(mem::transmute(shader));
+    let shader = try_or_throw!(env, RUNTIME_EXCEPTION, data.events.use_animshader(mem::transmute(shader)));
     data.glinit.set_anim_shader(shader);
 }
 
-unsafe extern "C" fn set_copy_shader(_: *mut JNIEnv, _: jobject, data: jpointer, shader: jint) {
+unsafe extern "C" fn set_copy_shader(env: *mut JNIEnv, _: jobject, data: jpointer, shader: jint) {
     let data = get_safe_data(data);
-    let shader = data.events.use_copyshader(mem::transmute(shader));
+    let shader = try_or_throw!(env, RUNTIME_EXCEPTION, data.events.use_copyshader(mem::transmute(shader)));
     data.glinit.set_copy_shader(shader);
 }
 
-unsafe extern "C" fn set_point_shader(_: *mut JNIEnv, _: jobject, data: jpointer, shader: jint) {
+unsafe extern "C" fn set_point_shader(env: *mut JNIEnv, _: jobject, data: jpointer, shader: jint) {
     let data = get_safe_data(data);
-    let shader = data.events.use_pointshader(mem::transmute(shader));
+    let shader = try_or_throw!(env, RUNTIME_EXCEPTION, data.events.use_pointshader(mem::transmute(shader)));
     data.glinit.set_point_shader(shader);
 }
 
-unsafe extern "C" fn set_brush_texture(_: *mut JNIEnv, _: jobject, data: jpointer, texture: jint) {
+unsafe extern "C" fn set_brush_texture(env: *mut JNIEnv, _: jobject, data: jpointer, texture: jint) {
     let data = get_safe_data(data);
-    let brush = data.events.use_brush(mem::transmute(texture));
+    let brush = try_or_throw!(env, RUNTIME_EXCEPTION, data.events.use_brush(mem::transmute(texture)));
     data.glinit.set_brush_texture(&brush.texture);
 }
 
@@ -118,9 +120,9 @@ pub unsafe extern "C" fn draw_image(env: *mut JNIEnv, _: jobject, data: jpointer
     get_safe_data(data).glinit.draw_image(bitmap.info.width as i32, bitmap.info.height as i32, pixels);
 }
 
-unsafe extern "C" fn jni_lua_set_interpolator(_: *mut JNIEnv, _: jobject, data: jpointer, scriptid: jint) {
+unsafe extern "C" fn jni_lua_set_interpolator(env: *mut JNIEnv, _: jobject, data: jpointer, scriptid: jint) {
     let data = get_safe_data(data);
-    let script = data.events.use_interpolator(mem::transmute(scriptid));
+    let script = try_or_throw!(env, RUNTIME_EXCEPTION, data.events.use_interpolator(mem::transmute(scriptid)));
     data.glinit.set_interpolator(script);
 }
 
@@ -177,6 +179,9 @@ unsafe extern "C" fn jni_set_brush_size(_: *mut JNIEnv, _: jobject, data: jpoint
 
 pub unsafe fn init(env: *mut JNIEnv) {
     LUA_EXCEPTION = CaseClass::new(env, cstr!("com/github/wartman4404/gldraw/LuaException"), cstr!("(Ljava/lang/String;)V")); 
+    RUNTIME_EXCEPTION = CaseClass::new(env, cstr!("java/lang/IndexOutOfBoundsException"), cstr!("(Ljava/lang/String;)V")); 
+
+    
 
     let glinitstaticmethods = [
         native_method!("initGL", "(IILcom/github/wartman4404/gldraw/UndoCallback;)I", init_gl),
@@ -216,4 +221,5 @@ pub unsafe fn init(env: *mut JNIEnv) {
 
 pub unsafe fn destroy(env: *mut JNIEnv) {
     LUA_EXCEPTION.destroy(env);
+    RUNTIME_EXCEPTION.destroy(env);
 }

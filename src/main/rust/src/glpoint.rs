@@ -32,11 +32,11 @@ pub struct MotionEventConsumer {
 }
 
 pub struct MotionEventProducer {
-    pointer_data: motionevent::Data,
     pub producer: PointProducer,
+    pointer_data: motionevent::Data,
 }
 
-pub fn create_motion_event_handler() -> (MotionEventConsumer, MotionEventProducer) {
+pub fn create_motion_event_handler(left_edge: i32) -> (MotionEventConsumer, MotionEventProducer) {
     let (producer, consumer) = comm::channel::<PointEntry>();
     let handler = MotionEventConsumer {
         consumer: consumer,
@@ -46,7 +46,7 @@ pub fn create_motion_event_handler() -> (MotionEventConsumer, MotionEventProduce
     };
     let producer = MotionEventProducer {
         producer: producer,
-        pointer_data: motionevent::Data::new(),
+        pointer_data: motionevent::Data::new(left_edge),
     };
     logi!("created motion event pair");
     (handler, producer)
