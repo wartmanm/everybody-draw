@@ -11,9 +11,9 @@ void main() {
   vec4 herecolor = texture2D(texture, herepos);
   vec4 leftcolor = texture2D(texture, leftpos);
   vec4 upcolor   = texture2D(texture, uppos);
-  float h = herecolor.r;
-  float l = leftcolor.r;
-  float u = upcolor.r;
+  float h = length(herecolor);
+  float l = length(leftcolor);
+  float u = length(upcolor);
   // TODO: average, use alpha
   float x = l - h;
   float y = u - h;
@@ -22,7 +22,7 @@ void main() {
   vec3 normal = normalize(vec3(-x * yscale, 2.0 * xzscale, y * yscale));
 
   vec3 lightDir = normalize(vec3(1.0, 1.0, 1.0));
-  vec3 color = vec3(1.0, 1.0, 1.0);
+  vec3 color = vec3(texture2D(texture, uv));
   float diffuse = max(dot(lightDir, normal), 0.0);
   
   vec3 outcolor;
