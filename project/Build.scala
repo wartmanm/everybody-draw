@@ -18,6 +18,8 @@ object General {
 
   lazy val rustDir = settingKey[File]("Rust source directory")
 
+  lazy val rustcOptions = settingKey[Seq[String]]("Rust compilation settings")
+
   lazy val processLogger = Def.task {
     new sbt.ProcessLogger() {
       override def buffer[T](f: => T): T = f
@@ -45,7 +47,8 @@ object General {
   }
 
   lazy val compileRustTask = Def.task {
-    val result = sbt.Process("cargo build --target arm-linux-androideabi",
+    val args = "cargo build --target arm-linux-androideabi".split(" ") ++ rustcOptions.value
+    val result = sbt.Process(args,
       rustDir.value,
       environment.value: _*
     ) !< processLogger.value
@@ -58,8 +61,11 @@ object General {
     rustCompile <<= compileRustTask,
     rustClean <<= cleanRustTask,
     rustDir <<= Def.setting { (sourceDirectory in Compile).value / "rust" },
+    rustcOptions := Seq(),
+    rustcOptions in Global := Seq(),
     (ndkBuild in Compile) <<= (ndkBuild in Compile) dependsOn rustCompile,
     (ndkBuild in Preload) <<= (ndkBuild in Preload) dependsOn rustCompile,
+    (ndkBuild in Release) <<= (ndkBuild in Release) dependsOn rustCompile,
     clean <<= clean dependsOn cleanRustTask
   )
 
@@ -74,11 +80,13 @@ object General {
   val settings = Defaults.defaultSettings ++ Seq (
     name := "everybodydraw",
     version := "0.1",
-    versionCode := 0,
+    versionCode := 1,
     scalaVersion := "2.11.2",
     platformName := "android-21",
     javacOptions ++= Seq("-encoding", "UTF-8", "-source", "1.6", "-target", "1.6", "-Xlint:all"),
-    scalacOptions ++= Seq("-feature", "-language:implicitConversions", "-deprecation", "-Xlint")
+    scalacOptions ++= Seq("-feature", "-language:implicitConversions", "-deprecation", "-Xlint"),
+    rustcOptions in Compile ++= Seq("-O"),
+    rustcOptions in Release ++= Seq("-O")
   ) ++ debugSettings
 
   lazy val onlyLocalResolvers = Seq (
@@ -94,9 +102,10 @@ object General {
     rustSettings ++
     onlyLocalResolvers ++
     PaintResources.settings ++
+    Seq(zipAlignPath in Release <<= Def.setting { buildToolsPath.value / "zipalign" }) ++
     Seq (ndkJniSourcePath <<= Def.setting { baseDirectory.value / "jni" }) ++
     Seq (
-      keyalias := "change-me",
+      keyalias := "android_2015",
       useTypedResources := true,
       libraryDependencies ++= Seq(
         aarlib("com.github.iPaulPro" % "aFileChooser" % "0.1"),
