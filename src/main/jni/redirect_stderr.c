@@ -60,7 +60,7 @@ static int selectstream_copyline(struct selectstream* s, char* buffer, int size)
   if (NULL == fgets(buffer, size, s -> stream)) {
     return -1;
   }
-  __android_log_write(s -> loglevel, "glinit", buffer);
+  __android_log_write(s -> loglevel, "redirect_log", buffer);
   return 0;
 }
 
@@ -100,6 +100,7 @@ static void* perform_read(void* args) {
       if (FD_ISSET(stream -> fd, &readfds)) {
         selected -= 1;
         if (selectstream_copyline(stream, buffer, sizeof buffer)) {
+          LOGERR();
           goto cleanup_pstderr;
         }
       }
