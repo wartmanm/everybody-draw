@@ -12,9 +12,9 @@ macro_rules! write(
     })
 )
 
-macro_rules! fail(
+macro_rules! panic(
     () => ({
-        fail!("explicit failure")
+        panic!("explicit panic")
     });
     ($msg:expr) => ({
         // static requires less code at runtime, more constant data
@@ -32,7 +32,7 @@ macro_rules! fail(
         // as returning !. We really do want this to be inlined, however,
         // because it's just a tiny wrapper. Small wins (156K to 149K in size)
         // were seen when forcing this to be inlined, and that number just goes
-        // up with the number of calls to fail!()
+        // up with the number of calls to panic!()
         //
         // The leading _'s are to avoid dead code warnings if this is
         // used inside a dead function. Just `#[allow(dead_code)]` is

@@ -1,6 +1,7 @@
 #![allow(non_snake_case)]
 use core::prelude::*;
 use core::{mem, ptr, raw};
+use core::str::raw::c_str_to_static_slice;
 use collections::str::StrAllocating;
 use collections::string::String;
 use libc::{c_char, c_void, size_t};
@@ -14,9 +15,10 @@ use luajit_constants::*;
 use glcommon::GLResult;
 use log::{logi, loge};
 
-use lua_callbacks::LuaCallbackType;
+use lua_callbacks::LuaCallback;
 
 static mut GLDRAW_LUA_SANDBOX: *mut c_void = 0 as *mut c_void;
+static mut GLDRAW_LUA_STOPFNS: *mut c_void = 0 as *mut c_void;
 static mut gldraw_lua_key: i32 = 0;
 static LUA_FFI_SCRIPT: &'static str = include_str!("../includes/lua/ffi_loader.lua");
 static LUA_RUNNER: &'static str = include_str!("../includes/lua/lua_runner.lua");
@@ -79,6 +81,7 @@ unsafe fn runstring(L: *mut lua_State, s: &str, filename: *const i8, env: Sandbo
 
 unsafe fn init_lua() -> GLResult<*mut lua_State> {
     GLDRAW_LUA_SANDBOX = &mut GLDRAW_LUA_SANDBOX as *mut *mut c_void as *mut c_void;
+    GLDRAW_LUA_STOPFNS = &mut GLDRAW_LUA_STOPFNS as *mut *mut c_void as *mut c_void;
 
     let L = luaL_newstate();
     luaL_openlibs(L);
@@ -89,6 +92,10 @@ unsafe fn init_lua() -> GLResult<*mut lua_State> {
         logi!("ffi init script loaded");
         lua_pushlightuserdata(L, GLDRAW_LUA_SANDBOX);
         lua_getglobal(L, cstr!("sandboxed"));
+        lua_settable(L, LUA_REGISTRYINDEX);
+
+        lua_pushlightuserdata(L, GLDRAW_LUA_STOPFNS);
+        lua_newtable(L);
         lua_settable(L, LUA_REGISTRYINDEX);
         Ok(L)
     } else {
@@ -108,9 +115,23 @@ unsafe fn get_lua() -> GLResult<*mut lua_State> {
     }
 }
 
+#[no_mangle]
+pub unsafe fn rust_raise_lua_err(L: Option<*mut lua_State>, msg: *const i8) -> ! {
+    let L = L.unwrap_or(get_existing_lua().unwrap());
+    ::lua::aux::raw::luaL_error(L, msg);
+    panic!("luaL_error() returned, this should never happen!");
+}
+
 #[inline(always)]
 pub unsafe fn get_existing_lua() -> Option<*mut lua_State> {
     STATIC_LUA
+}
+
+pub unsafe fn get_existing_lua_or_err() -> GLResult<*mut lua_State> {
+    match get_existing_lua() {
+        Some(lua) => Ok(lua),
+        None => Err("couldn't get lua state!".into_string()),
+    }
 }
 
 unsafe fn push_sandbox(L: *mut lua_State) {
@@ -118,12 +139,8 @@ unsafe fn push_sandbox(L: *mut lua_State) {
     lua_gettable(L, LUA_REGISTRYINDEX);
 }
 
-pub unsafe fn load_lua_script(script: Option<&str>) -> GLResult<i32> {
-    let L = try!(get_lua());
-    logi!("got lua");
-
+unsafe fn clear_sandbox(L: *mut lua_State) {
     push_sandbox(L);
-
     lua_pushnil(L);
     lua_setfield(L, -2, cstr!("main"));
     lua_pushnil(L);
@@ -132,52 +149,116 @@ pub unsafe fn load_lua_script(script: Option<&str>) -> GLResult<i32> {
     lua_setfield(L, -2, cstr!("ondown"));
     lua_pushnil(L);
     lua_setfield(L, -2, cstr!("onup"));
-
+    lua_pushnil(L);
+    lua_setfield(L, -2, cstr!("ondone"));
     lua_pop(L, 1);
+}
+
+unsafe fn save_ondone(L: *mut lua_State, key: i32) -> GLResult<()> {
+    logi!("saving ondone() method");
+    push_sandbox(L); {
+        lua_pushlightuserdata(L, GLDRAW_LUA_STOPFNS); {
+            lua_gettable(L, LUA_REGISTRYINDEX);
+            logi!("type of gldraw_lua_stopfns is {}", c_str_to_static_slice(lua_typename(L, lua_type(L, -1))));
+            // stack holds sandbox -- stopfns
+            lua_pushlightuserdata(L, key as *mut c_void); {
+                // stack holds sandbox -- stopfns -- stopidx
+                lua_getfield(L, -3, cstr!("ondone")); {
+                    // stack holds sandbox -- stopfns -- stopidx -- ondone
+                    if !lua_isfunction(L, -1) {
+                        lua_pop(L, 4);
+                        return log_err("ondone not defined.\nThis should never happen!".into_string());
+                    }
+                    logi!("saving ondone method to 0x{:x} in gldraw_lua_stopfns", key);
+                    lua_settable(L, -3);
+                }
+            }
+            // stack holds sandbox -- stopfns
+            lua_pop(L, 2);
+            Ok(())
+        }
+    }
+}
+
+pub unsafe fn load_lua_script(script: Option<&str>) -> GLResult<i32> {
+    let L = try!(get_lua());
+    logi!("got lua");
+
+    clear_sandbox(L);
 
     let key = (&gldraw_lua_key) as *const i32 as i32 + gldraw_lua_key;
-    lua_pushlightuserdata(L, key as *mut c_void);
-
     let script = script.unwrap_or(DEFAULT_SCRIPT);
-    if !runstring(L, script, cstr!("interpolator script"), Sandboxed(GLDRAW_LUA_SANDBOX)) {
-        let err = format!("script failed to load: {}", err_to_str(L));
-        lua_pop(L, 1);
-        return log_err(err);
+    lua_pushlightuserdata(L, key as *mut c_void); {
+
+        if !runstring(L, script, cstr!("interpolator script"), Sandboxed(GLDRAW_LUA_SANDBOX)) {
+            let err = format!("script failed to load: {}", err_to_str(L));
+            lua_pop(L, 1);
+            return log_err(err);
+        }
+
+        push_sandbox(L); {
+            lua_getfield(L, -1, cstr!("main")); {
+                if !lua_isfunction(L, -1) {
+                    lua_pop(L, 3);
+                    return log_err("no main function defined :(".into_string());
+                }
+                luaJIT_setmode(L, 0, LUAJIT_MODE_ENGINE as i32|LUAJIT_MODE_ON as i32);
+                lua_pop(L, 1);
+            }
+
+            // make values defined in script available to lua_runner
+            lua_setglobal(L, cstr!("callbacks"));
+        }
+
+        // FIXME compile runner once
+        if !runstring(L, LUA_RUNNER, cstr!("built-in lua_runner script"), Unsandboxed) {
+            let err = format!("lua runner failed to load: {}\n This should never happen!", err_to_str(L));
+            lua_pop(L, 1);
+            return log_err(err);
+        }
+
+        lua_getglobal(L, cstr!("runmain")); {
+            if !lua_isfunction(L, -1) {
+                lua_pop(L, 2);
+                return log_err("runmain not defined.\nThis should never happen!".into_string());
+            }
+            luaJIT_setmode(L, 0, LUAJIT_MODE_ENGINE as i32|LUAJIT_MODE_ON as i32);
+
+            if let Err(msg) = save_ondone(L, key) {
+                lua_pop(L, 2);
+                return Err(msg);
+            }
+
+            lua_settable(L, LUA_REGISTRYINDEX);
+        }
     }
 
-    push_sandbox(L);
-    lua_getfield(L, -1, cstr!("main"));
-    if !lua_isfunction(L, -1) {
-        lua_pop(L, 3);
-        return log_err("no main function defined :(".into_string());
-    }
-    luaJIT_setmode(L, 0, LUAJIT_MODE_ENGINE as i32|LUAJIT_MODE_ON as i32);
-    lua_pop(L, 1);
-
-    // make values defined in script available to lua_runner
-    lua_setglobal(L, cstr!("callbacks"));
-
-    // FIXME compile runner once
-    if !runstring(L, LUA_RUNNER, cstr!("built-in lua_runner script"), Unsandboxed) {
-        let err = format!("lua runner failed to load: {}\n This should never happen!", err_to_str(L));
-        lua_pop(L, 1);
-        return log_err(err);
-    }
-
-    lua_getglobal(L, cstr!("runmain"));
-    if !lua_isfunction(L, -1) {
-        lua_pop(L, 2);
-        return log_err("runmain not defined.\n  This should never happen!".into_string());
-    }
-    luaJIT_setmode(L, 0, LUAJIT_MODE_ENGINE as i32|LUAJIT_MODE_ON as i32);
-
-    lua_settable(L, LUA_REGISTRYINDEX);
     gldraw_lua_key += 1;
     logi!("created script for {}", script);
     Ok(key)
 }
 
-pub unsafe fn unload_lua_script(key: i32) {
+pub unsafe fn finish_lua_script<T: LuaCallback>(output: &mut T, script: &::luascript::LuaScript) -> GLResult<()> {
+    let L = get_lua().unwrap();
+    lua_pushlightuserdata(L, GLDRAW_LUA_STOPFNS);
+    lua_gettable(L, LUA_REGISTRYINDEX);
+    logi!("type of gldraw_lua_stopfns is {}", c_str_to_static_slice(lua_typename(L, lua_type(L, -1))));
+
+    // stack is stopfns
+    script.push_self();
+    lua_gettable(L, -2);
+    logi!("type of stopfn for {} is {}", script, c_str_to_static_slice(lua_typename(L, lua_type(L, -1))));
+    // stack is stopfns -- stopfn
+    lua_pushlightuserdata(L, output as *mut T as *mut c_void);
+    let result = match lua_pcall(L, 1, 0, 0) {
+        0 => Ok(()),
+        _ => log_err(format!("ondone() script failed to run: {}", err_to_str(L))),
+    };
+    lua_pop(L, 1); // remove stopfns
+    result
+}
+
+pub unsafe fn destroy_lua_script(key: i32) {
     let L = get_lua().unwrap();
     lua_pushlightuserdata(L, key as *mut c_void);
     lua_pushnil(L);
@@ -193,17 +274,17 @@ fn log_err<T>(message: String) -> GLResult<T> {
 pub unsafe fn push_lua_script(key: i32) {
     let L = get_lua().unwrap();
     lua_pushlightuserdata(L, key as *mut c_void);
-    lua_gettable(L, LUA_REGISTRYINDEX);
 }
 
-pub unsafe fn do_interpolate_lua(script: &::luascript::LuaScript, dimensions: (i32, i32), output: &mut LuaCallbackType) -> GLResult<()> {
-    let L = output.lua;
+pub unsafe fn do_interpolate_lua<T: LuaCallback>(script: &::luascript::LuaScript, dimensions: (i32, i32), output: &mut T) -> GLResult<()> {
+    let L = try!(get_existing_lua_or_err());
     script.push_self();
+    lua_gettable(L, LUA_REGISTRYINDEX);
 
     let (x, y) = dimensions;
     lua_pushnumber(L, x as f64);
     lua_pushnumber(L, y as f64);
-    lua_pushlightuserdata(L, output as *mut LuaCallbackType as *mut c_void);
+    lua_pushlightuserdata(L, output as *mut T as *mut c_void);
 
     match lua_pcall(L, 3, 0, 0) {
         0 => Ok(()),

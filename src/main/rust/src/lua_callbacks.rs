@@ -1,8 +1,6 @@
 use core::prelude::*;
 use core::mem;
-use collections::MutableSeq;
 use collections::vec::Vec;
-use collections::str::StrAllocating;
 
 use android::log::{ANDROID_LOG_INFO, __android_log_write};
 use libc::{c_char, c_int};
@@ -10,33 +8,36 @@ use point::ShaderPaintPoint;
 use point::{Move, Down, Up, NoEvent};
 use glpoint;
 use glpoint::MotionEventConsumer;
-use glcommon::GLResult;
 use glinit::GLInit;
 use drawevent::Events;
-use lua::raw::lua_State;
+use log::loge;
+use lua_geom::rust_raise_lua_err;
+use rustjni::JNICallbackClosure;
 
 static MOVE: u8 = 0u8;
 static DONE: u8 = 1u8;
 static DOWN: u8 = 2u8;
 static UP:   u8 = 3u8;
 
-pub struct LuaCallbackType<'a, 'b, 'c: 'b> {
+//pub type UndoCallback<'a> = ::rustjni::JNICallbackClosure<'a>;
+
+pub struct LuaCallbackType<'a, 'b, 'c: 'b, 'd> {
     consumer: &'a mut MotionEventConsumer,
     events: &'c mut Events<'c>,
     glinit: &'b mut GLInit<'c>,
-    pub lua: *mut lua_State,
+    undo_callback: &'d JNICallbackClosure<'d>,
 }
 
-impl<'a, 'b, 'c> LuaCallbackType<'a, 'b, 'c> {
-    pub fn new(glinit: &'b mut GLInit<'c>, events: &'c mut Events<'c>, s: &'a mut MotionEventConsumer) -> GLResult<LuaCallbackType<'a, 'b, 'c>> {
-        match unsafe { ::lua_geom::get_existing_lua() } {
-            Some(lua) => Ok(LuaCallbackType {
-                consumer: s,
-                events: events,
-                glinit: glinit,
-                lua: lua,
-            }),
-            None => Err("couldn't get lua state!".into_string()),
+pub trait LuaCallback { }
+impl<'a,'b,'c,'d> LuaCallback for LuaCallbackType<'a,'b,'c,'d> { }
+
+impl<'a, 'b, 'c, 'd> LuaCallbackType<'a, 'b, 'c, 'd> {
+    pub fn new(glinit: &'b mut GLInit<'c>, events: &'c mut Events<'c>, s: &'a mut MotionEventConsumer, undo_callback: &'d JNICallbackClosure) -> LuaCallbackType<'a, 'b, 'c, 'd> {
+        LuaCallbackType {
+            consumer: s,
+            events: events,
+            glinit: glinit,
+            undo_callback: undo_callback,
         }
     }
 }
@@ -55,13 +56,6 @@ pub extern "C" fn lua_nextpoint(data: &mut LuaCallbackType, points: &mut (Shader
     ((luastate as u16) << 8) | (pointer as u16)
 }
 
-#[no_mangle]
-#[allow(non_snake_case)]
-pub unsafe fn rust_raise_lua_err(L: *mut lua_State, msg: *const i8) -> ! {
-    ::lua::aux::raw::luaL_error(L, msg);
-    fail!("luaL_error() returned, this should never happen!");
-}
-
 macro_rules! rust_raise_lua_err(
     ($L:expr, $fmt:expr, $($arg:tt)*) => ({
         let formatted = format!(concat!($fmt, "\0"), $($arg)*);
@@ -73,7 +67,8 @@ fn get_queue_or_raise_err<'a, 'b, 'c, 'd>(data: &'d mut LuaCallbackType, queue: 
     let points = &mut data.glinit.points;
     if (queue as uint) >= points.len() {
         unsafe {
-            rust_raise_lua_err!(data.lua, "tried to push point to queue {} of {}", queue + 1, points.len());
+            loge!("tried to push point to queue {} of {}", queue + 1, points.len());
+            rust_raise_lua_err!(None, "tried to push point to queue {} of {}", queue + 1, points.len());
         }
     }
     unsafe { points.as_mut_slice().unsafe_mut(queue as uint) }
@@ -99,8 +94,9 @@ pub unsafe extern "C" fn lua_log(message: *const c_char) {
 #[no_mangle]
 pub unsafe extern "C" fn lua_clearlayer(data: &mut LuaCallbackType, layer: i32) {
     if let Err(mut msg) = data.glinit.erase_layer(layer) {
+        loge!(msg.as_slice());
         msg.push('\0');
-        rust_raise_lua_err(data.lua, msg.as_slice().as_ptr() as *const i8);
+        rust_raise_lua_err(None, msg.as_slice().as_ptr() as *const i8);
     }
 }
 
@@ -118,3 +114,11 @@ pub unsafe extern "C" fn lua_pushcatmullrom(data: &mut LuaCallbackType, queue: i
 pub unsafe extern "C" fn lua_pushcubicbezier(data: &mut LuaCallbackType, queue: i32, points: &[ShaderPaintPoint, ..4]) {
     glpoint::push_cubicbezier(&mut data.glinit.points.as_mut_slice()[queue as uint], points);
 }
+
+#[no_mangle]
+pub unsafe extern "C" fn lua_saveundobuffer(data: &mut LuaCallbackType) -> () {
+    let result = data.glinit.push_undo_frame();
+    (*data.undo_callback)(result);
+}
+
+

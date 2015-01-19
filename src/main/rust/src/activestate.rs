@@ -1,4 +1,4 @@
-#![allow(unused_variable, dead_code)]
+#![allow(unused_variables, dead_code)]
 
 const NEWMASK: u8 = 0x01;
 const OLDMASK: u8 = 0x02;
@@ -16,5 +16,9 @@ impl ActiveState {
         let ActiveState(state) = self;
         ActiveState(((state << 1) & OLDMASK) | newstate as u8)
     }
+    //#[inline]
+    //pub fn is_active(self) -> bool {
+        //(self & NEWMASK) != 0
+    //}
 }
 

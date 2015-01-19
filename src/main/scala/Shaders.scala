@@ -16,6 +16,9 @@ class GLInit private (private val nativePtr: Int) extends AnyVal {
     m
   }
 }
+trait UndoCallback {
+  def undoBufferChanged(newSize: Int): Unit
+}
 object GLResultTypeDef {
   type GLResult[T] = Either[String, T]
 }
@@ -67,9 +70,9 @@ object LuaScript {
 }
 
 object GLInit {
-  @native def initGL(width: Int, height: Int): Int;
-  def apply(width: Int, height: Int): GLInit = {
-    new GLInit(initGL(width, height))
+  @native def initGL(width: Int, height: Int, callback: UndoCallback): Int;
+  def apply(width: Int, height: Int, callback: UndoCallback): GLInit = {
+    new GLInit(initGL(width, height, callback))
   }
   // helper for texturesurfacethread
   def fromMessage(m: Message) = {

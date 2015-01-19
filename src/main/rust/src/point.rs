@@ -37,9 +37,11 @@ pub struct ShaderPaintPoint {
 /// this enables us to use raw motionevent pointer ids, which get recycled regularly
 /// it's arguably simpler than ensuring each pointer gets a unique queue for its entire
 /// lifetime and maintaining an up-to-date pointer id -> queue mapping
+/// FrameStop indicates that we should stop reading 
 #[deriving(PartialEq)]
 pub enum PointInfo {
     Stop,
+    FrameStop,
     Point(PaintPoint),
 }
 

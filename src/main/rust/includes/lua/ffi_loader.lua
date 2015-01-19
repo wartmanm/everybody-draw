@@ -19,6 +19,7 @@ ffi.cdef[[
   void lua_pushcubicbezier(void *output, int queue, struct ShaderPaintPoint points[4]);
   void lua_clearlayer(void *output, int layer);
   void lua_savelayers(void *output);
+  void lua_saveundobuffer(void *output);
 ]]
 
 pushpoint=ffi.C.lua_pushpoint
@@ -28,6 +29,7 @@ pushcubicbezier=ffi.C.lua_pushcubicbezier
 loglua=ffi.C.lua_log
 clearlayer=ffi.C.lua_clearlayer
 savelayers=ffi.C.lua_savelayers
+saveundo=ffi.C.lua_saveundobuffer
 
 ShaderPaintPoint=ffi.typeof("struct ShaderPaintPoint")
 
@@ -66,5 +68,6 @@ sandboxed = {
   loglua = loglua,
   clearlayer = clearlayer,
   savelayers = savelayers,
+  saveundo = saveundo,
   ShaderPaintPoint = ShaderPaintPoint,
 }

@@ -1,9 +1,9 @@
 use core::prelude::*;
 
+use collections::vec_map::VecMap;
+
 use log::logi;
 use android::input::*;
-
-use collections::{SmallIntMap, MutableSeq, MutableMap, Map};
 
 use point;
 use point::{PaintPoint, Coordinate, PointEntry, PointProducer};
@@ -12,15 +12,29 @@ use activestate;
 static AMOTION_EVENT_ACTION_POINTER_INDEX_SHIFT: uint = 8;
 
 // TODO: consider eliminating entirely and putting faith in ACTION_POINTER_UP/DOWN
-type PointerState = SmallIntMap<activestate::ActiveState>;
+type PointerState = VecMap<activestate::ActiveState>;
 pub struct Data {
     pointer_states: PointerState,
 }
 
 impl Data {
     pub fn new() -> Data {
-        Data { pointer_states: SmallIntMap::new() }
+        Data { pointer_states: VecMap::new() }
     }
+}
+
+pub fn pause(data: &mut Data, queue: &mut PointProducer) {
+    let active = &mut data.pointer_states;
+    for (_, state) in active.iter_mut() {
+        *state = state.push(false);
+    }
+    push_stops(queue, active);
+    // index must be a valid index.  Consider making FrameStop a part of PointEntry instead --
+    // is this tradeoff worth it?
+    // pro: straightforward, con: extra 4 bytes on every pointentry
+    // could fold index into pointinfo, or have a magic index like -1 to indicate framestop
+    // maybe this entire approach isn't such a good one after all?
+    queue.push(PointEntry { index: 0, entry: point::FrameStop })
 }
 
 pub fn append_motion_event(data: &mut Data, evt: *const AInputEvent, queue: &mut PointProducer) -> () {
@@ -84,7 +98,7 @@ fn push_moves(queue: &mut PointProducer, active: &mut PointerState, evt: *const 
 }
 
 fn make_active(queue: &mut PointProducer, active: &mut PointerState, id: i32, newstate: bool) {
-    let updated = active.find(&(id as uint)).unwrap_or(&activestate::INACTIVE).push(newstate);
+    let updated = active.get(&(id as uint)).unwrap_or(&activestate::INACTIVE).push(newstate);
     active.insert(id as uint, updated);
     if updated == activestate::STOPPING {
         queue.push(PointEntry { index: id, entry: point::Stop });

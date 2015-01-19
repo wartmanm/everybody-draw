@@ -1,7 +1,7 @@
-#![allow(unused_attribute)]
+#![allow(unused_attributes)]
 #![allow(non_camel_case_types)]
 #![allow(non_snake_case)]
-#![allow(non_uppercase_statics)]
+#![allow(non_upper_case_globals)]
 
 pub const JNI_FALSE: i32 = 0;
 pub const JNI_TRUE:  i32 = 1;

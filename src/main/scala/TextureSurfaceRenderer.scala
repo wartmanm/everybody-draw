@@ -10,6 +10,7 @@ import unibrush.Layer
 class TextureSurfaceThread(surface: SurfaceTexture, private var motionHandler: MotionEventHandler, handlerCallback: (TextureSurfaceThread)=>Unit, errorCallback: (Exception)=>Unit)
 extends Thread with Handler.Callback with AndroidImplicits {
   import TextureSurfaceThread.Constants._
+  import TextureSurfaceThread._
 
   private var handler: Handler = null
   private val running = new AtomicBoolean(true)
@@ -23,6 +24,7 @@ extends Thread with Handler.Callback with AndroidImplicits {
 
   @native protected def nativeUpdateGL(data: GLInit): Unit
   @native protected def nativeDrawQueuedPoints(data: GLInit, handler: MotionEventHandler, transformMatrix: Array[Float]): Unit
+  @native protected def nativeFinishLuaScript(data: GLInit, handler: MotionEventHandler): Unit
   @native protected def nativeClearFramebuffer(data: GLInit): Unit
   @native protected def drawImage(data: GLInit, bitmap: Bitmap): Unit
   @native protected def nativeSetAnimShader(data: GLInit, shader: CopyShader): Boolean
@@ -33,6 +35,7 @@ extends Thread with Handler.Callback with AndroidImplicits {
   @native protected def nativeSetInterpolator(data: GLInit, script: LuaScript): Unit
   @native protected def nativeAddLayer(data: GLInit, copyshader: CopyShader, pointshader: PointShader, pointidx: Int): Unit
   @native protected def nativeClearLayers(data: GLInit): Unit
+  @native protected def nativeLoadUndo(data: GLInit, pos: Int): Unit
 
   override def run() = {
     Looper.prepare()
@@ -76,7 +79,8 @@ extends Thread with Handler.Callback with AndroidImplicits {
         eglHelper = new EGLHelper()
         eglHelper.init(surface)
         Log.i("tst", "egl inited");
-        val gl = GLInit(msg.arg1, msg.arg2)
+        val BeginGLArgs(undoCallback, beginGLCallback) = msg.obj.asInstanceOf[BeginGLArgs]
+        val gl = GLInit(msg.arg1, msg.arg2, undoCallback)
         glinit = Some(gl)
         initOutputShader(gl)
         android.opengl.Matrix.orthoM(matrix, 0,
@@ -91,26 +95,26 @@ extends Thread with Handler.Callback with AndroidImplicits {
           matrix(12), matrix(13), matrix(14), matrix(15)))
         Log.i("tst", "gl inited");
         updateGL(gl)
-        msg.obj.asInstanceOf[()=>Unit]()
+        beginGLCallback(gl)
       }
     }
     true
   }
 
-  def beginGL(x: Int, y: Int, callback: ()=>Unit): Unit = {
-    handler.obtainMessage(MSG_BEGIN_GL, x, y, callback).sendToTarget()
+  def beginGL(x: Int, y: Int, initCallback: (GLInit)=>Unit, undoCallback: UndoCallback): Unit = {
+    handler.obtainMessage(MSG_BEGIN_GL, x, y, BeginGLArgs(undoCallback, initCallback)).sendToTarget()
+  }
+
+  def startFrames(): Unit = {
+    glinit match {
+      case Some(gl) => startFrames(gl)
+      case None => Log.e("tst", "unable to start frames, no gl inited!")
+    }
   }
   
-  def startFrames() = {
-    glinit match {
-      case Some(gl) => {
-        this.running.set(true)
-        gl.toMessage(handler.obtainMessage(MSG_NEW_FRAME)).sendToTarget()
-      }
-      case None => {
-        Log.e("tst", "unable to start frames, no gl inited!")
-      }
-    }
+  def startFrames(gl: GLInit): Unit = {
+    this.running.set(true)
+    gl.toMessage(handler.obtainMessage(MSG_NEW_FRAME)).sendToTarget()
   }
 
   def stopFrames() = {
@@ -122,14 +126,14 @@ extends Thread with Handler.Callback with AndroidImplicits {
     handler.post(() => { fn; () })
   }
 
-  def initScreen(bitmap: Option[Bitmap]) = withGL(gl => {
+  def initScreen(gl: GLInit, bitmap: Option[Bitmap]) = {
     Log.i("tst", "initing output shader")
     Log.i("tst", s"drawing bitmap: ${bitmap}")
     for (b <- bitmap) {
       drawImage(gl, b)
       b.recycle()
     }
-  })
+  }
 
   def clearScreen() = withGL(nativeClearFramebuffer _)
 
@@ -167,6 +171,13 @@ extends Thread with Handler.Callback with AndroidImplicits {
     nativeDrawQueuedPoints(g, motionHandler, matrix)
   }
 
+  def finishLuaScript(gl: GLInit) = {
+    Log.i("tst", "finishing lua script - final draw")
+    nativeDrawQueuedPoints(gl, motionHandler, matrix)
+    Log.i("tst", "finishing lua script - unloading")
+    nativeFinishLuaScript(gl, motionHandler)
+  }
+
   private def drawReplayFrame(gl: GLInit, r: Replay) = {
     val finished = Replay.advanceFrame(gl, r, matrix)
     if (finished) {
@@ -196,6 +207,8 @@ extends Thread with Handler.Callback with AndroidImplicits {
     nativeAddLayer(gl, copyshader, pointshader, pointidx)
   }
 
+  def loadUndo(gl: GLInit, pos: Int) = nativeLoadUndo(gl, pos)
+
   // only set values, could maybe run on main thread
   def setAnimShader(gl: GLInit, shader: CopyShader) = nativeSetAnimShader(gl, shader)
   def setPointShader(gl: GLInit, shader: PointShader) = nativeSetPointShader(gl, shader)
@@ -216,4 +229,6 @@ object TextureSurfaceThread {
     val MSG_BEGIN_GL = 3
     val MSG_BEGIN_FRAMES = 4
   }
+
+  case class BeginGLArgs(undoCallback: UndoCallback, initCallback: (GLInit) => Unit)
 }

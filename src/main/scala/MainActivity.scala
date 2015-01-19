@@ -54,9 +54,12 @@ class MainActivity extends Activity with TypedActivity with AndroidImplicits {
   lazy val drawerParent = findView(TR.drawer_parent)
   lazy val controlflipper = findView(TR.controlflipper)
   lazy val controldrawer = findView(TR.control_drawer)
+  lazy val sidebar = findView(TR.sidebar_parent)
   lazy val drawerToggle = new android.support.v7.app.ActionBarDrawerToggle(
       this, drawerParent, R.string.sidebar_open, R.string.sidebar_close)
   lazy val sidebarAdapter = new SidebarAdapter()
+  lazy val undoButton = findView(TR.undo_button)
+  lazy val redoButton = findView(TR.redo_button)
 
   var textureThread: Option[TextureSurfaceThread] = None
 
@@ -65,6 +68,7 @@ class MainActivity extends Activity with TypedActivity with AndroidImplicits {
   lazy val saveThread = ExecutionContext.fromExecutor(Executors.newSingleThreadExecutor())
 
   @native protected def nativeAppendMotionEvent(handler: MotionEventProducer, m: MotionEvent): Unit
+  @native protected def nativePauseMotionEvent(handler: MotionEventProducer): Unit
 
   // TODO: actually clean up
   var handlers: Option[MotionEventHandlerPair] = None
@@ -76,21 +80,54 @@ class MainActivity extends Activity with TypedActivity with AndroidImplicits {
     Log.i("main", "started thread");
   }
 
+  var undoCount: Int = 0
+  var undoPos: Int = 0
+
+  class MainUndoListener() extends UndoCallback() {
+    override def undoBufferChanged(newSize: Int): Unit = {
+      Log.i("main", s"new undo buffer size: ${newSize}")
+      undoCount = newSize
+      undoPos = newSize - 1
+      runOnUiThread(() => {
+        updateUndoButtons()
+      })
+    }
+  }
+
+  def moveUndo(offset: Int) = {
+    val newPos = undoPos + offset
+    if (newPos >= 0 && newPos < undoCount) {
+      for (thread <- textureThread) {
+        undoPos = newPos
+        updateUndoButtons()
+        thread.withGL(gl => {
+          thread.loadUndo(gl, newPos)
+        })
+      }
+    }
+  }
+
+  def updateUndoButtons() = {
+    redoButton.setEnabled(undoCount - undoPos > 1)
+    undoButton.setEnabled(undoPos > 0)
+  }
+
   val onTextureThreadStarted = (x: Int, y: Int, producer: MotionEventProducer) => (thread: TextureSurfaceThread) => this.runOnUiThread(() => {
     Log.i("main", "got handler")
     textureThread = Some(thread)
-    thread.beginGL(x, y, onTextureCreated(thread, producer) _)
-    thread.startFrames()
+    val undoCallback = new MainUndoListener()
+    thread.beginGL(x, y, onTextureCreated(thread, producer) _, undoCallback)
+    //thread.startFrames() // FIXME is this needed?
     Log.i("main", "sent begin_gl message")
     ()
   })
 
   // runs on gl thread
-  def onTextureCreated(thread: TextureSurfaceThread, producer: MotionEventProducer)() = {
-    thread.initScreen(savedBitmap)
+  def onTextureCreated(thread: TextureSurfaceThread, producer: MotionEventProducer)(gl: GLInit) = {
+    thread.initScreen(gl, savedBitmap)
     savedBitmap = None
-    thread.startFrames()
-    populatePickers()
+    thread.startFrames(gl)
+    populatePickers(producer, thread, gl)
     content.setOnTouchListener(createViewTouchListener(producer))
     Log.i("main", "set ontouch listener")
   }
@@ -117,6 +154,11 @@ class MainActivity extends Activity with TypedActivity with AndroidImplicits {
         sidebarAdapter.sidebarControls(pos).onClick(pos)
       }
     })
+    
+    updateUndoButtons()
+    undoButton.setOnClickListener(() => moveUndo(-1))
+    redoButton.setOnClickListener(() => moveUndo(1))
+
 
     drawerParent.setDrawerListener(drawerToggle)
     getActionBar().setDisplayHomeAsUpEnabled(true)
@@ -293,28 +335,53 @@ class MainActivity extends Activity with TypedActivity with AndroidImplicits {
     })
   }
 
-  def populatePickers() = {
-    for (thread <- textureThread) {
-      // TODO: maybe make the save thread load from disk and then hand off to the gl thread?
-      // also, have it opportunistically load at least up to that point
-      val brushes = DrawFiles.loadBrushes(this).toArray
-      val anims = DrawFiles.loadAnimShaders(this).toArray
-      val paints = DrawFiles.loadPointShaders(this).toArray
-      val interpscripts = DrawFiles.loadScripts(this).toArray
-      val unibrushes = DrawFiles.loadUniBrushes(this).toArray
-      Log.i("main", s"got ${brushes.length} brushes, ${anims.length} anims, ${paints.length} paints, ${interpscripts.length} interpolation scripts")
-
-      MainActivity.this.runOnUiThread(() => {
-        // TODO: make hardcoded shaders accessible a better way
-        populatePicker(controls.brushpicker, brushes,  thread.setBrushTexture _, thread)
-        populatePicker(controls.animpicker, anims,  thread.setAnimShader _, thread)
-        populatePicker(controls.paintpicker, paints,  thread.setPointShader _, thread)
-        populatePicker(controls.interppicker, interpscripts,  thread.setInterpScript _, thread)
-        populatePicker(controls.unipicker, unibrushes, loadUniBrush(thread), thread)
-        controls.copypicker.value = thread.outputShader
-        controls.restoreState()
+  def unloadInterpolatorSynchronized(thread: TextureSurfaceThread, producer: MotionEventProducer, gl: GLInit) = {
+    val notify = new Object()
+    notify.synchronized {
+      runOnUiThread(() => {
+        nativePauseMotionEvent(producer)
+        Log.i("main", "loading interpolator - paused motion events")
+        notify.synchronized {
+          notify.notify()
+        }
       })
+      Log.i("main", "loading interpolator - waiting for pause")
+      notify.wait()
     }
+    Log.i("main", "loading interpolator - finishing lua script")
+    try {
+      thread.finishLuaScript(gl)
+    }
+    catch { case _: LuaException => { } }
+  }
+
+  def loadInterpolatorSynchronized(thread: TextureSurfaceThread, producer: MotionEventProducer) =
+  (gl: GLInit, script: LuaScript) => {
+    unloadInterpolatorSynchronized(thread, producer, gl)
+    thread.setInterpScript(gl, script)
+  }
+
+  def populatePickers(producer: MotionEventProducer, thread: TextureSurfaceThread, gl: GLInit) = {
+    // TODO: maybe make the save thread load from disk and then hand off to the gl thread?
+    // also, have it opportunistically load at least up to that point
+    val brushes = DrawFiles.loadBrushes(this).toArray
+    val anims = DrawFiles.loadAnimShaders(this).toArray
+    val paints = DrawFiles.loadPointShaders(this).toArray
+    val interpscripts = DrawFiles.loadScripts(this).toArray
+    val unibrushes = DrawFiles.loadUniBrushes(this).toArray
+    Log.i("main", s"got ${brushes.length} brushes, ${anims.length} anims, ${paints.length} paints, ${interpscripts.length} interpolation scripts")
+
+    MainActivity.this.runOnUiThread(() => {
+      // TODO: make hardcoded shaders accessible a better way
+      val interpLoader = loadInterpolatorSynchronized(thread, producer)
+      populatePicker(controls.brushpicker, brushes,  thread.setBrushTexture _, thread)
+      populatePicker(controls.animpicker, anims,  thread.setAnimShader _, thread)
+      populatePicker(controls.paintpicker, paints,  thread.setPointShader _, thread)
+      populatePicker(controls.interppicker, interpscripts,  interpLoader, thread)
+      populatePicker(controls.unipicker, unibrushes, loadUniBrush(thread, producer), thread)
+      controls.copypicker.value = thread.outputShader
+      controls.restoreState()
+    })
   }
 
   // TODO: fewer callbacks
@@ -324,7 +391,8 @@ class MainActivity extends Activity with TypedActivity with AndroidImplicits {
     })
   }
 
-  def loadUniBrush(thread: TextureSurfaceThread) = (gl: GLInit, unibrush: UniBrush) => {
+  def loadUniBrush(thread: TextureSurfaceThread, producer: MotionEventProducer) =
+  (gl: GLInit, unibrush: UniBrush) => {
     Log.i("main", "loading unibrush")
     def getSelectedValue[T](picker: GLControl[T]) = {
       // return None if the control is already active, or we're trying to restore a missing value
@@ -354,6 +422,11 @@ class MainActivity extends Activity with TypedActivity with AndroidImplicits {
     Log.i("unibrush", "loading interp")
     val interp = unibrush.interpolator.orElse(getSelectedValue(controls.interppicker))
     Log.i("unibrush", "loading unibrush!")
+    
+    // Unconditionally call ondone() in the interpolator to write layers, etc
+    // This runs the old interpolator and so must run under the old state.
+    unloadInterpolatorSynchronized(thread, producer, gl)
+    Log.i("unibrush", s"should have unloaded interpolator, which is ${interp} (unibrush interp is ${unibrush.interpolator})")
     thread.clearLayers(gl)
     for (layer <- unibrush.layers) {
       thread.addLayer(gl, layer.copyshader, layer.pointshader, layer.pointsrc)
@@ -438,11 +511,11 @@ class MainActivity extends Activity with TypedActivity with AndroidImplicits {
   def showControl(pos: Int) = {
     controlflipper.setVisibility(View.VISIBLE)
     controlflipper.setDisplayedChild(pos)
-    drawerParent.closeDrawer(controldrawer)
+    drawerParent.closeDrawer(sidebar)
   }
   def hideControls() = {
     controlflipper.setVisibility(View.INVISIBLE)
-    drawerParent.closeDrawer(controldrawer)
+    drawerParent.closeDrawer(sidebar)
   }
 
   class SidebarAdapter() extends BaseAdapter {
