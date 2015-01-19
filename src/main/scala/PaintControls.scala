@@ -126,7 +126,6 @@ object PaintControls extends AndroidImplicits {
     type LP = LazyPicker[V]
     type U = AdapterView[LP]
     override def currentValue(gl: GLInit): GLStoredResult[V] = {
-      Log.i("picker", s"getting value at idx ${selected}: '${adapter.lazified(selected).name}'")
       adapter.getState(selected, gl)
     }
     var selectedName = ""
@@ -136,7 +135,6 @@ object PaintControls extends AndroidImplicits {
       control.setAdapter(a)
     }
     override def restoreState(): Unit = {
-      Log.i("picker", s"restoring unnamedpicker state to '${selectedName}'")
       selected = this.adapter.lazified.indexWhere(_.name == selectedName) match {
         case -1 => 0
         case  x => x
@@ -166,7 +164,6 @@ object PaintControls extends AndroidImplicits {
   class FixedIndexPicker(override val control: AdapterView[ListAdapter]) extends SavedControl with SelectedListener {
     override type AdapterType = ListAdapter
     override def restoreState(): Unit = {
-      Log.i("picker", s"clicking ${selected} in sidebar")
       this.control.setSelection(selected)
     }
     override def updateState() = { }
@@ -178,7 +175,6 @@ object PaintControls extends AndroidImplicits {
     override def save(j: JsonWriter) = j.value(enabled)
     override def load(j: JsonReader) = { enabled = j.nextBoolean() }
     override def currentValue(gl: GLInit): GLStoredResult[T] = {
-      Log.i("picker", "getting unpicker value")
       value.getOrElse(throw new GLException("No value present?"))
       value match {
         case None => Left("No value present?")

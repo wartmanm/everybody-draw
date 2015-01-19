@@ -17,7 +17,6 @@ use rustjni::android_bitmap::AndroidBitmap;
 static mut SCALA_TUPLE2: CaseClass = CaseClass { constructor: 0 as jmethodID, class: 0 as jclass };
 
 unsafe fn glresult_or_exception<T>(env: *mut JNIEnv, result: GLResult<DrawObjectIndex<T>>) -> jint {
-    logi!("in glresult_or_exception");
     match result {
         Err(msg) => {
             let errmsg = str_to_jstring(env, msg.as_slice()).as_jvalue();
@@ -65,22 +64,17 @@ unsafe fn get_shader_source_tuple(env: *mut JNIEnv, source: &(MString, MString))
 }
 
 pub unsafe extern "C" fn jni_get_copyshader_source(env: *mut JNIEnv, _: jobject, data: jpointer, copyshader: jint) -> jobject {
-    logi!("getting copyshader source");
     let source = get_safe_data(data).events.get_copyshader_source(mem::transmute(copyshader));
-    logi!("got copyshader source");
     let tuple = get_shader_source_tuple(env, source);
-    logi!("created tuple");
     tuple
 }
 
 unsafe extern "C" fn jni_get_pointshader_source(env: *mut JNIEnv, _: jobject, data: jpointer, pointshader: jint) -> jobject {
-    logi!("getting pointshader source");
     let source = get_safe_data(data).events.get_pointshader_source(mem::transmute(pointshader));
     get_shader_source_tuple(env, source)
 }
 
 unsafe extern "C" fn jni_get_luascript_source(env: *mut JNIEnv, _: jobject, data: jpointer, luascript: jint) -> jstring {
-    logi!("getting luascript source");
     let source = get_safe_data(data).events.get_luascript_source(mem::transmute(luascript));
     str_to_jstring(env, source.as_slice())
 }

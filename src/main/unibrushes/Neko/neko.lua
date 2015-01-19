@@ -114,7 +114,7 @@ function direction(neko, mMoveDeltaX, mMoveDeltaY)
 end
 
 function setState(neko, state)
-  print("setting state to " .. mStateNames[state])
+  --print("setting state to " .. mStateNames[state])
   neko.mTickCount = 0
   neko.mStateCount = 0
   neko.mState = state

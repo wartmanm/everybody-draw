@@ -84,7 +84,6 @@ extends Thread with Handler.Callback with AndroidImplicits {
         Log.i("tst", "got begin_gl message");
         eglHelper = new EGLHelper()
         eglHelper.init(surface)
-        Log.i("tst", "egl inited");
         val BeginGLArgs(undoCallback, beginGLCallback) = msg.obj.asInstanceOf[BeginGLArgs]
         val gl = GLInit(msg.arg1, msg.arg2, undoCallback)
         glinit = Some(gl)
@@ -93,13 +92,6 @@ extends Thread with Handler.Callback with AndroidImplicits {
           0, msg.arg1,
           msg.arg2, 0,
           -1, 1)
-        Log.i("tst", "set up matrix for %d, %d: \n[[%5.03f,%5.03f,%5.03f,%5.03f]\n [%5.03f,%5.03f,%5.03f,%5.03f]\n [%5.03f,%5.03f,%5.03f,%5.03f]\n [%5.03f,%5.03f,%5.03f,%5.03f]]".format(
-          msg.arg1, msg.arg2,
-          matrix(0), matrix(1), matrix(2), matrix(3),
-          matrix(4), matrix(5), matrix(6), matrix(7),
-          matrix(8), matrix(9), matrix(10), matrix(11),
-          matrix(12), matrix(13), matrix(14), matrix(15)))
-        Log.i("tst", "gl inited");
         updateGL(gl)
         beginGLCallback(gl)
       }
@@ -133,8 +125,6 @@ extends Thread with Handler.Callback with AndroidImplicits {
   }
 
   def initScreen(gl: GLInit, bitmap: Option[Bitmap], rotation: Rotation) = {
-    Log.i("tst", "initing output shader")
-    Log.i("tst", s"drawing bitmap: ${bitmap}")
     for (b <- bitmap) {
       nativeDrawImage(gl, b, rotation)
       b.recycle()

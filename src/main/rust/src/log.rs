@@ -38,6 +38,10 @@ pub fn raw_logi(rustmsg: *const c_char) {
     }
 }
 
+pub macro_rules! debug_logi {
+    ($($arg:tt)*) => (if cfg!(not(ndebug)) { logi!($($arg)*); })
+}
+
 // macros that define entire macro bodies don't seem to be allowed yet
 pub macro_rules! logi(
     ($fmt:expr, $($arg:expr),+) => (

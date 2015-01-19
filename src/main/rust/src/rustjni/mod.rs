@@ -211,10 +211,10 @@ pub unsafe extern "C" fn JNI_OnLoad(vm: *mut JavaVM, reserved: *mut c_void) -> j
     logi!("jni onload!!");
     let mut env: *mut c_void = ptr::null_mut();
     if ((**vm).GetEnv)(vm, (&mut env as *mut *mut c_void), JNI_VERSION_1_6) != JNI_OK {
+        loge!("failed to get environment?!");
         return -1;
     }
     let env = env as *mut JNIEnv;
-    logi!("got environment!: {:?}", env);
 
     texturethread::init(env);
     texturethread::init(env);
@@ -234,7 +234,7 @@ pub unsafe extern "C" fn JNI_OnLoad(vm: *mut JavaVM, reserved: *mut c_void) -> j
 #[allow(non_snake_case, unused_variables)]
 #[no_mangle]
 pub unsafe extern "C" fn JNI_OnUnload(vm: *mut JavaVM, reserved: *mut c_void) {
-    logi!("jni onload!!");
+    logi!("jni onunload!!");
     let mut env: *mut c_void = ptr::null_mut();
     if ((**vm).GetEnv)(vm, (&mut env as *mut *mut c_void), JNI_VERSION_1_6) != JNI_OK {
         return;

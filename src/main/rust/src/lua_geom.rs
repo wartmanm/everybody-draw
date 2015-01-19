@@ -253,7 +253,6 @@ impl LuaInterpolatorState {
         luaJIT_setmode(L, 0, LUAJIT_MODE_ENGINE as i32|LUAJIT_MODE_ON as i32);
 
         if runstring(L, LUA_FFI_SCRIPT, cstr!("built-in ffi init script"), Unsandboxed) {
-            logi!("ffi init script loaded");
             lua_getglobal(L, cstr!("create_sandbox"));
             let create_sandbox = RegistryRef::new(L);
 
@@ -287,7 +286,6 @@ impl LuaInterpolatorState {
 
     unsafe fn save_ondone(&mut self, key: i32, sandbox: LuaValue) -> GLResult<()> {
         let L = self.L;
-        logi!("saving ondone() method");
         let stacksize = lua_gettop(L);
         sandbox.push_self(L); {
             self.stopfns.push(L); {
@@ -299,7 +297,6 @@ impl LuaInterpolatorState {
                         assert_eq!(stacksize, lua_gettop(L));
                         return log_err("ondone not defined.\nThis should never happen!".into_cow());
                     }
-                    logi!("saving ondone method to 0x{:x} in gldraw_lua_stopfns", key);
                     lua_rawseti(L, -2, key);
                 }
                 // stack holds sandbox -- stopfns
@@ -312,7 +309,6 @@ impl LuaInterpolatorState {
 
     pub unsafe fn load_lua_script(&mut self, script: &str) -> GLResult<i32> {
         let L = self.L;
-        logi!("got lua");
         let stacksize = lua_gettop(L);
         let result = self.load_lua_script_internal(script);
         assert_eq!(stacksize, lua_gettop(L));
@@ -409,7 +405,6 @@ impl LuaInterpolatorState {
             // stack is stopfns
             lua_rawgeti(L, -1, script.get_key());
             // stack is stopfns -- stopfn
-            logi!("calling lua ondone()");
             let result = match lua_pcall(L, 0, 0, 0) {
                 0 => Ok(()),
                 _ => {

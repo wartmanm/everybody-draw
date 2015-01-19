@@ -190,7 +190,6 @@ impl TargetData {
 
 impl<'a> GLInit<'a> {
     pub fn draw_image(&mut self, w: i32, h: i32, pixels: &[u8], rotation: matrix::Rotation) -> () {
-        logi!("drawing image...");
         let target = self.targetdata.get_current_texturetarget();
         let (tw, th) = target.texture.dimensions;
         let heightratio = th as f32 / h as f32;
@@ -201,7 +200,7 @@ impl<'a> GLInit<'a> {
         let (glratiox, glratioy) = (widthratio / ratio, heightratio / ratio);
 
         let matrix = matrix::fit_inside((w, h), target.texture.dimensions, rotation);
-        logi!("drawing with ratio: {:5.3}, glratio {:5.3}, {:5.3}, matrix:\n{}", ratio, glratiox, glratioy, matrix::log(matrix.as_slice()));
+        logi!("drawing image with ratio: {:5.3}, glratio {:5.3}, {:5.3}", ratio, glratiox, glratioy);
 
         let intexture = Texture::with_image(w, h, Some(pixels), PixelFormat::RGBA);
         check_gl_error("creating texture");
@@ -234,24 +233,24 @@ impl<'a> GLInit<'a> {
 
     // TODO: make an enum for these with a scala counterpart
     pub fn set_copy_shader(&mut self, shader: &'a CopyShader) -> () {
-        logi!("setting copy shader");
+        debug_logi!("setting copy shader");
         self.paintstate.copyshader = Some(shader);
     }
 
     // these can also be null to unset the shader
     // TODO: document better from scala side
     pub fn set_anim_shader(&mut self, shader: &'a CopyShader) -> () {
-        logi!("setting anim shader");
+        debug_logi!("setting anim shader");
         self.paintstate.animshader = Some(shader);
     }
 
     pub fn set_point_shader(&mut self, shader: &'a PointShader) -> () {
-        logi!("setting point shader");
+        debug_logi!("setting point shader");
         self.paintstate.pointshader = Some(shader);
     }
 
     pub fn set_interpolator(&mut self, interpolator: &'a LuaScript) -> () {
-        logi!("setting interpolator");
+        debug_logi!("setting interpolator");
         self.paintstate.interpolator = Some(interpolator);
     }
 
@@ -270,7 +269,7 @@ impl<'a> GLInit<'a> {
     }
 
     pub fn add_layer(&mut self, layer: PaintLayer<'a>) -> () {
-        logi!("adding layer");
+        debug_logi!("adding layer");
         let extra: i32 = (layer.pointidx as i32 + 1) - self.points.len() as i32;
         if extra > 0 {
             //self.points.extend(iter::repeat(Vec::new()).take(extra as uint));
@@ -280,7 +279,7 @@ impl<'a> GLInit<'a> {
     }
 
     pub fn clear_layers(&mut self) {
-        logi!("setting layer count to 0");
+        debug_logi!("setting layer count to 0");
         self.paintstate.layers.clear();
         self.points.truncate(1);
     }
