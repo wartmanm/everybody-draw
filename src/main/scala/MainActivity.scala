@@ -24,8 +24,6 @@ import com.ipaulpro.afilechooser.utils.FileUtils
 
 import unibrush.{UniBrush, Layer}
 
-import resource._
-
 import com.larswerkman.holocolorpicker.{ColorPicker, ScaleBar}
 
 import scala.concurrent.ExecutionContext
@@ -73,6 +71,10 @@ class MainActivity extends Activity with TypedActivity with AndroidImplicits {
   private var savedBitmap: Option[Bitmap] = None
 
   lazy val saveThread = ExecutionContext.fromExecutor(Executors.newSingleThreadExecutor())
+
+  lazy val loadedDrawFiles = Future {
+    new LoadedDrawFiles(this)
+  }(saveThread)
 
   var drawerIsOpen = false
 
@@ -154,6 +156,16 @@ class MainActivity extends Activity with TypedActivity with AndroidImplicits {
 
     super.onCreate(bundle)
     setContentView(R.layout.activity_main)
+
+    // Trigger off-thread resource enumeration.
+    // This locks resources required for layout inflation ( in
+    // Resource.loadXmlResourceParser() ), so it needs to take place after
+    // setContentView and maybe setAdapter()
+    // TODO: what placement gives the fastest startup time?
+    // TODO: consider using resources rather than assets, so no enumeration is needed
+    // TODO: consider laziness, only populating the needed views
+    // TODO: consider recycling a single gridview, they're not cheap
+    loadedDrawFiles
 
     controls.sidebar.control.setAdapter(sidebarAdapter)
     controls.sidebar.setListener((v: View, pos: Int) => {
@@ -319,11 +331,13 @@ class MainActivity extends Activity with TypedActivity with AndroidImplicits {
 
   private def loadFromFile() = {
     Log.i("main", "loading from file")
+    val input = new BufferedInputStream(MainActivity.this.openFileInput("screen"))
     try {
-      for (input <- managed(new BufferedInputStream(MainActivity.this.openFileInput("screen")))) {
+      DrawFiles.withCloseable(input) {
         savedBitmap = Some(DrawFiles.decodeBitmap(Bitmap.Config.ARGB_8888)(input))
         val input2 = MainActivity.this.openFileInput("status")
         controls.load(input2)
+        input2.close()
       }
     } catch {
       case e @ (_: IOException | _: GLException) => { 
@@ -335,16 +349,19 @@ class MainActivity extends Activity with TypedActivity with AndroidImplicits {
   private def saveLocalState() = {
     savedBitmap.foreach(bitmap => {
         Future {
-          for (out <- managed(new BufferedOutputStream(
-            MainActivity.this.openFileOutput("screen", Context.MODE_PRIVATE)))) {
-            saveBitmapToFile(bitmap, out)
-          }
+          val out = new BufferedOutputStream(
+            MainActivity.this.openFileOutput("screen", Context.MODE_PRIVATE))
+          try {
+            DrawFiles.withCloseable(out) {
+              saveBitmapToFile(bitmap, out)
+            }
+          } catch { case _: Exception => { } }
         }(saveThread)
       })
     savePickersToFile()
   }
 
-  def populatePicker[U, T <: (String, (GLInit)=>GLResult[U])](picker: UnnamedPicker[U], arr: Array[T], cb: (GLInit, U)=>Unit, thread: TextureSurfaceThread) = {
+  def populatePicker[U](picker: UnnamedPicker[U], arr: Array[DrawFiles.Readable[U]], cb: (GLInit, U)=>Unit, thread: TextureSurfaceThread) = {
     val adapter = new LazyPicker(this, thread, arr)
     picker.setAdapter(adapter)
     picker.setListener((view: View, pos: Int) => {
@@ -392,24 +409,22 @@ class MainActivity extends Activity with TypedActivity with AndroidImplicits {
   def populatePickers(producer: MotionEventProducer, thread: TextureSurfaceThread, gl: GLInit) = {
     // TODO: maybe make the save thread load from disk and then hand off to the gl thread?
     // also, have it opportunistically load at least up to that point
-    val brushes = DrawFiles.loadBrushes(this).toArray
-    val anims = DrawFiles.loadAnimShaders(this).toArray
-    val paints = DrawFiles.loadPointShaders(this).toArray
-    val interpscripts = DrawFiles.loadScripts(this).toArray
-    val unibrushes = DrawFiles.loadUniBrushes(this).toArray
-    Log.i("main", s"got ${brushes.length} brushes, ${anims.length} anims, ${paints.length} paints, ${interpscripts.length} interpolation scripts")
 
-    MainActivity.this.runOnUiThread(() => {
-      // TODO: make hardcoded shaders accessible a better way
-      val interpLoader = loadInterpolatorSynchronized(thread, producer)
-      populatePicker(controls.brushpicker, brushes, loadBrush(thread), thread)
-      populatePicker(controls.animpicker, anims,  thread.setAnimShader _, thread)
-      populatePicker(controls.paintpicker, paints,  thread.setPointShader _, thread)
-      populatePicker(controls.interppicker, interpscripts,  interpLoader, thread)
-      populatePicker(controls.unipicker, unibrushes, loadUniBrush(thread, producer), thread)
-      controls.copypicker.value = thread.outputShader
-      controls.restoreState()
-    })
+    implicit val ec = saveThread
+    for (drawfiles <- loadedDrawFiles) {
+      MainActivity.this.runOnUiThread(() => {
+        // TODO: make hardcoded shaders accessible a better way
+        val interpLoader = loadInterpolatorSynchronized(thread, producer)
+        Log.i("main", s"got ${drawfiles.brushes.length} brushes, ${drawfiles.anims.length} anims, ${drawfiles.paints.length} paints, ${drawfiles.interpscripts.length} interpolation scripts")
+        populatePicker(controls.brushpicker, drawfiles.brushes, loadBrush(thread), thread)
+        populatePicker(controls.animpicker, drawfiles.anims,  thread.setAnimShader _, thread)
+        populatePicker(controls.paintpicker, drawfiles.paints,  thread.setPointShader _, thread)
+        populatePicker(controls.interppicker, drawfiles.interpscripts,  interpLoader, thread)
+        populatePicker(controls.unipicker, drawfiles.unibrushes, loadUniBrush(thread, producer), thread)
+        controls.copypicker.value = thread.outputShader
+        controls.restoreState()
+      })
+    }
   }
 
   // TODO: fewer callbacks
@@ -505,9 +520,15 @@ class MainActivity extends Activity with TypedActivity with AndroidImplicits {
         thread.getBitmap(b => {
             Future {
               val outfile = new File(getExternalFilesDir(null), new Date().toString() + ".png")
-              for (outstream <- managed(new BufferedOutputStream(new FileOutputStream(outfile)))) {
-                saveBitmapToFile(b, outstream)
+              try {
+
               }
+              val outstream = new BufferedOutputStream(new FileOutputStream(outfile))
+              try {
+                DrawFiles.withCloseable(outstream) {
+                  saveBitmapToFile(b, outstream)
+                }
+              } catch { case _: Exception => { } }
             }(saveThread)
           })
       })
@@ -519,9 +540,7 @@ class MainActivity extends Activity with TypedActivity with AndroidImplicits {
       if (resultCode == Activity.RESULT_OK) {
         val path = FileUtils.getPath(this, data.getData())
         val bitmap = (try {
-          val tmp: Option[Bitmap] = DrawFiles.withFileStream(new File(path))
-          .acquireAndGet(fs => Some(DrawFiles.decodeBitmap(Bitmap.Config.ARGB_8888)(fs)))
-          tmp
+          Some(new DrawFiles.Unread(new DrawFiles.FileSource(new File(path)), DrawFiles.BitmapReader).read().content)
         } catch {
           case e: Exception => None
         })
@@ -724,5 +743,13 @@ object MainActivity {
   abstract class NamedSidebarControl(val name: String) {
     override def toString() = name
     def onClick(pos: Int)
+  }
+
+  class LoadedDrawFiles(c: Context) {
+    val brushes = DrawFiles.loadBrushes(c)
+    val anims = DrawFiles.loadAnimShaders(c)
+    val paints = DrawFiles.loadPointShaders(c)
+    val interpscripts = DrawFiles.loadScripts(c)
+    val unibrushes = DrawFiles.loadUniBrushes(c)
   }
 }

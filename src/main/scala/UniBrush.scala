@@ -1,30 +1,40 @@
 package com.github.wartman4404.gldraw.unibrush
 
-import java.io.{File, IOException, InputStream, ByteArrayOutputStream, ByteArrayInputStream}
+import java.io.{File, IOException, InputStream, ByteArrayOutputStream, ByteArrayInputStream, StringReader}
 import java.util.zip.{ZipEntry, ZipInputStream}
 import android.graphics.Bitmap
 import android.util.Log
+import android.util.JsonReader
 
 import scala.collection.mutable
+import scala.collection.mutable.ArraySeq
 import scala.annotation.tailrec
-
-import spray.json._
 
 import com.github.wartman4404.gldraw._
 
 import GLResultTypeDef._
 
-import scala.collection.mutable.ArraySeq
-
-case class ShaderSource(
+case class ShaderSource (
   fragmentshader: Option[String],
   vertexshader: Option[String]
 ) {
-  def compile[T](data: GLInit, compiler: Shader[T], files: Map[String, Array[Byte]]): GLResult[T] = {
-    val Seq(frag, vert) = for (path <- Seq(fragmentshader, vertexshader)) yield {
-      path.map(x => new String(files.get(x).getOrElse(return UniBrush.logAbort(s"missing shader file ${x}")))).getOrElse(null)
-    }
-    compiler(data, vert, frag)
+  def compile[T](data: GLInit, compiler: Shader[T]): GLResult[T] = {
+    compiler(data, vertexshader.getOrElse(null), fragmentshader.getOrElse(null))
+  }
+}
+
+object ShaderSource {
+
+  def readFromJson(j: JsonReader, files: Map[String, Array[Byte]]) = {
+    var fragmentshader: Option[String] = None
+    var vertexshader: Option[String] = None
+    j.beginObject()
+      while (j.hasNext()) j.nextName() match {
+        case "fragmentshader" => fragmentshader = Some(new String(UniBrush.bytesOrException(j.nextString(), files, "fragment shader")))
+        case "vertexshader" => vertexshader = Some(new String(UniBrush.bytesOrException(j.nextString(), files, "vertex shader")))
+      }
+    j.endObject()
+    ShaderSource(fragmentshader, vertexshader)
   }
 }
 
@@ -34,6 +44,22 @@ case class LayerSource(
   pointsrc: Option[Int]
 )
 
+object LayerSource {
+  def readFromJson(j: JsonReader) = {
+    var pointshader: Option[Int] = None
+    var copyshader: Option[Int] = None
+    var pointsrc: Option[Int] = None
+    j.beginObject()
+      while (j.hasNext()) j.nextName() match {
+        case "pointshader" => pointshader = Some(j.nextInt())
+        case "copyshader" => copyshader = Some(j.nextInt())
+        case "pointsrc" => pointsrc = Some(j.nextInt())
+      }
+    j.endObject()
+    LayerSource(pointshader, copyshader, pointsrc)
+  }
+}
+
 case class Layer(
   pointshader: PointShader,
   copyshader: CopyShader,
@@ -41,15 +67,51 @@ case class Layer(
 )
 
 case class UniBrushSource (
-  brushpath: Option[String],
-  pointshaders: Option[Array[ShaderSource]],
-  animshaders: Option[Array[ShaderSource]],
+  brush: Option[Bitmap],
+  pointshaders: Array[ShaderSource],
+  animshaders: Array[ShaderSource],
   basepointshader: Option[ShaderSource],
   baseanimshader: Option[ShaderSource],
   basecopyshader: Option[ShaderSource],
   interpolator: Option[String],
-  layers: Option[Array[LayerSource]]
+  layers: Array[LayerSource]
 )
+object UniBrushSource extends AndroidImplicits {
+  def readFromJson(j: JsonReader, sourceFiles: Map[String, Array[Byte]]) = {
+    var brush: Option[Bitmap] = None
+    var pointshaders: Array[ShaderSource] = Array()
+    var animshaders: Array[ShaderSource] = Array()
+    var basepointshader: Option[ShaderSource] = None
+    var baseanimshader: Option[ShaderSource] = None
+    var basecopyshader: Option[ShaderSource] = None
+    var interpolator: Option[String] = None
+    var layers: Array[LayerSource] = Array()
+    j.beginObject()
+      while (j.hasNext()) j.nextName() match {
+        case "brushpath" => {
+          val brushpath = j.nextString()
+          val stream = sourceFiles.get(brushpath)
+            .map(new ByteArrayInputStream(_))
+            .getOrElse(UniBrush.logAbort(s"unable to load bitmap in unibrush: ${brushpath}"))
+          brush = Some(DrawFiles.BitmapReader.readSource(stream))
+        }
+        case "pointshaders" => pointshaders = j.readArray(j2 => ShaderSource.readFromJson(j2, sourceFiles)).toArray
+        case "animshaders" => animshaders = j.readArray(j2 => ShaderSource.readFromJson(j2, sourceFiles)).toArray
+        case "basepointshader" => basepointshader = Some(ShaderSource.readFromJson(j, sourceFiles))
+        case "baseanimshader" => baseanimshader = Some(ShaderSource.readFromJson(j, sourceFiles))
+        case "basecopyshader" => basecopyshader = Some(ShaderSource.readFromJson(j, sourceFiles))
+        case "interpolator" => interpolator = Some(new String(UniBrush.bytesOrException(j.nextString(), sourceFiles, "lua script")))
+        case "layers" => layers = j.readArray(LayerSource.readFromJson).toArray
+      }
+    j.endObject()
+    for (layer <- layers) {
+      for (ps <- layer.pointshader) { if (ps < 0 || ps >= pointshaders.length) UniBrush.logAbort(s"no point shader numbered ${ps}") }
+      for (cs <- layer.pointshader) { if (cs < 0 || cs >= pointshaders.length) UniBrush.logAbort(s"no point shader numbered ${cs}") }
+    }
+    UniBrushSource(brush, pointshaders, animshaders, basepointshader,
+      baseanimshader, basecopyshader, interpolator, layers)
+  }
+}
 
 case class UniBrush(
   brush: Option[Texture],
@@ -59,10 +121,14 @@ case class UniBrush(
   interpolator: Option[LuaScript],
   layers: Array[Layer])
 
-object UniBrush extends AutoProductFormat {
+object UniBrush {
   def logAbort[T](s: String): GLResult[T] = {
     Log.e("unibrush", s"failed to load: ${s}")
     throw new GLException(s)
+  }
+
+  def bytesOrException(s: String, files: Map[String, Array[Byte]], filetype: String) = {
+    files.get(s).getOrElse(UniBrush.logAbort(s"missing ${filetype} file '${s}'"))
   }
 
   // iterator to unzip everything into memory
@@ -99,66 +165,54 @@ object UniBrush extends AutoProductFormat {
     }
   }
 
-  def compileFromStream(data: GLInit, sourceZip: InputStream): GLResult[UniBrush] = {
+  def readFromStream(sourceZip: InputStream): UniBrushSource = {
     Log.i("unibrush", "loading unibrush")
     try {
       val files = new ZipInputStream(sourceZip)
         .map { case (entry, bytes) => (entry.getName(), bytes) }
         .toMap
-      val brushjson = files.get("brush.json").getOrElse(return logAbort("unable to find brush.json"))
+      val brushjson = files.get("brush.json").getOrElse(logAbort("unable to find brush.json"))
       Log.i("unibrush", "got brush.json")
-      compile(data, new String(brushjson).parseJson.convertTo[UniBrushSource], files)
+      val brushjsonreader = new JsonReader(new StringReader(new String(brushjson)))
+      UniBrushSource.readFromJson(brushjsonreader, files)
     } catch {
-      case e: DeserializationException => {
-        logAbort(s"unable to parse brush.json: ${e}")
-      }
       case e: IOException => logAbort(s"Error reading unibrush ${e}")
+      case e: Exception => logAbort(s"Other exception ${e}")
+    }
+  }
+
+  def compileFromSource(data: GLInit, source: UniBrushSource): GLResult[UniBrush] = {
+    try {
+      Log.i("unibrush", "compiling unibrush")
+      compile(data, source)
+    } catch {
       case e: GLException => logAbort(s"Error in unibrush files ${e}")
       case e: Exception => logAbort(s"Other exception ${e}")
     }
   }
 
-  def compileShaders[T](data: GLInit, shaders: Option[Array[ShaderSource]], compiler: Shader[T], files: Map[String, Array[Byte]]): GLResult[ArraySeq[T]] = {
-    shaders.getOrElse(Array.empty).map(x => x.compile(data, compiler, files))
+  def compileShaders[T](data: GLInit, shaders: Array[ShaderSource], compiler: Shader[T]): GLResult[ArraySeq[T]] = {
+    shaders.map(x => x.compile(data, compiler))
   }
 
-  def getLayers(data: GLInit, pointshaders: Array[PointShader], copyshaders: Array[CopyShader], layers: Option[Array[LayerSource]]): GLResult[Array[Layer]] = {
-    layers.getOrElse(Array.empty).map(l => {
-      val point = l.pointshader.map(x => pointshaders.lift(x).getOrElse(logAbort(s"no point shader numbered ${x}"))).getOrElse(PointShader(data, null, null))
-      val copy = l.copyshader.map(x => copyshaders.lift(x).getOrElse(logAbort(s"no copy shader numbered ${x}"))).getOrElse(CopyShader(data, null, null))
+  def getLayers(data: GLInit, pointshaders: Array[PointShader], copyshaders: Array[CopyShader], layers: Array[LayerSource]): GLResult[Array[Layer]] = {
+    layers.map(l => {
+      val point = l.pointshader.map(x => pointshaders(x)).getOrElse(PointShader(data, null, null))
+      val copy = l.copyshader.map(x => copyshaders(x)).getOrElse(CopyShader(data, null, null))
       val idx = l.pointsrc.getOrElse(0)
       Layer(point, copy, idx)
     })
   }
 
-  def flipoption[T,U,V](opt: Option[T], cb: (T)=>Either[U,V]): Either[U,Option[V]] = {
-    opt match {
-      case None => Right(None)
-      case Some(x) => cb(x) match {
-        case Left(y) => Left(y)
-        case Right(z) => Right(Some(z))
-      }
-    }
-  }
-
-
-  def compile(data: GLInit, s: UniBrushSource, files: Map[String, Array[Byte]]): GLResult[UniBrush] = {
+  def compile(data: GLInit, s: UniBrushSource): GLResult[UniBrush] = {
     Log.i("unibrush", "compiling unibrush");
-    val brush = s.brushpath.map(bp => {
-        val stream = (files.get(bp)
-        .map(new ByteArrayInputStream(_))
-        .getOrElse(logAbort(s"unable to load bitmap in unibrush: ${bp}")))
-        Texture(data, DrawFiles.decodeBitmap(Bitmap.Config.ALPHA_8)(stream))
-    })
-    val pointshaders: GLResult[ArraySeq[PointShader]] = compileShaders(data, s.pointshaders, PointShader, files)
-    val copyshaders = compileShaders(data, s.animshaders, CopyShader, files)
-    val baseanimshader = s.baseanimshader.map(_.compile(data, CopyShader, files))
-    val basecopyshader = s.basecopyshader.map(_.compile(data, CopyShader, files))
-    val basepointshader = s.basepointshader.map(_.compile(data, PointShader, files))
-    val interpolator = s.interpolator.map(path => {
-      val luastring = files.get(path).getOrElse(logAbort(s"missing interpolator file ${path}"))
-      LuaScript(data, new String(luastring))
-    })
+    val brush = s.brush.map(Texture(data, _))
+    val pointshaders: GLResult[ArraySeq[PointShader]] = compileShaders(data, s.pointshaders, PointShader)
+    val copyshaders = compileShaders(data, s.animshaders, CopyShader)
+    val baseanimshader = s.baseanimshader.map(_.compile(data, CopyShader))
+    val basecopyshader = s.basecopyshader.map(_.compile(data, CopyShader))
+    val basepointshader = s.basepointshader.map(_.compile(data, PointShader))
+    val interpolator = s.interpolator.map(LuaScript(data, _))
     val layers = getLayers(data, pointshaders.toArray, copyshaders.toArray, s.layers)
     Log.i("unibrush", s"have interpolator: ${interpolator.nonEmpty}");
     Log.i("unibrush", s"have pointshader: ${basepointshader.nonEmpty}");

@@ -5,18 +5,19 @@ import android.content.Context
 import android.view.View
 import android.widget.{AdapterView, Adapter, GridView, ListAdapter}
 import android.util.Log
+import android.graphics.Bitmap
 
 import java.io.{InputStream, OutputStream, OutputStreamWriter, BufferedWriter}
 
-import unibrush.UniBrush
+import unibrush.{UniBrush, UniBrushSource}
 
-import spray.json._
 import PaintControls._
 import GLResultTypeDef._
+import java.io.{StringReader, StringWriter}
+import android.util.{JsonReader, JsonWriter}
 
 class PaintControls
-  (val animpicker: UP[CopyShader], val brushpicker: UP[Texture], val paintpicker: UP[PointShader], val interppicker: UP[LuaScript], val unipicker: UP[UniBrush], val copypicker: UUP[CopyShader], val sidebar: FIP) 
-extends AutoProductFormat {
+  (val animpicker: UP[CopyShader], val brushpicker: UP[Texture], val paintpicker: UP[PointShader], val interppicker: UP[LuaScript], val unipicker: UP[UniBrush], val copypicker: UUP[CopyShader], val sidebar: FIP) {
 
   val namedPickers = Map(
     "anim" -> animpicker,
@@ -31,13 +32,24 @@ extends AutoProductFormat {
   def restoreState() = namedPickers.values.foreach(_.restoreState())
   def updateState() = namedPickers.values.foreach(_.updateState())
   def saveToString(): String = {
-    namedPickers.map({case (k,v) => (k, v.save())}).toJson.toString
+    val writer = new StringWriter()
+    val j = new JsonWriter(writer)
+    j.beginObject()
+    for ((k, v) <- namedPickers) {
+      j.name(k)
+      v.save(j)
+    }
+    writer.close()
+    writer.toString()
   }
   def loadFromString(s: String) = {
-    val saved = s.parseJson.convertTo[Map[String, JsValue]]
-    for ((name, state) <- saved) {
-      namedPickers(name).load(state)
+    val reader = new JsonReader(new StringReader(s))
+    reader.beginObject()
+    while (reader.hasNext()) {
+      namedPickers(reader.nextName()).load(reader)
     }
+    reader.endObject()
+    reader.close()
   }
   def save(b: Bundle): Unit = b.putString("paintcontrols", saveToString())
   def load(b: Bundle): Unit = loadFromString(b.getString("paintcontrols"))
@@ -53,7 +65,7 @@ extends AutoProductFormat {
 }
 object PaintControls extends AndroidImplicits {
   type LAV = AdapterView[ListAdapter]
-  type UP[T] = UnnamedPicker[T]
+  type UP[U] = UnnamedPicker[U]
   type UUP[T] = UnnamedUnpicker[T]
   type FIP = FixedIndexPicker
   def apply
@@ -69,8 +81,8 @@ object PaintControls extends AndroidImplicits {
   }
 
   trait SavedControl {
-    def save(): JsValue
-    def load(j: JsValue): Unit
+    def save(j: JsonWriter): Unit
+    def load(j: JsonReader): Unit
     def restoreState() { }
     def updateState() { }
   }
@@ -91,21 +103,22 @@ object PaintControls extends AndroidImplicits {
     def currentValue(gl: GLInit): GLStoredResult[T]
   }
 
-  class UnnamedPicker[T](override val control: AdapterView[ListAdapter]) extends SavedControl with GLControl[T] with SelectedListener with AutoProductFormat {
-    type U = AdapterView[LazyPicker[T]]
-    override def currentValue(gl: GLInit): GLStoredResult[T] = {
-      Log.i("picker", s"getting value at idx ${selected}: '${adapter.lazified(selected)._1}'")
+  class UnnamedPicker[V](override val control: AdapterView[ListAdapter]) extends SavedControl with GLControl[V] with SelectedListener {
+    type LP = LazyPicker[V]
+    type U = AdapterView[LP]
+    override def currentValue(gl: GLInit): GLStoredResult[V] = {
+      Log.i("picker", s"getting value at idx ${selected}: '${adapter.lazified(selected).name}'")
       adapter.getState(selected, gl)
     }
     var selectedName = ""
-    private var adapter: LazyPicker[T] = null
-    def setAdapter(a: LazyPicker[T]) = {
+    private var adapter: LP = null
+    def setAdapter(a: LP) = {
       adapter = a
       control.setAdapter(a)
     }
     override def restoreState(): Unit = {
       Log.i("picker", "restoring unnamedpicker state")
-      selected = this.adapter.lazified.indexWhere(_._1 == selectedName) match {
+      selected = this.adapter.lazified.indexWhere(_.name == selectedName) match {
         case -1 => 0
         case  x => x
       }
@@ -113,29 +126,37 @@ object PaintControls extends AndroidImplicits {
     }
     override def updateState() = selectedName = selected match {
       case AdapterView.INVALID_POSITION => ""
-      case x => adapter.lazified(x)._1
+      case x => adapter.lazified(x).name
     }
-    override def save() = SavedState(enabled, selectedName).toJson
-    override def load(j: JsValue) = {
-      val state = j.convertTo[SavedState]
-      enabled = state.enabled
-      selectedName = state.selectedName
+    override def save(j: JsonWriter) = {
+      j.beginObject()
+        j.name("enabled").value(enabled)
+        j.name("selectedName").value(selectedName)
+      j.endObject()
+    }
+    override def load(j: JsonReader) = {
+      j.beginObject()
+        while (j.hasNext()) j.nextName() match {
+          case "enabled" => enabled = j.nextBoolean()
+          case "selectedName" => selectedName = j.nextString()
+        }
+      j.endObject()
     }
   }
 
-  class FixedIndexPicker(override val control: AdapterView[ListAdapter]) extends SavedControl with SelectedListener with AutoProductFormat {
+  class FixedIndexPicker(override val control: AdapterView[ListAdapter]) extends SavedControl with SelectedListener {
     override def restoreState(): Unit = {
       Log.i("picker", s"clicking ${selected} in sidebar")
       this.control.performItemClick(null, selected, selected)
     }
     override def updateState() = { }
-    override def save() = selected.toJson
-    override def load(j: JsValue) = { selected = j.convertTo[Int] }
+    override def save(j: JsonWriter) = j.value(selected)
+    override def load(j: JsonReader) = { selected = j.nextInt() }
   }
 
-  class UnnamedUnpicker[T](var value: Option[T] = None) extends SavedControl with GLControl[T] with AutoProductFormat {
-    override def save() = enabled.toJson
-    override def load(j: JsValue) = enabled = j.convertTo[Boolean]
+  class UnnamedUnpicker[T](var value: Option[T] = None) extends SavedControl with GLControl[T] {
+    override def save(j: JsonWriter) = j.value(enabled)
+    override def load(j: JsonReader) = { enabled = j.nextBoolean() }
     override def currentValue(gl: GLInit): GLStoredResult[T] = {
       Log.i("picker", "getting unpicker value")
       value.getOrElse(throw new GLException("No value present?"))
@@ -145,8 +166,6 @@ object PaintControls extends AndroidImplicits {
       }
     }
   }
-
-  case class SavedState(enabled: Boolean, selectedName: String)
 
   implicit class AdapterSeq(a: Adapter) extends IndexedSeq[Object] {
     def length = a.getCount()

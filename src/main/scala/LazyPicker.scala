@@ -4,13 +4,15 @@ import android.widget._
 import android.content.Context
 import GLResultTypeDef._
 
-class LazyPicker[T](context: Context, thread: TextureSurfaceThread, content: Seq[(String, (GLInit)=>GLResult[T])]) extends BaseAdapter {
+import DrawFiles.Readable
+
+class LazyPicker[U](context: Context, thread: TextureSurfaceThread, content: Array[Readable[U]]) extends BaseAdapter {
   val inflater = LayoutInflater.from(context)
-  val lazified: Seq[(String, LoadedState[T])] = content.map { case (k, v) => (k, new LoadedState(v)) }
+  val lazified = content
   case class Holder(nameView: TextView)
 
   override def areAllItemsEnabled = false
-  override def isEnabled(pos: Int) = lazified(pos)._2.isNotFailed
+  override def isEnabled(pos: Int) = lazified(pos).isNotFailed
   override def getCount = lazified.size
   override def getViewTypeCount() = 1
   override def getItem(pos: Int) = lazified(pos)
@@ -29,37 +31,13 @@ class LazyPicker[T](context: Context, thread: TextureSurfaceThread, content: Seq
       holder = view.getTag().asInstanceOf[Holder]
     }
     val nameview = holder.nameView
-    nameview.setText(item._1)
-    val ok = item._2.isNotFailed
+    nameview.setText(item.name)
+    val ok = item.isNotFailed
     nameview.setEnabled(ok)
     view.setEnabled(ok)
     //view.setBackgroundColor(if ok 0xffff0000 else 0x00000000);
     view
   }
 
-  def getState(pos: Int, gl: GLInit) = lazified(pos)._2.get(gl)
-
-  class LoadedState[T](var loader: (GLInit)=>GLResult[T]) {
-    def get(gl: GLInit): GLStoredResult[T] = {
-      cachedValue match {
-        case None => {
-          val value = (
-          try {
-            Right(loader(gl))
-          } catch {
-            case e: GLException => Left(e.getMessage())
-          })
-          cachedValue = Some(value)
-          value
-        }
-        case Some(value) => value
-      }
-    }
-    private var cachedValue: Option[GLStoredResult[T]] = None
-
-    def isNotFailed = cachedValue match {
-      case None => true
-      case Some(x) => x.isRight
-    }
-  }
+  def getState(pos: Int, gl: GLInit) = lazified(pos).compileSafe(gl)
 }
