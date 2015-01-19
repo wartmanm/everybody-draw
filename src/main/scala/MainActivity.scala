@@ -8,6 +8,7 @@ import android.view._
 import android.graphics.{SurfaceTexture, Bitmap}
 import android.content.{Context, Intent}
 import android.content.res.Configuration
+import android.app.AlertDialog
 
 import java.io.{BufferedInputStream}
 import java.io.{OutputStream, FileOutputStream, BufferedOutputStream}
@@ -217,6 +218,8 @@ class MainActivity extends Activity with TypedActivity with AndroidImplicits {
       case R.id.menu_load => loadFile()
       case R.id.menu_replay => startReplay()
       case R.id.menu_clear => textureThread.foreach(_.clearScreen())
+      case R.id.menu_credits => Toast.makeText(this, "Soon.", Toast.LENGTH_LONG).show()
+      case R.id.menu_debug => showDebugMessagebox()
       case _ => return super.onOptionsItemSelected(item)
     }
     true
@@ -559,6 +562,34 @@ class MainActivity extends Activity with TypedActivity with AndroidImplicits {
   def hideControls() = {
     controlflipper.setVisibility(View.INVISIBLE)
     drawerParent.closeDrawer(sidebar)
+  }
+
+  def showDebugMessagebox() {
+    for (thread <- textureThread) thread.withGL(gl => {
+       def getSource[T,U](gl: GLInit, control: GLControl[T], cb: (GLInit, T)=>U, default: U) = {
+         control.currentValue(gl).right.toOption.map(cb(gl, _)).getOrElse(default)
+       }
+       val animdebug = getSource(gl, controls.animpicker, CopyShader.getSource, ("", ""))
+       val copydebug = getSource(gl, controls.copypicker, CopyShader.getSource, ("", ""))
+       val paintdebug = getSource(gl, controls.paintpicker, PointShader.getSource, ("", ""))
+       val interpdebug = getSource(gl, controls.interppicker, LuaScript.getSource, "")
+
+       val strs = Array(
+         animdebug._1 + "\n\n" + animdebug._2,
+         copydebug._1 + "\n\n" + copydebug._2,
+         paintdebug._1 + "\n\n" + paintdebug._2,
+         interpdebug)
+       MainActivity.this.runOnUiThread(() => {
+         val text = new TextView(this)
+         text.setText(strs.mkString("-------"))
+         new AlertDialog.Builder(this)
+         .setView(text)
+         .setTitle("debug")
+         .setPositiveButton("Done", () => {})
+         .show()
+         ()
+       })
+    })
   }
 
   class SidebarAdapter() extends BaseAdapter {

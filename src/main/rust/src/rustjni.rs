@@ -5,6 +5,7 @@ use core::raw;
 use alloc::boxed::Box;
 use libc::{c_void, c_char};
 use collections::string::String;
+use collections::str::{MaybeOwned, IntoMaybeOwned};
 use collections::vec::Vec;
 
 use jni::{jobject, jclass, jfieldID, jmethodID, JNIEnv, jint, jfloat, jstring, jboolean, jfloatArray, JNINativeMethod, JavaVM};
@@ -13,7 +14,7 @@ use android::bitmap::{AndroidBitmap_getInfo, AndroidBitmap_lockPixels, AndroidBi
 use android::bitmap::{ANDROID_BITMAP_FORMAT_RGBA_8888, ANDROID_BITMAP_FORMAT_A_8};
 use android::native_window_jni::{ANativeWindow_fromSurface};//, ANativeWindow_release};
 use android::native_window::ANativeWindow_release;
-use glcommon::GLResult;
+use glcommon::{GLResult, MString};
 
 use log::{logi, loge};
 
@@ -26,7 +27,7 @@ use jni_constants::*;
 use drawevent::Events;
 use drawevent::event_stream::EventStream;
 use gltexture::ToPixelFormat;
-use gltexture::Texture;
+use gltexture::{Texture, BrushTexture};
 use redirect_stderr;
 use redirect_stderr::Struct_stdout_forwarder;
 
@@ -236,10 +237,10 @@ unsafe extern "C" fn set_point_shader(_: *mut JNIEnv, _: jobject, data: jint, sh
 unsafe extern "C" fn set_brush_texture(_: *mut JNIEnv, _: jobject, data: jint, texture: jint) {
     let data = get_safe_data(data);
     let brush = data.events.use_brush(mem::transmute(texture));
-    data.glinit.set_brush_texture(brush);
+    data.glinit.set_brush_texture(&brush.texture);
 }
 
-unsafe fn safe_create_texture(env: *mut JNIEnv, data: jint, bitmap: jobject) -> GLResult<DrawObjectIndex<Texture>> {
+unsafe fn safe_create_texture(env: *mut JNIEnv, data: jint, bitmap: jobject) -> GLResult<DrawObjectIndex<BrushTexture>> {
     let bitmap = AndroidBitmap::from_jobject(env, bitmap);
     let (w, h) = (bitmap.info.width, bitmap.info.height);
     let format: AndroidBitmapFormat = mem::transmute(bitmap.info.format);
@@ -257,23 +258,14 @@ unsafe extern "C" fn clear_framebuffer(_: *mut JNIEnv, _: jobject, data: jint) {
     data.glinit.clear_buffer();
 }
 
-unsafe fn get_string(env: *mut JNIEnv, string: jstring) -> Option<String> {
-    match string.as_mut() {
-        Some(string) => {
-            let chars = ((**env).GetStringChars)(env, string, ptr::null_mut()).as_ref();
-            match chars {
-                Some(c) => {
-                    let len = ((**env).GetStringLength)(env, string);
-                    let strslice: &[u16] = mem::transmute(raw::Slice { data: c, len: len as uint });
-                    let ruststr = String::from_utf16(strslice);
-                    ((**env).ReleaseStringChars)(env, string as jstring, strslice.as_ptr());
-                    ruststr
-                },
-                None => None,
-            }
-        },
-        None => None,
-    }
+unsafe fn get_string(env: *mut JNIEnv, string: jstring) -> Option<MString> {
+    let string = try_opt!(string.as_mut());
+    let c = try_opt!(((**env).GetStringChars)(env, string, ptr::null_mut()).as_ref());
+    let len = ((**env).GetStringLength)(env, string);
+    let strslice: &[u16] = mem::transmute(raw::Slice { data: c, len: len as uint });
+    let ruststr = String::from_utf16(strslice);
+    ((**env).ReleaseStringChars)(env, string as jstring, strslice.as_ptr());
+    Some(try_opt!(ruststr).into_maybe_owned())
 }
 
 unsafe extern "C" fn compile_copyshader(env: *mut JNIEnv, _: jobject, data: i32, vec: jstring, frag: jstring) -> jint {
@@ -427,6 +419,40 @@ unsafe extern "C" fn jni_set_brush_size(_: *mut JNIEnv, _: jobject, data: jint, 
     get_safe_data(data).glinit.set_brush_size(size);
 }
 
+unsafe fn get_shader_source_tuple(env: *mut JNIEnv, source: &(MString, MString)) -> jobject {
+    let &(ref vert, ref frag) = source;
+    let tuple2 = ((**env).FindClass)(env, cstr!("scala/Tuple2"));
+    logi!("found tuple2 class: {}", tuple2);
+    let tuple2_init = ((**env).GetMethodID)(env, tuple2, cstr!("<init>"), cstr!("(Ljava/lang/Object;Ljava/lang/Object;)V"));
+    logi!("got tuple2 init: {}", tuple2_init);
+    let jvert = str_to_jstring(env, vert.as_slice());
+    let jfrag = str_to_jstring(env, frag.as_slice());
+    logi!("converted to jstring");
+    ((**env).NewObject)(env, tuple2, tuple2_init, jvert, jfrag)
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn jni_get_copyshader_source(env: *mut JNIEnv, _: jobject, data: jint, copyshader: jint) -> jobject {
+    logi!("getting copyshader source");
+    let source = get_safe_data(data).events.get_copyshader_source(mem::transmute(copyshader));
+    logi!("got copyshader source");
+    let tuple = get_shader_source_tuple(env, source);
+    logi!("created tuple");
+    tuple
+}
+
+unsafe extern "C" fn jni_get_pointshader_source(env: *mut JNIEnv, _: jobject, data: jint, pointshader: jint) -> jobject {
+    logi!("getting pointshader source");
+    let source = get_safe_data(data).events.get_pointshader_source(mem::transmute(pointshader));
+    get_shader_source_tuple(env, source)
+}
+
+unsafe extern "C" fn jni_get_luascript_source(env: *mut JNIEnv, _: jobject, data: jint, luascript: jint) -> jstring {
+    logi!("getting luascript source");
+    let source = get_safe_data(data).events.get_luascript_source(mem::transmute(luascript));
+    str_to_jstring(env, source.as_slice())
+}
+
 unsafe fn register_classmethods(env: *mut JNIEnv, classname: *const i8, methods: &[JNINativeMethod]) {
     let class = ((**env).FindClass)(env, classname);
     ((**env).RegisterNatives)(env, class, methods.as_ptr(), methods.len() as i32);
@@ -498,9 +524,11 @@ pub unsafe extern "C" fn JNI_OnLoad(vm: *mut JavaVM, reserved: *mut c_void) -> j
 
     let pointshaderstaticmethods = [
         native_method!("compile", "(ILjava/lang/String;Ljava/lang/String;)I", compile_pointshader),
+        native_method!("getSource", "(II)Lscala/Tuple2;", jni_get_pointshader_source),
     ];
     let copyshaderstaticmethods = [
         native_method!("compile", "(ILjava/lang/String;Ljava/lang/String;)I", compile_copyshader),
+        native_method!("getSource", "(II)Lscala/Tuple2;", jni_get_copyshader_source),
     ];
     let texturestaticmethods = [
         native_method!("init", "(ILandroid/graphics/Bitmap;)I", create_texture),
@@ -519,6 +547,7 @@ pub unsafe extern "C" fn JNI_OnLoad(vm: *mut JavaVM, reserved: *mut c_void) -> j
 
     let luastaticmethods = [
         native_method!("init", "(ILjava/lang/String;)I", jni_lua_compile_script),
+        native_method!("getSource", "(II)Ljava/lang/String;", jni_get_luascript_source),
     ];
     register_classmethods(env, cstr!("com/github/wartman4404/gldraw/LuaScript$"), luastaticmethods);
     logi!("registered lua methods!");

@@ -22,7 +22,6 @@ static mut GLDRAW_LUA_STOPFNS: *mut c_void = 0 as *mut c_void;
 static mut gldraw_lua_key: i32 = 0;
 static LUA_FFI_SCRIPT: &'static str = include_str!("../includes/lua/ffi_loader.lua");
 static LUA_RUNNER: &'static str = include_str!("../includes/lua/lua_runner.lua");
-static DEFAULT_SCRIPT: &'static str = include_str!("../includes/lua/default_interpolator.lua");
 
 static mut STATIC_LUA: Option<*mut lua_State> = None;
 
@@ -215,13 +214,12 @@ unsafe fn save_ondone(L: *mut lua_State, key: i32, sandbox: LuaValue) -> GLResul
     }
 }
 
-pub unsafe fn load_lua_script(script: Option<&str>) -> GLResult<i32> {
+pub unsafe fn load_lua_script(script: &str) -> GLResult<i32> {
     let L = try!(get_lua());
     logi!("got lua");
     let stacksize = lua_gettop(L);
 
     let key = (&gldraw_lua_key) as *const i32 as i32 + gldraw_lua_key;
-    let script = script.unwrap_or(DEFAULT_SCRIPT);
 
     create_sandbox(L); {
         let sandbox_idx = IndexValue(lua_gettop(L));
