@@ -7,7 +7,7 @@ use libc::{c_void, c_char};
 use collections::string::String;
 use collections::vec::Vec;
 
-use jni::{jobject, jclass, jfieldID, jmethodID, JNIEnv, jint, jstring, jboolean, jfloatArray, JNINativeMethod, JavaVM};
+use jni::{jobject, jclass, jfieldID, jmethodID, JNIEnv, jint, jfloat, jstring, jboolean, jfloatArray, JNINativeMethod, JavaVM};
 use android::input::AInputEvent;
 use android::bitmap::{AndroidBitmap_getInfo, AndroidBitmap_lockPixels, AndroidBitmap_unlockPixels, AndroidBitmapInfo};
 use android::bitmap::{ANDROID_BITMAP_FORMAT_RGBA_8888, ANDROID_BITMAP_FORMAT_A_8};
@@ -68,9 +68,10 @@ impl CaseClass {
     }
 }
 
-static mut SCALA_LEFT: CaseClass = CaseClass { constructor: 0 as jmethodID, class: 0 as jclass };
-static mut SCALA_RIGHT: CaseClass = CaseClass { constructor: 0 as jmethodID, class: 0 as jclass };
-static mut BOXED_JINT: CaseClass = CaseClass { constructor: 0 as jmethodID, class: 0 as jclass };
+//static mut GL_EXCEPTION: CaseClass = CaseClass { constructor: 0 as jmethodID, class: 0 as jclass };
+//static mut SCALA_LEFT: CaseClass = CaseClass { constructor: 0 as jmethodID, class: 0 as jclass };
+//static mut SCALA_RIGHT: CaseClass = CaseClass { constructor: 0 as jmethodID, class: 0 as jclass };
+//static mut BOXED_JINT: CaseClass = CaseClass { constructor: 0 as jmethodID, class: 0 as jclass };
 
 struct JNIUndoCallback {
     callback_obj: jobject,
@@ -111,21 +112,17 @@ impl JNIUndoCallback {
     }
 }
 
-unsafe fn glresult_to_either<T>(env: *mut JNIEnv, result: GLResult<DrawObjectIndex<T>>) -> jobject {
-    logi!("in glresult_to_either");
+unsafe fn glresult_or_exception<T>(env: *mut JNIEnv, result: GLResult<DrawObjectIndex<T>>) -> jint {
+    logi!("in glresult_or_exception");
     match result {
         Err(msg) => {
-            logi!("creating scala.util.Left for message: \"{}\"", msg);
-            let jmsg = str_to_jstring(env, msg.as_slice());
-            SCALA_LEFT.construct(env, jmsg)
+            let glerr_class = ((**env).FindClass)(env, cstr!("com/github/wartman4404/gldraw/GLException"));
+            let glerr_init = ((**env).GetMethodID)(env, glerr_class, cstr!("<init>"), cstr!("(Ljava/lang/String;)V"));
+            let err = ((**env).NewObject)(env, glerr_class, glerr_init, str_to_jstring(env, msg.as_slice()));
+            ((**env).Throw)(env, err);
+            0
         },
-        Ok(idx) => {
-            let idx: jint = mem::transmute(idx);
-            logi!("creating scala.util.Right for drawobjectindex {}", idx);
-            let boxedidx = BOXED_JINT.construct(env, idx);
-            let result = SCALA_RIGHT.construct(env, boxedidx);
-            result
-        }
+        Ok(idx) => mem::transmute(idx),
     }
 }
 
@@ -246,8 +243,8 @@ unsafe fn safe_create_texture(env: *mut JNIEnv, data: jint, bitmap: jobject) -> 
     Ok(get_safe_data(data).events.load_brush(w as i32, h as i32, bitmap.as_slice(), texformat))
 }
 
-unsafe extern "C" fn create_texture(env: *mut JNIEnv, _: jobject, data: jint, bitmap: jobject) -> jobject {
-    glresult_to_either(env, safe_create_texture(env, data, bitmap))
+unsafe extern "C" fn create_texture(env: *mut JNIEnv, _: jobject, data: jint, bitmap: jobject) -> jint {
+    glresult_or_exception(env, safe_create_texture(env, data, bitmap))
 }
 
 unsafe extern "C" fn clear_framebuffer(_: *mut JNIEnv, _: jobject, data: jint) {
@@ -275,12 +272,12 @@ unsafe fn get_string(env: *mut JNIEnv, string: jstring) -> Option<String> {
     }
 }
 
-unsafe extern "C" fn compile_copyshader(env: *mut JNIEnv, _: jobject, data: i32, vec: jstring, frag: jstring) -> jobject {
-    glresult_to_either(env, get_safe_data(data).events.load_copyshader(get_string(env, vec), get_string(env, frag)))
+unsafe extern "C" fn compile_copyshader(env: *mut JNIEnv, _: jobject, data: i32, vec: jstring, frag: jstring) -> jint {
+    glresult_or_exception(env, get_safe_data(data).events.load_copyshader(get_string(env, vec), get_string(env, frag)))
 }
 
-unsafe extern "C" fn compile_pointshader(env: *mut JNIEnv, _: jobject, data: i32, vec: jstring, frag: jstring) -> jobject {
-    glresult_to_either(env, get_safe_data(data).events.load_pointshader(get_string(env, vec), get_string(env, frag)))
+unsafe extern "C" fn compile_pointshader(env: *mut JNIEnv, _: jobject, data: i32, vec: jstring, frag: jstring) -> jint {
+    glresult_or_exception(env, get_safe_data(data).events.load_pointshader(get_string(env, vec), get_string(env, frag)))
 }
 
 unsafe extern "C" fn draw_image(env: *mut JNIEnv, _: jobject, data: i32, bitmap: jobject) {
@@ -364,9 +361,9 @@ unsafe extern "C" fn jni_egl_init(env: *mut JNIEnv, _: jobject, surface: jobject
     ANativeWindow_release(window);
 }
 
-unsafe extern "C" fn jni_lua_compile_script(env: *mut JNIEnv, _: jobject, data: i32, script: jstring) -> jobject {
+unsafe extern "C" fn jni_lua_compile_script(env: *mut JNIEnv, _: jobject, data: i32, script: jstring) -> jint {
     let scriptstr = get_string(env, script);
-    glresult_to_either(env, get_safe_data(data).events.load_interpolator(scriptstr))
+    glresult_or_exception(env, get_safe_data(data).events.load_interpolator(scriptstr))
 }
 
 unsafe extern "C" fn jni_lua_set_interpolator(_: *mut JNIEnv, _: jobject, data: jint, scriptid: jint) {
@@ -418,6 +415,14 @@ unsafe extern "C" fn jni_load_undo(_: *mut JNIEnv, _: jobject, data: jint, idx: 
     data.glinit.load_undo_frame(idx);
 }
 
+unsafe extern "C" fn jni_set_brush_color(_: *mut JNIEnv, _: jobject, data: jint, color: jint) {
+    get_safe_data(data).glinit.set_brush_color(color);
+}
+
+unsafe extern "C" fn jni_set_brush_size(_: *mut JNIEnv, _: jobject, data: jint, size: jfloat) {
+    get_safe_data(data).glinit.set_brush_size(size);
+}
+
 unsafe fn register_classmethods(env: *mut JNIEnv, classname: *const i8, methods: &[JNINativeMethod]) {
     let class = ((**env).FindClass)(env, classname);
     ((**env).RegisterNatives)(env, class, methods.as_ptr(), methods.len() as i32);
@@ -436,9 +441,9 @@ pub unsafe extern "C" fn JNI_OnLoad(vm: *mut JavaVM, reserved: *mut c_void) -> j
     MOTION_CLASS = ((**env).FindClass)(env, cstr!("android/view/MotionEvent"));
     MOTIONEVENT_NATIVE_PTR_FIELD = ((**env).GetFieldID)(env, MOTION_CLASS, cstr!("mNativePtr"), cstr!("I"));
     logi!("got motion classes");
-    SCALA_LEFT = CaseClass::new(env, cstr!("scala/util/Left"), cstr!("(Ljava/lang/Object;)V"));
-    SCALA_RIGHT = CaseClass::new(env, cstr!("scala/util/Right"), cstr!("(Ljava/lang/Object;)V"));
-    BOXED_JINT = CaseClass::new(env, cstr!("java/lang/Integer"), cstr!("(I)V"));
+    //SCALA_LEFT = CaseClass::new(env, cstr!("scala/util/Left"), cstr!("(Ljava/lang/Object;)V"));
+    //SCALA_RIGHT = CaseClass::new(env, cstr!("scala/util/Right"), cstr!("(Ljava/lang/Object;)V"));
+    //BOXED_JINT = CaseClass::new(env, cstr!("java/lang/Integer"), cstr!("(I)V"));
 
     let mainmethods = [
         native_method!("nativeAppendMotionEvent", "(ILandroid/view/MotionEvent;)V", native_append_motion_event),
@@ -461,22 +466,24 @@ pub unsafe extern "C" fn JNI_OnLoad(vm: *mut JavaVM, reserved: *mut c_void) -> j
         native_method!("nativeAddLayer", "(IIII)V", jni_add_layer),
         native_method!("nativeClearLayers", "(I)V", jni_clear_layers),
         native_method!("nativeLoadUndo", "(II)V", jni_load_undo),
+        native_method!("nativeSetBrushColor", "(II)V", jni_set_brush_color),
+        native_method!("nativeSetBrushSize", "(IF)V", jni_set_brush_size),
     ];
     register_classmethods(env, cstr!("com/github/wartman4404/gldraw/TextureSurfaceThread"), texturemethods);
     logi!("registered texture thread methods!");
 
     let pointshaderstaticmethods = [
-        native_method!("compile", "(ILjava/lang/String;Ljava/lang/String;)Lscala/util/Either;", compile_pointshader),
+        native_method!("compile", "(ILjava/lang/String;Ljava/lang/String;)I", compile_pointshader),
     ];
     let copyshaderstaticmethods = [
-        native_method!("compile", "(ILjava/lang/String;Ljava/lang/String;)Lscala/util/Either;", compile_copyshader),
+        native_method!("compile", "(ILjava/lang/String;Ljava/lang/String;)I", compile_copyshader),
     ];
     let texturestaticmethods = [
-        native_method!("init", "(ILandroid/graphics/Bitmap;)Lscala/util/Either;", create_texture),
+        native_method!("init", "(ILandroid/graphics/Bitmap;)I", create_texture),
     ];
     register_classmethods(env, cstr!("com/github/wartman4404/gldraw/PointShader$"), pointshaderstaticmethods);
     register_classmethods(env, cstr!("com/github/wartman4404/gldraw/CopyShader$"), copyshaderstaticmethods);
-    register_classmethods(env, cstr!("com/github/wartman4404/gldraw/Texture$"), texturestaticmethods);
+    register_classmethods(env, cstr!("com/github/wartman4404/gldraw/TexturePtr$"), texturestaticmethods);
     logi!("registered point|copy|texture static methods!");
 
     let eglhelpermethods = [
@@ -487,7 +494,7 @@ pub unsafe extern "C" fn JNI_OnLoad(vm: *mut JavaVM, reserved: *mut c_void) -> j
     logi!("registered egl methods!");
 
     let luastaticmethods = [
-        native_method!("init", "(ILjava/lang/String;)Lscala/util/Either;", jni_lua_compile_script),
+        native_method!("init", "(ILjava/lang/String;)I", jni_lua_compile_script),
     ];
     register_classmethods(env, cstr!("com/github/wartman4404/gldraw/LuaScript$"), luastaticmethods);
     logi!("registered lua methods!");
@@ -525,7 +532,7 @@ pub unsafe extern "C" fn JNI_OnUnload(vm: *mut JavaVM, reserved: *mut c_void) {
         return;
     }
     let env = env as *mut JNIEnv;
-    SCALA_LEFT.destroy(env);
-    SCALA_RIGHT.destroy(env);
-    BOXED_JINT.destroy(env);
+    //SCALA_LEFT.destroy(env);
+    //SCALA_RIGHT.destroy(env);
+    //BOXED_JINT.destroy(env);
 }

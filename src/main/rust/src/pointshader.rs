@@ -24,6 +24,7 @@ pub struct PointShader {
     matrix_handle: GLint,
     texture_handle: Option<GLint>,
     color_handle: GLint,
+    size_factor_handle: GLint,
     pointer_handle: Option<GLuint>,
     speed_handle: Option<GLuint>,
     distance_handle: Option<GLuint>,
@@ -49,6 +50,7 @@ impl Shader for PointShader {
                     matrix_handle: matrix,
                     texture_handle: get_uniform_handle_option(program, "texture"),
                     color_handle: gl2::get_uniform_location(program, "vColor"),
+                    size_factor_handle: gl2::get_uniform_location(program, "vSizeFactor"),
                     pointer_handle: get_shader_handle(program, "vPointer"),
                     speed_handle: get_shader_handle(program, "vSpeed"),
                     distance_handle: get_shader_handle(program, "vDistance"),
@@ -68,7 +70,7 @@ impl Shader for PointShader {
 
 impl PointShader {
 
-    pub fn prep(&self, matrix: &[f32], points: &[ShaderPaintPoint], color: [f32, ..3], brush: &Texture, backbuffer: &Texture) {
+    pub fn prep(&self, matrix: &[f32], points: &[ShaderPaintPoint], color: [f32, ..3], brushsize: f32, brush: &Texture, backbuffer: &Texture) {
         gl2::use_program(self.program);
         check_gl_error("pointshader: use_program");
 
@@ -108,8 +110,11 @@ impl PointShader {
         let (w, h) = backbuffer.dimensions;
         gl2::uniform_2f(self.texture_size_handle, w as f32, h as f32);
 
-        unsafe { gl2::glUniform3fv(self.color_handle, 3, color.as_ptr() as *mut f32); }
+        unsafe { gl2::glUniform3fv(self.color_handle, 1, color.as_ptr() as *mut f32); }
         check_gl_error("uniform3fv");
+
+        gl2::uniform_1f(self.size_factor_handle, brushsize);
+        check_gl_error("uniform1f");
     }
 
 }

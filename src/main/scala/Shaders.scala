@@ -4,7 +4,8 @@ import android.os.Message
 
 class CopyShader private (private val nativePtr: Int) extends AnyVal
 class PointShader private (private val nativePtr: Int) extends AnyVal
-class Texture private (private val nativePtr: Int) extends AnyVal
+class Texture private (val ptr: TexturePtr, val bitmap: Bitmap)
+class TexturePtr private (private val nativePtr: Int) extends AnyVal
 class LuaScript private (private val nativePtr: Int) extends AnyVal
 class MotionEventHandler private (private val nativePtr: Int) extends AnyVal
 class MotionEventProducer private (private val nativePtr: Int) extends AnyVal
@@ -19,9 +20,13 @@ class GLInit private (private val nativePtr: Int) extends AnyVal {
 trait UndoCallback {
   def undoBufferChanged(newSize: Int): Unit
 }
+class GLException(msg: String) extends Exception(msg)
 object GLResultTypeDef {
-  type GLResult[T] = Either[String, T]
+  type GLResult[T] = T
+  type GLStoredResult[T] = Either[String, T]
+  type GLException = com.github.wartman4404.gldraw.GLException
 }
+
 
 import GLResultTypeDef._
 
@@ -32,40 +37,34 @@ trait Shader[T] {
 object CopyShader extends Shader[CopyShader] {
   @native def compile(data: GLInit, vec: String, frag: String): GLResult[Int]
   def apply(data: GLInit, vec: String, frag: String): GLResult[CopyShader] = {
-    compile(data, vec, frag) match {
-      case Left(x) => Left(x)
-      case Right(x) => Right(new CopyShader(x))
-    }
+    new CopyShader(compile(data, vec, frag))
   }
 }
 
 object PointShader extends Shader[PointShader] {
   @native def compile(data: GLInit, vec: String, frag: String): GLResult[Int]
   def apply(data: GLInit, vec: String, frag: String): GLResult[PointShader] = {
-    compile(data, vec, frag) match {
-      case Left(x) => Left(x)
-      case Right(x) => Right(new PointShader(x))
-    }
+    new PointShader(compile(data, vec, frag))
+  }
+}
+
+object TexturePtr {
+  @native def init(data: GLInit, image: Bitmap): GLResult[Int]
+  def apply(data: GLInit, image: Bitmap): GLResult[TexturePtr] = {
+    new TexturePtr(init(data, image))
   }
 }
 
 object Texture {
-  @native def init(data: GLInit, image: Bitmap): GLResult[Int];
   def apply(data: GLInit, image: Bitmap): GLResult[Texture] = {
-    init(data, image) match {
-      case Left(x) => Left(x)
-      case Right(x) => Right(new Texture(x))
-    }
+    new Texture(TexturePtr(data, image), image)
   }
 }
 
 object LuaScript {
   @native def init(data: GLInit, script: String): GLResult[Int]
   def apply(data: GLInit, script: String): GLResult[LuaScript] = {
-    init(data, script) match {
-      case Left(x) => Left(x)
-      case Right(x) => Right(new LuaScript(x))
-    }
+    new LuaScript(init(data, script))
   }
 }
 
@@ -96,3 +95,5 @@ object MotionEventHandlerPair {
   @native def init(): MotionEventHandlerPair
   @native def destroy(m: MotionEventHandlerPair): Unit
 }
+
+//case class BrushProperties(color: Int, size: Float)

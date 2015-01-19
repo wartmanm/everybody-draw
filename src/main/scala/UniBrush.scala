@@ -62,7 +62,7 @@ case class UniBrush(
 object UniBrush extends AutoProductFormat {
   def logAbort[T](s: String): GLResult[T] = {
     Log.e("unibrush", s"failed to load: ${s}")
-    Left(s)
+    throw new GLException(s)
   }
 
   // iterator to unzip everything into memory
@@ -112,25 +112,23 @@ object UniBrush extends AutoProductFormat {
       case e: DeserializationException => {
         logAbort(s"unable to parse brush.json: ${e}")
       }
-      case e: IOException => logAbort(s"IOException ${e}")
+      case e: IOException => logAbort(s"Error reading unibrush ${e}")
+      case e: GLException => logAbort(s"Error in unibrush files ${e}")
       case e: Exception => logAbort(s"Other exception ${e}")
     }
   }
 
   def compileShaders[T](data: GLInit, shaders: Option[Array[ShaderSource]], compiler: Shader[T], files: Map[String, Array[Byte]]): GLResult[ArraySeq[T]] = {
-    Right(shaders.getOrElse(Array.empty).map(x => x.compile(data, compiler, files) match {
-        case Left(x) => return Left(x)
-        case Right(x) => x
-      }))
+    shaders.getOrElse(Array.empty).map(x => x.compile(data, compiler, files))
   }
 
   def getLayers(data: GLInit, pointshaders: Array[PointShader], copyshaders: Array[CopyShader], layers: Option[Array[LayerSource]]): GLResult[Array[Layer]] = {
-    Right(layers.getOrElse(Array.empty).map(l => {
-        val point = l.pointshader.map(x => pointshaders.lift(x).getOrElse(return Left(s"no point shader numbered ${x}"))).getOrElse(PointShader(data, null, null).right.get)
-        val copy = l.copyshader.map(x => copyshaders.lift(x).getOrElse(return Left(s"no copy shader numbered ${x}"))).getOrElse(CopyShader(data, null, null).right.get)
-        val idx = l.pointsrc.getOrElse(0)
-        Layer(point, copy, idx)
-      }))
+    layers.getOrElse(Array.empty).map(l => {
+      val point = l.pointshader.map(x => pointshaders.lift(x).getOrElse(logAbort(s"no point shader numbered ${x}"))).getOrElse(PointShader(data, null, null))
+      val copy = l.copyshader.map(x => copyshaders.lift(x).getOrElse(logAbort(s"no copy shader numbered ${x}"))).getOrElse(CopyShader(data, null, null))
+      val idx = l.pointsrc.getOrElse(0)
+      Layer(point, copy, idx)
+    })
   }
 
   def flipoption[T,U,V](opt: Option[T], cb: (T)=>Either[U,V]): Either[U,Option[V]] = {
@@ -146,60 +144,27 @@ object UniBrush extends AutoProductFormat {
 
   def compile(data: GLInit, s: UniBrushSource, files: Map[String, Array[Byte]]): GLResult[UniBrush] = {
     Log.i("unibrush", "compiling unibrush");
-    val brush = {
-      flipoption(s.brushpath, (bp: String) => {
-          (files.get(bp)
-          .map(new ByteArrayInputStream(_)) match {
-            case None => Left(s"unable to load bitmap in unibrush: {bp}")
-            case Some(x) => Right(x)
-          }).right
-          .flatMap(x => DrawFiles.decodeBitmap(Bitmap.Config.ALPHA_8)(x)).right
-          .flatMap(Texture.apply(data, _))
-        })
-    } match {
-      case Left(x) => return Left(x)
-      case Right(x) => x
-    }
-    val pointshaderopt: Either[String, ArraySeq[PointShader]] = compileShaders(data, s.pointshaders, PointShader, files)
-    val pointshaders = pointshaderopt match {
-      case Left(x) => return Left(x)
-      case Right(x) => x.toArray
-    }
-    val copyshaders = compileShaders(data, s.animshaders, CopyShader, files) match {
-      case Left(x) => return Left(x)
-      case Right(x) => x.toArray
-    }
-    val baseanimshader = flipoption(s.baseanimshader, (x: ShaderSource) => x.compile(data, CopyShader, files)) match {
-      case Left(x) => return Left(x)
-      case Right(x) => x
-    }
-    val basecopyshader = flipoption(s.basecopyshader, (x: ShaderSource) => x.compile(data, CopyShader, files)) match {
-      case Left(x) => return Left(x)
-      case Right(x) => x
-    }
-    val basepointshader = flipoption(s.basepointshader, (x: ShaderSource) => x.compile(data, PointShader, files)) match {
-      case Left(x) => return Left(x)
-      case Right(x) => x
-    }
-    val interpolator = flipoption(s.interpolator, (path: String) => {
-        files.get(path) match {
-          case None => Left(s"missing interpolator file ${path}")
-          case Some(x) => LuaScript(data, new String(x))
-        }
-      })
-    match {
-      case Left(x) => return Left(x)
-      case Right(x) => x
-    }
-    val layers = getLayers(data, pointshaders, copyshaders, s.layers) match {
-      case Left(x) => return Left(x)
-      case Right(x) => x
-    }
+    val brush = s.brushpath.map(bp => {
+        val stream = (files.get(bp)
+        .map(new ByteArrayInputStream(_))
+        .getOrElse(logAbort(s"unable to load bitmap in unibrush: ${bp}")))
+        Texture(data, DrawFiles.decodeBitmap(Bitmap.Config.ALPHA_8)(stream))
+    })
+    val pointshaders: GLResult[ArraySeq[PointShader]] = compileShaders(data, s.pointshaders, PointShader, files)
+    val copyshaders = compileShaders(data, s.animshaders, CopyShader, files)
+    val baseanimshader = s.baseanimshader.map(_.compile(data, CopyShader, files))
+    val basecopyshader = s.basecopyshader.map(_.compile(data, CopyShader, files))
+    val basepointshader = s.basepointshader.map(_.compile(data, PointShader, files))
+    val interpolator = s.interpolator.map(path => {
+      val luastring = files.get(path).getOrElse(logAbort(s"missing interpolator file ${path}"))
+      LuaScript(data, new String(luastring))
+    })
+    val layers = getLayers(data, pointshaders.toArray, copyshaders.toArray, s.layers)
     Log.i("unibrush", s"have interpolator: ${interpolator.nonEmpty}");
     Log.i("unibrush", s"have pointshader: ${basepointshader.nonEmpty}");
     Log.i("unibrush", s"have animshader: ${baseanimshader.nonEmpty}");
     Log.i("unibrush", s"have layers: ${layers.length}");
     Log.i("unibrush", s"have brush: ${brush.nonEmpty}");
-    Right(UniBrush(brush, basepointshader, baseanimshader, basecopyshader, interpolator, layers))
+    UniBrush(brush, basepointshader, baseanimshader, basecopyshader, interpolator, layers)
   }
 }

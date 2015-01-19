@@ -104,7 +104,8 @@ object General {
         aarlib("com.github.iPaulPro" % "aFileChooser" % "0.1"),
         aarlib("android.support.v7" % "appcompat" % "1.0.0"),
         "com.jsuereth" %% "scala-arm" % "1.5-SNAPSHOT",
-        "io.spray" %%  "spray-json" % "1.3.0"
+        "io.spray" %%  "spray-json" % "1.3.0",
+        aarlib("com.larswerkman" % "HoloColorPicker" % "1.4")
       ),
       proguardOptions ++= Seq(
         """
@@ -113,6 +114,9 @@ object General {
           <init>(int, int);
         }
         -keepclassmembers class com.github.wartman4404.gldraw.LuaException {
+          <init>(java.lang.String);
+        }
+        -keepclassmembers class com.github.wartman4404.gldraw.GLException {
           <init>(java.lang.String);
         }
         -keepclassmembers class com.github.wartman4404.gldraw.MainActivity$MainUndoListener {

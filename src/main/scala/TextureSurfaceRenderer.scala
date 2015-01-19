@@ -30,12 +30,15 @@ extends Thread with Handler.Callback with AndroidImplicits {
   @native protected def nativeSetAnimShader(data: GLInit, shader: CopyShader): Boolean
   @native protected def nativeSetCopyShader(data: GLInit, shader: CopyShader): Boolean
   @native protected def nativeSetPointShader(data: GLInit, shader: PointShader): Boolean
-  @native protected def nativeSetBrushTexture(data: GLInit, t: Texture): Unit
+  @native protected def nativeSetBrushTexture(data: GLInit, t: TexturePtr): Unit
   @native protected def exportPixels(data: GLInit): Bitmap
   @native protected def nativeSetInterpolator(data: GLInit, script: LuaScript): Unit
   @native protected def nativeAddLayer(data: GLInit, copyshader: CopyShader, pointshader: PointShader, pointidx: Int): Unit
   @native protected def nativeClearLayers(data: GLInit): Unit
   @native protected def nativeLoadUndo(data: GLInit, pos: Int): Unit
+  //@native protected def nativeSetBrushProperties(props: BrushProperties): Unit
+  @native protected def nativeSetBrushColor(data: GLInit, color: Int): Unit
+  @native protected def nativeSetBrushSize(data: GLInit, size: Float): Unit
 
   override def run() = {
     Looper.prepare()
@@ -59,7 +62,7 @@ extends Thread with Handler.Callback with AndroidImplicits {
             }
           } catch {
             case e: LuaException => {
-              nativeSetInterpolator(gl, LuaScript(gl, null).right.get)
+              nativeSetInterpolator(gl, LuaScript(gl, null))
               errorCallback(e)
             }
           }
@@ -161,7 +164,7 @@ extends Thread with Handler.Callback with AndroidImplicits {
 
   // private
   private def initOutputShader(g: GLInit) = {
-    pOutputShader = CopyShader(g, null, null).right.toOption
+    pOutputShader = Some(CopyShader(g, null, null))
     pOutputShader.map((x) => {
         nativeSetCopyShader(g, x)
       })
@@ -192,7 +195,7 @@ extends Thread with Handler.Callback with AndroidImplicits {
 
   def setBrushTexture(gl: GLInit, texture: Texture) {
     Log.i("tst", s"setting brush texture to ${texture}")
-    nativeSetBrushTexture(gl, texture)
+    nativeSetBrushTexture(gl, texture.ptr)
   }
 
   def beginReplay() {
@@ -214,6 +217,8 @@ extends Thread with Handler.Callback with AndroidImplicits {
   def setPointShader(gl: GLInit, shader: PointShader) = nativeSetPointShader(gl, shader)
   def setInterpScript(gl: GLInit, script: LuaScript) = nativeSetInterpolator(gl, script)
   def setCopyShader(gl: GLInit, shader: CopyShader) = nativeSetCopyShader(gl, shader)
+  def setBrushColor(gl: GLInit, color: Int) = nativeSetBrushColor(gl, color)
+  def setBrushSize(gl: GLInit, size: Float) = nativeSetBrushSize(gl, size)
 
   def withGL(cb: (GLInit) => Unit) = {
     for (gl <- glinit) { runHere {

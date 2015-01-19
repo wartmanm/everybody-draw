@@ -8,7 +8,6 @@ import android.view._
 import android.graphics.{SurfaceTexture, Bitmap}
 import android.content.{Context, Intent}
 import android.content.res.Configuration
-import android.opengl.GLException
 
 import java.io.{BufferedInputStream}
 import java.io.{OutputStream, FileOutputStream, BufferedOutputStream}
@@ -24,6 +23,8 @@ import com.ipaulpro.afilechooser.utils.FileUtils
 import unibrush.{UniBrush, Layer}
 
 import resource._
+
+import com.larswerkman.holocolorpicker.{ColorPicker, ScaleBar}
 
 import scala.concurrent.ExecutionContext
 import scala.concurrent.Future
@@ -60,6 +61,10 @@ class MainActivity extends Activity with TypedActivity with AndroidImplicits {
   lazy val sidebarAdapter = new SidebarAdapter()
   lazy val undoButton = findView(TR.undo_button)
   lazy val redoButton = findView(TR.redo_button)
+  lazy val clearButton = findView(TR.clear_button)
+  lazy val loadButton = findView(TR.load_button)
+  lazy val saveButton = findView(TR.save_button)
+  lazy val colorPicker = findView(TR.brush_colorpicker_main)
 
   var textureThread: Option[TextureSurfaceThread] = None
 
@@ -159,6 +164,24 @@ class MainActivity extends Activity with TypedActivity with AndroidImplicits {
     undoButton.setOnClickListener(() => moveUndo(-1))
     redoButton.setOnClickListener(() => moveUndo(1))
 
+    saveButton.setOnClickListener(saveFile _)
+    loadButton.setOnClickListener(loadFile _)
+    clearButton.setOnClickListener(() => textureThread.foreach(_.clearScreen()))
+
+    colorPicker.addSVBar(findView(TR.brush_colorpicker_svbar))
+    val scaleBar = findView(TR.brush_colorpicker_scalebar)
+    colorPicker.addScaleBar(scaleBar)
+    colorPicker.setShowOldCenterColor(false)
+    colorPicker.setOnColorChangedListener(new ColorPicker.OnColorChangedListener() {
+      override def onColorChanged(color: Int) = {
+        textureThread.foreach(t => t.withGL(gl => t.setBrushColor(gl, color)))
+      }
+    })
+    scaleBar.setOnScaleChangedListener(new ScaleBar.OnScaleChangedListener() {
+      override def onScaleChanged(size: Float) = {
+        textureThread.foreach(t => t.withGL(gl => t.setBrushSize(gl, size)))
+      }
+    })
 
     drawerParent.setDrawerListener(drawerToggle)
     getActionBar().setDisplayHomeAsUpEnabled(true)
@@ -293,12 +316,12 @@ class MainActivity extends Activity with TypedActivity with AndroidImplicits {
     Log.i("main", "loading from file")
     try {
       for (input <- managed(new BufferedInputStream(MainActivity.this.openFileInput("screen")))) {
-        savedBitmap = DrawFiles.decodeBitmap(Bitmap.Config.ARGB_8888)(input).right.toOption
+        savedBitmap = Some(DrawFiles.decodeBitmap(Bitmap.Config.ARGB_8888)(input))
         val input2 = MainActivity.this.openFileInput("status")
         controls.load(input2)
       }
     } catch {
-      case e: IOException => { 
+      case e @ (_: IOException | _: GLException) => { 
         Log.i("main", "loading from file failed: %s".format(e))
       }
     }
@@ -374,7 +397,7 @@ class MainActivity extends Activity with TypedActivity with AndroidImplicits {
     MainActivity.this.runOnUiThread(() => {
       // TODO: make hardcoded shaders accessible a better way
       val interpLoader = loadInterpolatorSynchronized(thread, producer)
-      populatePicker(controls.brushpicker, brushes,  thread.setBrushTexture _, thread)
+      populatePicker(controls.brushpicker, brushes, loadBrush(thread), thread)
       populatePicker(controls.animpicker, anims,  thread.setAnimShader _, thread)
       populatePicker(controls.paintpicker, paints,  thread.setPointShader _, thread)
       populatePicker(controls.interppicker, interpscripts,  interpLoader, thread)
@@ -391,28 +414,42 @@ class MainActivity extends Activity with TypedActivity with AndroidImplicits {
     })
   }
 
+  def loadBrush(thread: TextureSurfaceThread) = (gl: GLInit, bmtx: Texture) => {
+    thread.setBrushTexture(gl, bmtx)
+    runOnUiThread(() => {
+      colorPicker.setNewCenterBitmap(bmtx.bitmap)
+    })
+  }
+
   def loadUniBrush(thread: TextureSurfaceThread, producer: MotionEventProducer) =
   (gl: GLInit, unibrush: UniBrush) => {
     Log.i("main", "loading unibrush")
-    def getSelectedValue[T](picker: GLControl[T]) = {
+    def getSelectedValue[T](picker: GLControl[T]): Option[T] = {
       // return None if the control is already active, or we're trying to restore a missing value
       // TODO: the missing-value part is probably busted
-      if (picker.enabled) None
-      else picker.currentValue(gl) match {
-        case Left(msg) => {
-          runOnUiThread(() => {
-            Toast.makeText(MainActivity.this, "unable to load old control!" + msg, Toast.LENGTH_LONG).show()
-          })
-          Log.i("main", s"unable to load old control: ${msg}")
-          None
+      if (picker.enabled) {
+        None
+      } else {
+        val tmp: GLStoredResult[T] = picker.currentValue(gl)
+        tmp match {
+          case Left(msg) => {
+            runOnUiThread(() => {
+              Toast.makeText(MainActivity.this, "unable to load old control!" + msg, Toast.LENGTH_LONG).show()
+            })
+            Log.i("main", s"unable to load old control: ${msg}")
+            None
+          }
+          case Right(value) => {
+            val tmp: T = value
+            Some(tmp)
+          }
         }
-        case Right(value) => Some(value)
       }
     }
     //Log.i("main", s"copypicker is enabled: ${controls.copypicker.enabled}")
     Log.i("unibrush", "loading unibrushes and old values...")
     Log.i("unibrush", "loading brush")
-    val brush = unibrush.brush.orElse(getSelectedValue(controls.brushpicker))
+    val brush: Option[Texture] = unibrush.brush.orElse(getSelectedValue(controls.brushpicker))
     Log.i("unibrush", "loading anim")
     val anim = unibrush.baseanimshader.orElse(getSelectedValue(controls.animpicker))
     Log.i("unibrush", "loading point")
@@ -476,7 +513,13 @@ class MainActivity extends Activity with TypedActivity with AndroidImplicits {
       Log.i("main", s"got activity result: ${data}")
       if (resultCode == Activity.RESULT_OK) {
         val path = FileUtils.getPath(this, data.getData())
-        val bitmap = DrawFiles.withFileStream(new File(path)).map(DrawFiles.decodeBitmap(Bitmap.Config.ARGB_8888) _).opt.map(x => x.right.toOption).flatten
+        val bitmap = (try {
+          val tmp: Option[Bitmap] = DrawFiles.withFileStream(new File(path))
+          .acquireAndGet(fs => Some(DrawFiles.decodeBitmap(Bitmap.Config.ARGB_8888)(fs)))
+          tmp
+        } catch {
+          case e: Exception => None
+        })
         Log.i("main", s"got bitmap ${bitmap}")
         for (b <- bitmap; thread <- textureThread) {
           Log.i("main", "drawing bitmap...")
