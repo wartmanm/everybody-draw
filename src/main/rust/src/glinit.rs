@@ -223,7 +223,6 @@ impl<'a> GLInit<'a> {
     }
 
     pub fn get_pixels(&mut self, pixels: &mut [u8]) {
-        logi("in with_pixels");
         let oldtarget = self.targetdata.get_current_texturetarget();
         let (x,y) = oldtarget.texture.dimensions;
         gl2::bind_framebuffer(gl2::FRAMEBUFFER, oldtarget.framebuffer);
@@ -339,7 +338,7 @@ impl<'a> GLInit<'a> {
 
     pub fn unload_interpolator(&mut self, handler: &mut MotionEventConsumer, events: &'a mut Events<'a>, undo_callback: &JNICallbackClosure) -> GLResult<()> {
         if let Some(interpolator) = self.paintstate.interpolator {
-            logi!("finishing luascript {}", interpolator);
+            logi!("finishing {}", interpolator);
             unsafe {
                 let mut callback = LuaCallbackType::new(self, events, handler, undo_callback);
                 finish_lua_script(&mut callback, interpolator)
@@ -350,7 +349,7 @@ impl<'a> GLInit<'a> {
     }
 
     pub fn push_undo_frame(&mut self) -> i32 {
-        let source = self.targetdata.get_current_texturesource(); // FIXME is this correct?
+        let source = self.targetdata.get_current_texturesource(); // they should be identical at this point
         if let Some(copy_shader) = self.paintstate.copyshader {
             self.paintstate.undo_targets.push_new_buffer(source, copy_shader);
         }
@@ -358,7 +357,6 @@ impl<'a> GLInit<'a> {
     }
 
     pub fn load_undo_frame(&mut self, idx: i32) {
-        // FIXME why does this work, shouldn't it get overwritten?
         let source = self.targetdata.get_current_texturetarget();
         if let Some(copy_shader) = self.paintstate.copyshader {
             self.paintstate.undo_targets.load_buffer_at(idx, source, copy_shader);
@@ -368,8 +366,6 @@ impl<'a> GLInit<'a> {
     pub fn draw_queued_points(&mut self, handler: &mut MotionEventConsumer, events: &'a mut Events<'a>, matrix: &matrix::Matrix, undo_callback: &JNICallbackClosure) -> GLResult<()> {
         match (self.paintstate.pointshader, self.paintstate.copyshader, self.paintstate.brush) {
             (Some(point_shader), Some(copy_shader), Some(brush)) => {
-                gl2::enable(gl2::BLEND);
-                gl2::blend_func(gl2::ONE, gl2::ONE_MINUS_SRC_ALPHA);
                 let interp_error = match self.paintstate.interpolator {
                     Some(interpolator) => unsafe {
                         let dimensions = self.dimensions;
@@ -378,6 +374,11 @@ impl<'a> GLInit<'a> {
                     },
                     None => Ok(())
                 };
+                // lua calls like push_undo_frame may have changed the blend fn
+                // TODO: would it be better to use noalpha_copy for them?
+                // probably not, sub-base layers might still happen
+                gl2::enable(gl2::BLEND);
+                gl2::blend_func(gl2::ONE, gl2::ONE_MINUS_SRC_ALPHA);
 
                 let (target, source) = self.targetdata.get_texturetargets();
 
@@ -413,6 +414,8 @@ impl<'a> GLInit<'a> {
         if let (Some(copy_shader), Some(point_shader)) = (self.paintstate.copyshader, self.paintstate.pointshader) {
             let copymatrix = matrix::IDENTITY.as_slice();
             let target = self.targetdata.get_current_texturetarget();
+            gl2::enable(gl2::BLEND);
+            gl2::blend_func(gl2::ONE, gl2::ONE_MINUS_SRC_ALPHA);
             for layer in self.paintstate.layers.iter() {
                 let completed = layer.complete(copy_shader, point_shader);
                 perform_copy(target.framebuffer, &layer.target.texture, completed.copyshader, copymatrix);

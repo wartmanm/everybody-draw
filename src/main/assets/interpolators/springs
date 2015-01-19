@@ -1,0 +1,60 @@
+local planets = {
+  {force = 0.2, decay = 0.7, maxspeed = 50, size = 1, color = 0xffff0000, speedx = 0, speedy = 0, x = 200, y = 200}
+}
+local positions = {}
+
+function ondown(a, output)
+  positions[a.counter] = {x = a.x, y = a.y}
+  loglua("ondown " .. a.counter)
+  default_ondown(a, output)
+end
+function onup(a, output)
+  default_onup(a, output)
+end
+function onframe(x, y, points)
+  local planetpoint = ShaderPaintPoint(0, 0, 0, 0, 0, 0, 0, 0)
+  local oldplanetpoint = ShaderPaintPoint(0, 0, 0, 0, 0, 0, 0, 0) 
+  --loglua("frame")
+  for i,planet in ipairs(planets) do
+    for i2,pos in pairs(positions) do
+      --loglua("adding in " .. pos.x .. "," .. pos.y)
+      local distx = pos.x - planet.x
+      local disty = pos.y - planet.y
+      planet.speedx = planet.speedx + planet.force * distx
+      planet.speedy = planet.speedy + planet.force * disty
+    end
+    planet.speedx = planet.speedx * planet.decay
+    planet.speedy = planet.speedy * planet.decay
+    local speedsq = planet.speedx * planet.speedx + planet.speedy * planet.speedy
+    if (speedsq > planet.maxspeed * planet.maxspeed) then
+      local speed = math.sqrt(speedsq)
+      planet.speedx = planet.speedx * (planet.maxspeed / speed)
+      planet.speedy = planet.speedy * (planet.maxspeed / speed)
+    end
+    oldplanetpoint.x = planet.x
+    oldplanetpoint.y = planet.y
+    oldplanetpoint.size = planet.size
+
+    planet.x = planet.x + planet.speedx
+    planet.y = planet.y + planet.speedy
+
+    planetpoint.x = planet.x
+    planetpoint.y = planet.y
+    planetpoint.size = planet.size
+
+    pushline(points, 0, oldplanetpoint, planetpoint)
+  end
+  positions = {}
+end
+
+ondone = default_ondone
+
+function main(a, b, x, y, points)
+  if positions[b.counter] == nil then
+    positions[b.counter] = {x = b.x, y = b.y}
+  else
+    positions[b.counter].x = b.x
+    positions[b.counter].y = b.y
+  end
+  pushline(points, 0, a, b)
+end

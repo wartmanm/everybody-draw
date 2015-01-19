@@ -22,10 +22,8 @@ impl LuaScript {
     }
 
     #[inline]
-    pub fn push_self(&self) {
-        unsafe {
-            push_lua_script(self.registry_id);
-        }
+    pub fn get_key(&self) -> i32 {
+        self.registry_id
     }
 }
 

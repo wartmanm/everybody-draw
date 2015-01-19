@@ -48,7 +48,7 @@ pub enum PointInfo {
 pub enum ShaderPointEvent {
     Move(ShaderPaintPoint, ShaderPaintPoint),
     Down(ShaderPaintPoint),
-    Up,
+    Up(ShaderPaintPoint),
     NoEvent,
 }
 

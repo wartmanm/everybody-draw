@@ -1,0 +1,8 @@
+{
+  "interpolator": "bezier.lua", 
+  "layers": [
+    {
+      "pointsrc": 1
+    }
+  ]
+}

@@ -1,6 +1,7 @@
 package com.github.wartman4404.gldraw
 import android.graphics.Bitmap
 import android.os.Message
+import android.view.MotionEvent
 
 class CopyShader private (private val nativePtr: Int) extends AnyVal
 class PointShader private (private val nativePtr: Int) extends AnyVal
@@ -81,6 +82,11 @@ object GLInit {
     new GLInit(m.arg1)
   }
   @native def destroy(data: GLInit): Unit
+}
+
+object MotionEventProducer {
+  @native def nativeAppendMotionEvent(producer: MotionEventProducer, evt: MotionEvent): Unit
+  @native def nativePauseMotionEvent(handler: MotionEventProducer): Unit
 }
 
 object Replay {

@@ -19,9 +19,13 @@ use log::{logi, loge};
 use glinit::GLInit;
 use drawevent::Events;
 use glcommon::MString;
+use libc::types::os::arch::posix88::pid_t;
 
 use rustrt;
 
+extern "C" {
+    pub fn gettid() -> pid_t;
+}
 
 mod macros;
 pub mod texturethread;
@@ -38,6 +42,7 @@ struct GLInitEvents<'a> {
     glinit: GLInit<'a>,
     events: Events<'a>,
     jni_undo_callback: JNIUndoCallback,
+    owning_thread: pid_t,
 }
 
 pub struct JNIUndoCallback {
@@ -114,7 +119,11 @@ pub unsafe fn register_classmethods(env: *mut JNIEnv, classname: *const i8, meth
 }
 
 fn get_safe_data<'a>(data: i32) -> &'a mut GLInitEvents<'a> {
-    unsafe { mem::transmute(data) }
+    unsafe {
+        let data: &'a mut GLInitEvents<'a> = mem::transmute(data);
+        assert_eq!(gettid(), data.owning_thread);
+        data
+    }
 }
 
 fn on_unwind(msg: &Any + Send, file: &'static str, line: uint) {

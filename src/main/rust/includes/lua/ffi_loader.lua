@@ -32,6 +32,7 @@ savelayers=ffi.C.lua_savelayers
 saveundo=ffi.C.lua_saveundobuffer
 
 ShaderPaintPoint=ffi.typeof("struct ShaderPaintPoint")
+ShaderPaintPointArray=ffi.typeof("struct ShaderPaintPoint[?]")
 
 local function copytable(t)
   out = {}
@@ -62,7 +63,6 @@ function create_sandbox()
     math = mathbox,
     table = tablebox,
     pushpoint = pushpoint,
-
     pushline = pushline,
     pushcatmullrom = pushcatmullrom,
     pushcubicbezier = pushcubicbezier,
@@ -71,6 +71,7 @@ function create_sandbox()
     savelayers = savelayers,
     saveundo = saveundo,
     ShaderPaintPoint = ShaderPaintPoint,
+    ShaderPaintPointArray = ShaderPaintPointArray,
   }
   return sandboxed
 end
