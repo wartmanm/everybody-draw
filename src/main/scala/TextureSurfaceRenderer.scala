@@ -18,7 +18,7 @@ extends Thread with Handler.Callback with AndroidImplicits {
   private var eglHelper: EGLHelper = null
   private var pOutputShader: Option[CopyShader] = None
   def outputShader = pOutputShader
-  var glinit: Option[GLInit] = None
+  private var glinit: Option[GLInit] = None
   private var replay = Replay.nullReplay
 
   @native protected def nativeUpdateGL(data: GLInit): Unit
@@ -118,28 +118,23 @@ extends Thread with Handler.Callback with AndroidImplicits {
   }
 
   // TODO: check if we're already on the gl thread
-  def runHere(fn: => Unit) = {
+  private def runHere(fn: => Unit) = {
     handler.post(() => { fn; () })
   }
 
-  def initScreen(bitmap: Option[Bitmap]) = runHere {
+  def initScreen(bitmap: Option[Bitmap]) = withGL(gl => {
     Log.i("tst", "initing output shader")
     Log.i("tst", s"drawing bitmap: ${bitmap}")
-    for (b <- bitmap;
-         g <- glinit) {
-         drawImage(g, b)
-         b.recycle()
+    for (b <- bitmap) {
+      drawImage(gl, b)
+      b.recycle()
     }
-  }
+  })
 
-  def clearScreen() = runHere {
-    glinit.foreach(nativeClearFramebuffer _)
-  }
+  def clearScreen() = withGL(nativeClearFramebuffer _)
 
   // callback runs on gl thread
-  def getBitmap(cb: (Bitmap)=>Any) = runHere {
-    glinit.foreach(g => cb(exportPixels(g)))
-  }
+  def getBitmap(cb: (Bitmap)=>Any) = withGL(gl => cb(exportPixels(gl)))
 
   def getBitmapSynchronized() = {
     var bitmap: Bitmap = null
@@ -158,7 +153,7 @@ extends Thread with Handler.Callback with AndroidImplicits {
     handler.obtainMessage(MSG_END_GL).sendToTarget()
   }
 
-  def drawBitmap(bitmap: Bitmap) = runHere { glinit.foreach(drawImage(_, bitmap)) }
+  def drawBitmap(bitmap: Bitmap) = withGL(drawImage(_, bitmap))
 
   // private
   private def initOutputShader(g: GLInit) = {
@@ -184,64 +179,34 @@ extends Thread with Handler.Callback with AndroidImplicits {
     nativeUpdateGL(g)
   }
 
-  // no consumers??
-  def shaderWrapper[T](constructor: (String, String) => Option[T]) = (vec: String, frag: String) => runHere {
-    constructor(vec, frag)
-  }
-
-  def shaderWrappers[T](constructor: (String, String) => Option[T]) = (vecfrag: Array[(String, String)]) => runHere {
-    vecfrag.foreach(constructor.tupled)
-  }
-
-  def createShader[T](constructor: (String, String) => Option[T], vec: String, frag: String) = runHere {
-    constructor(vec, frag)
-  }
-
-  def setBrushTexture(texture: Texture) = for (gl <- glinit) {
+  def setBrushTexture(gl: GLInit, texture: Texture) {
     Log.i("tst", s"setting brush texture to ${texture}")
-    runHere {
-      nativeSetBrushTexture(gl, texture)
-    }
+    nativeSetBrushTexture(gl, texture)
   }
 
   def beginReplay() {
-    for (gl <- glinit) { runHere {
+    withGL(gl => {
       replay = Replay.init(gl)
-    }}
+    })
   }
 
-  def loadUniBrush(brushopt: Option[Texture], baseanimopt: Option[CopyShader], basepointopt: Option[PointShader], basecopyopt: Option[CopyShader], scriptopt: Option[LuaScript], layers: Array[Layer]) = {
-    for (gl <- glinit) { runHere {
-      Log.i("tst", "loading unibrush!")
-      nativeClearLayers(gl)
-      for (layer <- layers) {
-        nativeAddLayer(gl, layer.copyshader, layer.pointshader, layer.pointsrc)
-      }
-      Log.i("tst", "set up layers!")
-      baseanimopt.map(nativeSetAnimShader(gl, _))
-      basepointopt.map(nativeSetPointShader(gl, _))
-      basecopyopt.map(nativeSetCopyShader(gl, _))
-      scriptopt.map(nativeSetInterpolator(gl, _))
-      Log.i("tst", "set interpolator!")
-      brushopt.map(nativeSetBrushTexture(gl, _))
-      Log.i("tst", "done loading unibrush!")
-    }}
+  def clearLayers(gl: GLInit) = nativeClearLayers(gl)
+
+  def addLayer(gl: GLInit, copyshader: CopyShader, pointshader: PointShader, pointidx: Int) = {
+    nativeAddLayer(gl, copyshader, pointshader, pointidx)
   }
 
   // only set values, could maybe run on main thread
-  def setAnimShader(shader: CopyShader) = for (gl <- glinit) { runHere { nativeSetAnimShader(gl, shader) } }
-  def setPointShader(shader: PointShader) = for (gl <- glinit) { runHere { nativeSetPointShader(gl, shader) } }
-  def setInterpScript(script: LuaScript) = for (gl <- glinit) { runHere { nativeSetInterpolator(gl, script) } }
-  def setUnibrushLayers(layers: Array[Layer]) = {
+  def setAnimShader(gl: GLInit, shader: CopyShader) = nativeSetAnimShader(gl, shader)
+  def setPointShader(gl: GLInit, shader: PointShader) = nativeSetPointShader(gl, shader)
+  def setInterpScript(gl: GLInit, script: LuaScript) = nativeSetInterpolator(gl, script)
+  def setCopyShader(gl: GLInit, shader: CopyShader) = nativeSetCopyShader(gl, shader)
+
+  def withGL(cb: (GLInit) => Unit) = {
     for (gl <- glinit) { runHere {
-      nativeClearLayers(gl)
-      for (layer <- layers) {
-        nativeAddLayer(gl, layer.copyshader, layer.pointshader, layer.pointsrc)
-      }
+      cb(gl)
     }}
   }
-  //unused
-  def setCopyShader(shader: CopyShader) = for (gl <- glinit) { runHere { nativeSetCopyShader(gl, shader) } }
 }
 
 object TextureSurfaceThread {

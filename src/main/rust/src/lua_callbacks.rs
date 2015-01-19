@@ -1,6 +1,8 @@
 use core::prelude::*;
 use core::mem;
 use collections::MutableSeq;
+use collections::vec::Vec;
+use collections::str::StrAllocating;
 
 use android::log::{ANDROID_LOG_INFO, __android_log_write};
 use libc::{c_char, c_int};
@@ -8,9 +10,10 @@ use point::ShaderPaintPoint;
 use point::{Move, Down, Up, NoEvent};
 use glpoint;
 use glpoint::MotionEventConsumer;
+use glcommon::GLResult;
 use glinit::GLInit;
 use drawevent::Events;
-use log::{logi};
+use lua::raw::lua_State;
 
 static MOVE: u8 = 0u8;
 static DONE: u8 = 1u8;
@@ -21,14 +24,19 @@ pub struct LuaCallbackType<'a, 'b, 'c: 'b> {
     consumer: &'a mut MotionEventConsumer,
     events: &'c mut Events<'c>,
     glinit: &'b mut GLInit<'c>,
+    pub lua: *mut lua_State,
 }
 
 impl<'a, 'b, 'c> LuaCallbackType<'a, 'b, 'c> {
-    pub fn new(glinit: &'b mut GLInit<'c>, events: &'c mut Events<'c>, s: &'a mut MotionEventConsumer) -> LuaCallbackType<'a, 'b, 'c> {
-        LuaCallbackType {
-            consumer: s,
-            events: events,
-            glinit: glinit,
+    pub fn new(glinit: &'b mut GLInit<'c>, events: &'c mut Events<'c>, s: &'a mut MotionEventConsumer) -> GLResult<LuaCallbackType<'a, 'b, 'c>> {
+        match unsafe { ::lua_geom::get_existing_lua() } {
+            Some(lua) => Ok(LuaCallbackType {
+                consumer: s,
+                events: events,
+                glinit: glinit,
+                lua: lua,
+            }),
+            None => Err("couldn't get lua state!".into_string()),
         }
     }
 }
@@ -48,13 +56,39 @@ pub extern "C" fn lua_nextpoint(data: &mut LuaCallbackType, points: &mut (Shader
 }
 
 #[no_mangle]
+#[allow(non_snake_case)]
+pub unsafe fn rust_raise_lua_err(L: *mut lua_State, msg: *const i8) -> ! {
+    ::lua::aux::raw::luaL_error(L, msg);
+    fail!("luaL_error() returned, this should never happen!");
+}
+
+macro_rules! rust_raise_lua_err(
+    ($L:expr, $fmt:expr, $($arg:tt)*) => ({
+        let formatted = format!(concat!($fmt, "\0"), $($arg)*);
+        rust_raise_lua_err($L, formatted.as_slice().as_ptr() as *const ::libc::c_char);
+    })
+)
+
+fn get_queue_or_raise_err<'a, 'b, 'c, 'd>(data: &'d mut LuaCallbackType, queue: i32) -> &'d mut Vec<ShaderPaintPoint> {
+    let points = &mut data.glinit.points;
+    if (queue as uint) >= points.len() {
+        unsafe {
+            rust_raise_lua_err!(data.lua, "tried to push point to queue {} of {}", queue + 1, points.len());
+        }
+    }
+    unsafe { points.as_mut_slice().unsafe_mut(queue as uint) }
+}
+
+#[no_mangle]
 pub unsafe extern "C" fn lua_pushpoint(data: &mut LuaCallbackType, queue: i32, point: *const ShaderPaintPoint) {
-    glpoint::push_point(&mut data.glinit.points.as_mut_slice()[queue as uint], &*point);
+    let points = get_queue_or_raise_err(data, queue);
+    glpoint::push_point(points, &*point);
 }
 
 #[no_mangle]
 pub unsafe extern "C" fn lua_pushline(data: &mut LuaCallbackType, queue: i32, a: *const ShaderPaintPoint, b: *const ShaderPaintPoint) {
-    glpoint::push_line(&mut data.glinit.points.as_mut_slice()[queue as uint], &*a, &*b);
+    let points = get_queue_or_raise_err(data, queue);
+    glpoint::push_line(points, &*a, &*b);
 }
 
 #[no_mangle]
@@ -64,7 +98,10 @@ pub unsafe extern "C" fn lua_log(message: *const c_char) {
 
 #[no_mangle]
 pub unsafe extern "C" fn lua_clearlayer(data: &mut LuaCallbackType, layer: i32) {
-    data.glinit.erase_layer(layer);
+    if let Err(mut msg) = data.glinit.erase_layer(layer) {
+        msg.push('\0');
+        rust_raise_lua_err(data.lua, msg.as_slice().as_ptr() as *const i8);
+    }
 }
 
 #[no_mangle]

@@ -4,7 +4,7 @@ import android.widget._
 import android.content.Context
 import GLResultTypeDef._
 
-class LazyPicker[T](context: Context, thread: TextureSurfaceThread, content: Seq[(String, (Unit)=>GLResult[T])]) extends BaseAdapter {
+class LazyPicker[T](context: Context, thread: TextureSurfaceThread, content: Seq[(String, (GLInit)=>GLResult[T])]) extends BaseAdapter {
   val inflater = LayoutInflater.from(context)
   val lazified: Seq[(String, LoadedState[T])] = content.map { case (k, v) => (k, new LoadedState(v)) }
   case class Holder(nameView: TextView)
@@ -37,30 +37,20 @@ class LazyPicker[T](context: Context, thread: TextureSurfaceThread, content: Seq
     view
   }
 
-  def getState(pos: Int, cb: (GLResult[T])=>Any) = {
-    lazified(pos)._2.get(cb)
-  }
-  //DANGER: runs callback on gl thread
-  class LoadedState[T](var loader: (Unit)=>GLResult[T]) {
-    def get(cb: (GLResult[T])=>Any) = {
-      thread.runHere {
-        cachedValue match {
-          case None => {
-            val value = loader(())
-            cachedValue = Some(value)
-            cb(value)
-          }
-          case Some(value) => cb(value)
+  def getState(pos: Int, gl: GLInit) = lazified(pos)._2.get(gl)
+
+  class LoadedState[T](var loader: (GLInit)=>GLResult[T]) {
+    def get(gl: GLInit): GLResult[T] = {
+      cachedValue match {
+        case None => {
+          val value = loader(gl)
+          cachedValue = Some(value)
+          value
         }
+        case Some(value) => value
       }
     }
-
     private var cachedValue: Option[GLResult[T]] = None
-
-    def getCached() = cachedValue match {
-      case Some(Right(x)) => Some(x)
-      case _ => None
-    }
 
     def isNotFailed = cachedValue match {
       case None => true

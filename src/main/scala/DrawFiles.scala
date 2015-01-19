@@ -15,16 +15,16 @@ object DrawFiles {
   import GLResultTypeDef._
   type MaybeRead[T] = (InputStream)=>GLResult[T]
   type MaybeReader[T] = (MaybeRead[T])=>GLResult[T]
-  def allfiles[T](c: Context, path: String): Array[(String, (Unit)=>ManagedResource[InputStream])] = {
+  def allfiles[T](c: Context, path: String): Array[(String, ()=>ManagedResource[InputStream])] = {
     val builtins = c.getAssets().list(path).map(path ++ "/" ++ _)
     val userdirs = c.getExternalFilesDirs(path).flatMap(Option(_)) // some paths may be null??
     val userfiles = userdirs.flatMap(_.listFiles())
     val builtinOpeners = builtins.map(path => {
-        basename(path) -> ((_: Unit)=>withAssetStream[Option[T]](c, path))
+        basename(path) -> (()=>withAssetStream[Option[T]](c, path))
       })
 
     val fileOpeners = userfiles.map(file => {
-        file.getName() -> ((_: Unit)=>withFileStream[Option[T]](file))
+        file.getName() -> (()=>withFileStream[Option[T]](file))
       })
     (builtinOpeners ++ fileOpeners)
   }
@@ -52,10 +52,14 @@ object DrawFiles {
     out
   }
 
-def withFilename[T](reader: MaybeRead[T]): ((String, (Unit)=>ManagedResource[InputStream]))=>(String, (Unit)=>GLResult[T]) = {
-    val a = (kv: (String, (Unit)=>ManagedResource[InputStream])) => {
+  def withFilename[T](reader: (GLInit, InputStream)=>GLResult[T]): ((String, ()=>ManagedResource[InputStream]))=>(String, (GLInit)=>GLResult[T]) = {
+    val a = (kv: (String, ()=>ManagedResource[InputStream])) => {
       val (k, v) = kv
-      k -> useInputStream(reader).compose(v)
+      k -> ((g: GLInit) => {
+        val is = v()
+        val useinput: (ManagedResource[InputStream]) => GLResult[T] = useInputStream(reader(g, _: InputStream))
+        useinput(is)
+      })
     }
     a
   }
@@ -74,41 +78,40 @@ def withFilename[T](reader: MaybeRead[T]): ((String, (Unit)=>ManagedResource[Inp
     }
   }
 
-  def loadShader[T](c: Context, constructor: MaybeRead[T], folder: String, defaultName: String, defaultObj: Option[T]): Array[(String, (Unit)=>GLResult[T])] = {
-    val default = defaultObj.map(x => (defaultName, (_: Unit) => Right(x)))
+  def loadShader[T](c: Context, constructor: (GLInit, InputStream)=>GLResult[T], 
+      folder: String, defaultName: String, defaultObj: Option[(GLInit)=>T]): Array[(String, (GLInit)=>GLResult[T])] = {
+        val default: Option[(String, (GLInit)=>GLResult[T])] = defaultObj.map(x => (defaultName, (data: GLInit) => Right(x(data))))
     val filenamed = withFilename[T](constructor)
     val files = allfiles[T](c, folder)
-    val shaders: Seq[(String, (Unit)=>GLResult[T])] = files.map(filenamed)
+    val shaders: Seq[(String, (GLInit)=>GLResult[T])] = files.map(filenamed)
     (default.toSeq ++ shaders).toArray
   }
 
-  def loadBrushes(c: Context, data: GLInit): Array[(String, (Unit)=>GLResult[Texture])] = {
-    val decoder: (InputStream=>GLResult[Texture]) = (is: InputStream) => (decodeBitmap(Bitmap.Config.ALPHA_8)(is).right.flatMap(Texture(data, _)))
+  def loadBrushes(c: Context): Array[(String, (GLInit)=>GLResult[Texture])] = {
+    val decoder: ((GLInit, InputStream)=>GLResult[Texture]) = (data: GLInit, is: InputStream) => (decodeBitmap(Bitmap.Config.ALPHA_8)(is).right.flatMap(Texture(data, _)))
     loadShader[Texture](c, decoder, "brushes", null, None)
   }
 
-  def foldShader[T](x: GLResult[T]) = x.fold(a => None, b => Some(b))
-
   // TODO: make these safe
-  def loadPointShaders(c: Context, data: GLInit): Seq[(String, (Unit)=>GLResult[PointShader])] = {
-    val constructor = readShader(PointShader(data, _, _)) _
-    loadShader(c, constructor, "pointshaders", "Default Paint", foldShader(PointShader(data, null, null)))
+  def loadPointShaders(c: Context): Seq[(String, (GLInit)=>GLResult[PointShader])] = {
+    val constructor = readShader(PointShader.apply _) _
+    loadShader[PointShader](c, constructor, "pointshaders", "Default Paint", Some((data: GLInit) => PointShader(data, null, null).right.get))
   }
 
-  def loadAnimShaders(c: Context, data: GLInit): Seq[(String, (Unit)=>GLResult[CopyShader])] = {
-    val constructor = readShader(CopyShader(data, _, _)) _
-    loadShader(c, constructor, "animshaders", "Default Animation", foldShader(CopyShader(data, null, null)))
+  def loadAnimShaders(c: Context): Seq[(String, (GLInit)=>GLResult[CopyShader])] = {
+    val constructor = readShader(CopyShader.apply _) _
+    loadShader(c, constructor, "animshaders", "Default Animation", Some((data: GLInit) => CopyShader(data, null, null).right.get))
   }
 
-  def loadScripts(c: Context, data: GLInit): Seq[(String, (Unit)=>GLResult[LuaScript])] = {
-    val constructor = (LuaScript(data, _: String)).compose(readStream _)
-    loadShader(c, constructor, "interpolators", "Default Interpolator", foldShader(LuaScript(data, null)))
+  def loadScripts(c: Context): Seq[(String, (GLInit)=>GLResult[LuaScript])] = {
+    val constructor = (data: GLInit, is: InputStream) => LuaScript(data, readStream(is))
+    loadShader(c, constructor, "interpolators", "Default Interpolator", Some((data: GLInit) => LuaScript(data, null).right.get))
   }
 
-  def loadUniBrushes(c: Context, data: GLInit): Seq[(String, (Unit)=>GLResult[UniBrush])] = {
-    val constructor = UniBrush.compile(data, _: InputStream)
+  def loadUniBrushes(c: Context): Seq[(String, (GLInit)=>GLResult[UniBrush])] = {
+    val constructor = UniBrush.compileFromStream _
     val defaultbrush = UniBrush(None, None, None, None, None, Array.empty)
-    loadShader(c, constructor, "unibrushes", "Nothing", Some(defaultbrush))
+    loadShader(c, constructor, "unibrushes", "Nothing", Some((data: GLInit) => defaultbrush))
   }
 
   def halfShaderPair(shader: String) = {
@@ -117,9 +120,9 @@ def withFilename[T](reader: MaybeRead[T]): ((String, (Unit)=>ManagedResource[Inp
     else None
   }
 
-  def readShader[T](constructor: (String, String)=>GLResult[T])(src: InputStream): GLResult[T] = {
+  def readShader[T](constructor: (GLInit, String, String)=>GLResult[T])(data: GLInit, src: InputStream): GLResult[T] = {
     halfShaderPair(readStream(src)) match {
-      case Some((vec, frag)) => constructor(vec, frag)
+      case Some((vec, frag)) => constructor(data, vec, frag)
       case None => Left("unable to load file")
     }
   }

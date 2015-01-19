@@ -209,14 +209,18 @@ impl<'a> GLInit<'a> {
     }
 
     #[inline]
-    pub fn erase_layer(&mut self, layer: i32) {
+    pub fn erase_layer(&mut self, layer: i32) -> GLResult<()> {
         let target = match layer {
             0 => self.targetdata.get_current_texturetarget().framebuffer,
-            _ => self.paintstate.layers[(layer - 1) as uint].target.framebuffer
+            _ => match self.paintstate.layers.as_slice().get((layer - 1) as uint) {
+                Some(layer) => layer.target.framebuffer,
+                None => return Err(format!("tried to erase layer {} of {}", layer - 1, self.paintstate.layers.len())),
+            },
         };
         gl2::bind_framebuffer(gl2::FRAMEBUFFER, target);
         gl2::clear_color(0f32, 0f32, 0f32, 0f32);
         gl2::clear(gl2::COLOR_BUFFER_BIT);
+        Ok(())
     }
 
     pub fn setup_graphics<'a>(w: i32, h: i32) -> GLInit<'a> {
@@ -254,7 +258,9 @@ impl<'a> GLInit<'a> {
 
                 let interp_error = match self.paintstate.interpolator {
                     Some(interpolator) => unsafe {
-                        do_interpolate_lua(interpolator, self.dimensions, &mut LuaCallbackType::new(self, events, handler))
+                        let dimensions = self.dimensions;
+                        let mut callback = try!(LuaCallbackType::new(self, events, handler));
+                        do_interpolate_lua(interpolator, dimensions, &mut callback)
                     },
                     None => Ok(())
                 };
