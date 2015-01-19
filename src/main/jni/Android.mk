@@ -32,7 +32,7 @@ include $(PREBUILT_STATIC_LIBRARY)
 include $(CLEAR_VARS)
 
 LOCAL_MODULE    := gl-stuff
-LOCAL_SRC_FILES := unwind.c lua_geom.c
+LOCAL_SRC_FILES := hello-jni.c unwind.c lua_geom.c
 
 LOCAL_CFLAGS := -std=c99 -Wall -Wextra -Wno-unused -Werror -g
 LOCAL_LDFLAGS := -L/opt/android-ndk/android-ndk-r9b/sources/cxx-stl/gnu-libstdc++/4.6/libs/armeabi -z muldefs

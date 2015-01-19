@@ -2,8 +2,9 @@ package com.github.wartman4404.gldraw
 import android.view._
 import android.widget._
 import android.content.Context
+import GLResultTypeDef._
 
-class LazyPicker[T](context: Context, thread: TextureSurfaceThread, content: Seq[(String, (Unit)=>Option[T])]) extends BaseAdapter {
+class LazyPicker[T](context: Context, thread: TextureSurfaceThread, content: Seq[(String, (Unit)=>GLResult[T])]) extends BaseAdapter {
   val inflater = LayoutInflater.from(context)
   val lazified: Seq[(String, LoadedState[T])] = content.map { case (k, v) => (k, new LoadedState(v)) }
   case class Holder(nameView: TextView)
@@ -28,15 +29,16 @@ class LazyPicker[T](context: Context, thread: TextureSurfaceThread, content: Seq
     holder.nameView.setText(item._1)
     view
   }
-  def getState(pos: Int, cb: (Option[T])=>Any) = {
+  def getState(pos: Int, cb: (GLResult[T])=>Any) = {
     lazified(pos)._2.get(cb)
   }
   //DANGER: runs callback on gl thread
-  class LoadedState[T](var loader: (Unit)=>Option[T]) {
-    def get(cb: (Option[T])=>Any) = {
+  class LoadedState[T](var loader: (Unit)=>GLResult[T]) {
+    def get(cb: (GLResult[T])=>Any) = {
       thread.runHere {
-        _value = loader(())
-        cb(_value)
+        val value = loader(())
+        _value = value.right.toOption
+        cb(value)
       }
     }
 

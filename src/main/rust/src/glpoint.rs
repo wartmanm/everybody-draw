@@ -21,6 +21,7 @@ use point;
 use point::{ShaderPaintPoint, Coordinate, PointEntry, PointConsumer, PointProducer};
 use activestate;
 use drawevent::Events;
+use luascript::LuaScript;
 
 use alloc::boxed::Box;
 
@@ -53,12 +54,7 @@ pub struct LuaCallbackType<'a, 'b, 'c, 'd: 'b> {
     drawvecs: &'c mut [Vec<ShaderPaintPoint>],
 }
 
-fn get_safe_data<'a, T>(data: *mut T) -> &'a mut T {
-    unsafe { &mut *data }
-}
-
-#[no_mangle]
-pub extern fn create_motion_event_handler() -> (*mut MotionEventConsumer, *mut MotionEventProducer) {
+pub fn create_motion_event_handler() -> (Box<MotionEventConsumer>, Box<MotionEventProducer>) {
     let (consumer, producer) = spsc_queue::queue::<PointEntry>(0);
     let handler = box MotionEventConsumer {
         consumer: consumer,
@@ -72,25 +68,16 @@ pub extern fn create_motion_event_handler() -> (*mut MotionEventConsumer, *mut M
         pointer_data: motionevent::Data::new(),
     };
     logi("created statics");
-    unsafe {
-        let handlerptr: *mut MotionEventConsumer = mem::transmute(handler) ;
-        let producerptr: *mut MotionEventProducer = mem::transmute(producer) ;
-        (handlerptr, producerptr)
-    }
+    (handler, producer)
 }
 
-#[no_mangle]
-pub unsafe extern fn destroy_motion_event_handler(consumer: *mut MotionEventConsumer, producer: *mut MotionEventProducer) {
-    let handler: Box<MotionEventConsumer> = mem::transmute(consumer);
-    let producer: Box<MotionEventProducer> = mem::transmute(producer);
-    mem::drop(handler);
+pub unsafe fn destroy_motion_event_handler(consumer: Box<MotionEventConsumer>, producer: Box<MotionEventProducer>) {
+    mem::drop(consumer);
     mem::drop(producer);
 }
 
-#[no_mangle]
 //FIXME: needs meaningful name
-pub extern fn jni_append_motion_event(s: &mut MotionEventProducer, evt: *const AInputEvent) {
-    let s = get_safe_data(s);
+pub fn jni_append_motion_event(s: &mut MotionEventProducer, evt: *const AInputEvent) {
     append_motion_event(&mut s.pointer_data, evt, &mut s.producer);
 }
 
@@ -100,9 +87,8 @@ fn manhattan_distance(a: Coordinate, b: Coordinate) -> f32 {
     return if x > y { x } else { y };
 }
 
-pub fn run_interpolators(dimensions: (i32, i32), s: *mut MotionEventConsumer, events: & mut Events, drawvecs: & mut [Vec<ShaderPaintPoint>]) -> bool {
-    let s = get_safe_data(s);
-    match events.interpolator {
+pub fn run_interpolators(dimensions: (i32, i32), s: &mut MotionEventConsumer, events: & mut Events, interpolator: Option<&LuaScript>, drawvecs: & mut [Vec<ShaderPaintPoint>]) -> bool {
+    match interpolator {
         Some(interpolator) => {
             interpolator.prep();
             run_lua_shader(dimensions, LuaCallbackType {

@@ -1,6 +1,7 @@
 use core::prelude::*;
 use core::{mem, fmt};
 use core::fmt::Show;
+use collections::str::StrAllocating;
 
 use opengles::gl2;
 use opengles::gl2::{GLint, GLuint, GLfloat};
@@ -8,7 +9,7 @@ use opengles::gl2::{GLint, GLuint, GLfloat};
 use log::{logi,loge};
 
 use glcommon;
-use glcommon::{check_gl_error, get_shader_handle, get_uniform_handle_option, Shader};
+use glcommon::{check_gl_error, get_shader_handle, get_uniform_handle_option, Shader, GLResult};
 use gltexture::{Texture};
     
 static TRIANGLE_VERTICES: [GLfloat, ..8] = [
@@ -59,38 +60,30 @@ pub struct CopyShader {
 }
 
 impl Shader for CopyShader {
-    fn new(vertopt: Option<&str>, fragopt: Option<&str>) -> Option<CopyShader> {
+    fn new(vertopt: Option<&str>, fragopt: Option<&str>) -> GLResult<CopyShader> {
         let vert = vertopt.unwrap_or_else(|| { logi("copy shader: using default vertex shader"); DEFAULT_VERTEX_SHADER});
         let frag = fragopt.unwrap_or_else(|| { logi("copy shader: using default fragment shader"); DEFAULT_FRAGMENT_SHADER});
-        let program_option = glcommon::create_program(vert, frag);
-        match program_option {
-            None => {
-                loge("could not create texture copy shader");
-                None
+        let program = try!(glcommon::create_program(vert, frag));
+
+        let position_option = get_shader_handle(program, "vPosition");
+        let tex_coord_option = get_shader_handle(program, "vTexCoord");
+        let texture_option = get_uniform_handle_option(program, "texture");
+        let matrix_option = get_uniform_handle_option(program, "textureMatrix");
+        match (position_option, tex_coord_option, texture_option, matrix_option) {
+            (Some(position), Some(tex_coord), Some(texture), Some(matrix)) => {
+                let shader = CopyShader {
+                    program: program,
+                    position_handle: position,
+                    tex_coord_handle: tex_coord,
+                    texture_handle: texture,
+                    matrix_handle: matrix,
+                };
+                logi!("created {}", shader);
+                Ok(shader)
             }
-            Some(program) => {
-                let position_option = get_shader_handle(program, "vPosition");
-                let tex_coord_option = get_shader_handle(program, "vTexCoord");
-                let texture_option = get_uniform_handle_option(program, "texture");
-                let matrix_option = get_uniform_handle_option(program, "textureMatrix");
-                match (position_option, tex_coord_option, texture_option, matrix_option) {
-                    (Some(position), Some(tex_coord), Some(texture), Some(matrix)) => {
-                        let shader = CopyShader {
-                            program: program,
-                            position_handle: position,
-                            tex_coord_handle: tex_coord,
-                            texture_handle: texture,
-                            matrix_handle: matrix,
-                        };
-                        logi!("created {}", shader);
-                        Some(shader)
-                    }
-                    _ => {
-                        loge!("copy shader missing vPosition, vTexCoord, or texture");
-                        gl2::delete_program(program);
-                        None
-                    }
-                }
+            _ => {
+                gl2::delete_program(program);
+                Err("copy shader missing vPosition, vTexCoord, or texture".into_string())
             }
         }
     }

@@ -9,6 +9,7 @@
 /// more importantly, switch to a map and return keys, rather than using indices
 
 use core::prelude::*;
+use core::mem;
 use collections::vec::Vec;
 use collections::string::String;
 use collections::{Map, MutableMap, MutableSeq};
@@ -20,16 +21,28 @@ use gltexture::{PixelFormat, Texture};
 use pointshader::PointShader;
 use glcommon::Shader;
 use luascript::LuaScript;
+use arena::TypedArena;
+use glcommon::GLResult;
 
 /// Holds GL objects that can be inited using the given keys.
 /// The list is to avoid having to pass those keys around, and serialize more easily.
-/// There may be a better way?
-pub struct DrawObjectList<T, Init: Eq+Hash> {
+/// The arena doesn't relocate its entries, so we can pass back longer-lived pointers,
+/// even if it needs some encouragement to do so.
+/// There ought to be a better way.
+pub struct DrawObjectList<'a, T: 'a, Init: Eq+Hash> {
     map: HashMap<Init, DrawObjectIndex<T>, SipHasher>,
-    list: Vec<T>,
+    list: Vec<&'a T>,
+    arena: TypedArena<T>,
 }
 
+#[deriving(Show)]
 pub struct DrawObjectIndex<T>(i32);
+
+impl<T> DrawObjectIndex<T> {
+    pub fn error() -> DrawObjectIndex<T> {
+        unsafe { mem::transmute(-1i) }
+    }
+}
 
 pub type ShaderInitValues = (Option<String>, Option<String>);
 pub type BrushInitValues = (PixelFormat, (i32, i32), Vec<u8>);
@@ -43,7 +56,7 @@ pub trait InitFromCache<Init> {
     fn init(&Init) -> Self;
 }
 pub trait MaybeInitFromCache<Init: Eq+Hash> {
-    fn maybe_init(&Init) -> Option<Self>;
+    fn maybe_init(&Init) -> GLResult<Self>;
 }
 trait ToOwnedInit<Init> {
     fn to_owned(&Self) -> Init;
@@ -52,21 +65,21 @@ trait ToOwnedInit<Init> {
 // this and the two shader impls were originally a single
 // impl<T: Shader> InitFromCache<ShaderInitValues> for Option<T>
 // but that counts as the impl for all of Option, not just Option<Shader>
-fn _init_copy_shader<T: Shader>(value: &(Option<String>, Option<String>)) -> Option<T> {
+fn _init_copy_shader<T: Shader>(value: &(Option<String>, Option<String>)) -> GLResult<T> {
     let &(ref frag, ref vert) = value;
     let (vertopt, fragopt) = (vert.as_ref().map(|x|x.as_slice()), frag.as_ref().map(|x|x.as_slice()));
     Shader::new(fragopt, vertopt)
 }
 impl MaybeInitFromCache<ShaderInitValues> for CopyShader {
-    fn maybe_init(value: &(Option<String>, Option<String>)) -> Option<CopyShader> { _init_copy_shader(value) }
+    fn maybe_init(value: &(Option<String>, Option<String>)) -> GLResult<CopyShader> { _init_copy_shader(value) }
 }
 impl MaybeInitFromCache<ShaderInitValues> for PointShader {
-    fn maybe_init(value: &(Option<String>, Option<String>)) -> Option<PointShader> { _init_copy_shader(value) }
+    fn maybe_init(value: &(Option<String>, Option<String>)) -> GLResult<PointShader> { _init_copy_shader(value) }
 }
 // TODO: use this as the impl for all InitFromCache<Init>
 impl MaybeInitFromCache<BrushInitValues> for Texture {
-    fn maybe_init(value: &BrushInitValues) -> Option<Texture> {
-        Some(InitFromCache::init(value))
+    fn maybe_init(value: &BrushInitValues) -> GLResult<Texture> {
+        Ok(InitFromCache::init(value))
     }
 }
 
@@ -78,13 +91,13 @@ impl InitFromCache<BrushInitValues> for Texture {
 }
 
 impl MaybeInitFromCache<LuaInitValues> for LuaScript {
-    fn maybe_init(value: &Option<String>) -> Option<LuaScript> {
+    fn maybe_init(value: &Option<String>) -> GLResult<LuaScript> {
         LuaScript::new(value.as_ref().map(|x|x.as_slice()))
     }
 }
 
-impl<T: MaybeInitFromCache<Init>, Init: Hash+Eq> DrawObjectList<T, Init> {
-    pub fn new() -> DrawObjectList<T, Init> {
+impl<'a, T: MaybeInitFromCache<Init>, Init: Hash+Eq> DrawObjectList<'a, T, Init> {
+    pub fn new() -> DrawObjectList<'a, T, Init> {
         // the default hasher is keyed off of the task-local rng,
         // which would blow up since we don't have a task
         //let mut rng = rand::weak_rng();
@@ -95,35 +108,37 @@ impl<T: MaybeInitFromCache<Init>, Init: Hash+Eq> DrawObjectList<T, Init> {
         DrawObjectList {
             map: map,
             list: Vec::new(),
+            arena: TypedArena::new(),
         }
     }
 
     // TODO: avoid allocations just to see if the key is in the map
-    pub fn push_object<'b>(&mut self, init: Init) -> Option<DrawObjectIndex<T>> {
+    pub fn push_object(&mut self, init: Init) -> GLResult<DrawObjectIndex<T>> {
         // Can't use map.entry() here as it consumes the key
         if self.map.contains_key(&init) {
-            Some(*self.map.find(&init).unwrap())
+            Ok(*self.map.find(&init).unwrap())
         } else {
-            match MaybeInitFromCache::maybe_init(&init) {
-                Some(inited) => {
-                    self.list.push(inited);
-                    let index = self.list.len() - 1;
-                    let objindex = DrawObjectIndex(index as i32);
-                    self.map.insert(init, objindex);
-                    Some(objindex)
-                },
-                None => None,
+            let inited = try!(MaybeInitFromCache::maybe_init(&init));
+            // ptr's lifetime is limited to &self's, which is fair but not very useful.
+            // smart ptrs involve individual allocs but are probably better
+            let ptr = self.arena.alloc(inited);
+            unsafe {
+                self.list.push(mem::transmute(ptr));
             }
+            let index = self.list.len() - 1;
+            let objindex = DrawObjectIndex(index as i32);
+            self.map.insert(init, objindex);
+            Ok(objindex)
         }
     }
 
-    pub fn get_object<'a>(&'a self, i: DrawObjectIndex<T>) -> &T {
+    pub fn get_object(&self, i: DrawObjectIndex<T>) -> &'a T {
         let DrawObjectIndex(idx) = i;
-        &self.list[idx as uint]
+        self.list[idx as uint]
     }
 }
 
-impl<T: InitFromCache<Init>+MaybeInitFromCache<Init>, Init: Hash+Eq> DrawObjectList<T, Init> {
+impl<'a, T: InitFromCache<Init>+MaybeInitFromCache<Init>, Init: Hash+Eq> DrawObjectList<'a, T, Init> {
     pub fn safe_push_object(&mut self, init: Init) -> DrawObjectIndex<T> {
         self.push_object(init).unwrap()
     }

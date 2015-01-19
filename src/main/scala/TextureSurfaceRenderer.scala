@@ -149,7 +149,7 @@ extends Thread with Handler.Callback with AndroidImplicits {
 
   // private
   private def initOutputShader(g: GLInit) = {
-    outputShader = CopyShader(g, null, null)
+    outputShader = CopyShader(g, null, null).right.toOption
     outputShader.map((x) => {
         nativeSetCopyShader(g, x)
       })

@@ -1,6 +1,7 @@
 use core::prelude::*;
 use core::{mem, fmt};
 use core::fmt::Show;
+use collections::str::StrAllocating;
 
 use log::{logi, loge};
 
@@ -8,7 +9,7 @@ use opengles::gl2;
 use opengles::gl2::{GLint, GLuint};
 
 use glcommon;
-use glcommon::{check_gl_error, get_shader_handle, get_uniform_handle_option, Shader};
+use glcommon::{check_gl_error, get_shader_handle, get_uniform_handle_option, Shader, GLResult};
 use point::ShaderPaintPoint;
 use gltexture::Texture;
 
@@ -66,43 +67,35 @@ pub struct PointShader {
 }
 
 impl Shader for PointShader {
-    fn new(vertopt: Option<&str>, fragopt: Option<&str>) -> Option<PointShader> {
+    fn new(vertopt: Option<&str>, fragopt: Option<&str>) -> GLResult<PointShader> {
         let vert = vertopt.unwrap_or_else(|| { logi("point shader: using default vertex shader"); DEFAULT_VERTEX_SHADER});
         let frag = fragopt.unwrap_or_else(|| { logi("point shader: using default fragment shader"); DEFAULT_FRAGMENT_SHADER});
-        let program_option = glcommon::create_program(vert, frag);
-        match program_option {
-            None => {
-                loge("could not create point shader");
-                None
+        let program = try!(glcommon::create_program(vert, frag));
+
+        let position_option = get_shader_handle(program, "vPosition"); 
+        let matrix_option = gl2::get_uniform_location(program, "textureMatrix");
+        match (position_option, matrix_option) {
+            (Some(position), matrix) if matrix != -1 => {
+                let shader = PointShader {
+                    program: program,
+                    position_handle: position,
+                    size_handle: get_shader_handle(program, "vSize"),
+                    time_handle: get_shader_handle(program, "vTime"),
+                    matrix_handle: matrix,
+                    texture_handle: get_uniform_handle_option(program, "texture"),
+                    color_handle: gl2::get_uniform_location(program, "vColor"),
+                    pointer_handle: get_shader_handle(program, "vPointer"),
+                    speed_handle: get_shader_handle(program, "vSpeed"),
+                    distance_handle: get_shader_handle(program, "vDistance"),
+                    back_buffer_handle: get_uniform_handle_option(program, "backbuffer"),
+                    texture_size_handle: gl2::get_uniform_location(program, "texturesize"),
+                };
+                logi!("created {}", shader);
+                Ok(shader)
             }
-            Some(program) => {
-                let position_option = get_shader_handle(program, "vPosition"); 
-                let matrix_option = gl2::get_uniform_location(program, "textureMatrix");
-                match (position_option, matrix_option) {
-                    (Some(position), matrix) if matrix != -1 => {
-                        let shader = PointShader {
-                            program: program,
-                            position_handle: position,
-                            size_handle: get_shader_handle(program, "vSize"),
-                            time_handle: get_shader_handle(program, "vTime"),
-                            matrix_handle: matrix,
-                            texture_handle: get_uniform_handle_option(program, "texture"),
-                            color_handle: gl2::get_uniform_location(program, "vColor"),
-                            pointer_handle: get_shader_handle(program, "vPointer"),
-                            speed_handle: get_shader_handle(program, "vSpeed"),
-                            distance_handle: get_shader_handle(program, "vDistance"),
-                            back_buffer_handle: get_uniform_handle_option(program, "backbuffer"),
-                            texture_size_handle: gl2::get_uniform_location(program, "texturesize"),
-                        };
-                        logi!("created {}", shader);
-                        Some(shader)
-                    }
-                    _ => {
-                        loge("point shader missing vPosition or textureMatrix attribute");
-                        gl2::delete_program(program);
-                        None
-                    }
-                }
+            _ => {
+                gl2::delete_program(program);
+                Err("point shader missing vPosition or textureMatrix attribute".into_string())
             }
         }
     }

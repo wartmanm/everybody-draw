@@ -12,15 +12,16 @@ use core::prelude::*;
 use collections::vec::Vec;
 use collections::{Mutable, MutableSeq};
 use collections::slice::CloneableVector;
+use collections::string::String;
 use point::PointEntry;
 use glstore::{DrawObjectIndex, DrawObjectList};
 use glstore::{ShaderInitValues, BrushInitValues, LuaInitValues};
 use gltexture::{Texture, PixelFormat};
 use pointshader::PointShader;
 use copyshader::CopyShader;
-use collections::str::StrAllocating;
 use luascript::LuaScript;
 use paintlayer::PaintLayer;
+use glcommon::GLResult;
 
 enum DrawEvent {
     UseAnimShader(DrawObjectIndex<CopyShader>),
@@ -36,16 +37,10 @@ enum DrawEvent {
 
 pub struct Events<'a> {
     eventlist: Vec<DrawEvent>,
-    pointshaders: DrawObjectList<PointShader, ShaderInitValues>,
-    copyshaders: DrawObjectList<CopyShader, ShaderInitValues>,
-    textures: DrawObjectList<Texture, BrushInitValues>,
-    luascripts: DrawObjectList<LuaScript, LuaInitValues>,
-    pub pointshader: Option<&'a PointShader>,
-    pub animshader: Option<&'a CopyShader>,
-    pub copyshader: Option<&'a CopyShader>,
-    pub brush: Option<&'a Texture>,
-    pub interpolator: Option<&'a LuaScript>,
-    pub layers: Vec<PaintLayer<'a>>,
+    pointshaders: DrawObjectList<'a, PointShader, ShaderInitValues>,
+    copyshaders: DrawObjectList<'a, CopyShader, ShaderInitValues>,
+    textures: DrawObjectList<'a, Texture, BrushInitValues>,
+    luascripts: DrawObjectList<'a, LuaScript, LuaInitValues>,
 }
 
 impl<'a> Events<'a> {
@@ -56,81 +51,63 @@ impl<'a> Events<'a> {
             copyshaders: DrawObjectList::new(),
             textures: DrawObjectList::new(),
             luascripts: DrawObjectList::new(),
-            pointshader: None,
-            animshader: None,
-            copyshader: None,
-            brush: None,
-            interpolator: None,
-            layers: Vec::new(),
         }
     }
 
     // FIXME: let glstore deal with optionalness
-    pub fn load_copyshader(&mut self, vert: Option<&str>, frag: Option<&str>) -> Option<DrawObjectIndex<CopyShader>> {
-        let initargs = (vert.map(|x|x.into_string()), frag.map(|x|x.into_string()));
+    pub fn load_copyshader(&mut self, vert: Option<String>, frag: Option<String>) -> GLResult<DrawObjectIndex<CopyShader>> {
+        let initargs = (vert, frag);
         self.copyshaders.push_object(initargs)
     }
 
-    pub fn use_copyshader(&'a mut self, idx: DrawObjectIndex<CopyShader>) -> &CopyShader {
+    pub fn use_copyshader(&mut self, idx: DrawObjectIndex<CopyShader>) -> &'a CopyShader {
         self.eventlist.push(UseCopyShader(idx));
-        let shader = self.copyshaders.get_object(idx);
-        self.copyshader = Some(shader);
-        shader
+        self.copyshaders.get_object(idx)
     }
 
-    pub fn use_animshader(&'a mut self, idx: DrawObjectIndex<CopyShader>) -> &CopyShader {
+    pub fn use_animshader(&mut self, idx: DrawObjectIndex<CopyShader>) -> &'a CopyShader {
         self.eventlist.push(UseAnimShader(idx));
-        let shader = self.copyshaders.get_object(idx);
-        self.animshader = Some(shader);
-        shader
+        self.copyshaders.get_object(idx)
     }
-    pub fn load_pointshader(&mut self, vert: Option<&str>, frag: Option<&str>) -> Option<DrawObjectIndex<PointShader>> {
-        let initargs = (vert.map(|x|x.into_string()), frag.map(|x|x.into_string()));
+
+    pub fn load_pointshader(&mut self, vert: Option<String>, frag: Option<String>) -> GLResult<DrawObjectIndex<PointShader>> {
+        let initargs = (vert, frag);
         self.pointshaders.push_object(initargs)
     }
-    pub fn use_pointshader(&'a mut self, idx: DrawObjectIndex<PointShader>) -> &PointShader {
+    pub fn use_pointshader(&mut self, idx: DrawObjectIndex<PointShader>) -> &'a PointShader {
         self.eventlist.push(UsePointShader(idx));
-        let shader = self.pointshaders.get_object(idx);
-        self.pointshader = Some(shader);
-        shader
+        self.pointshaders.get_object(idx)
     }
     pub fn load_brush(&mut self, w: i32, h: i32, pixels: &[u8], format: PixelFormat) -> DrawObjectIndex<Texture> {
         let ownedpixels = pixels.to_vec();
         let init: BrushInitValues = (format, (w, h), ownedpixels);
         self.textures.safe_push_object(init)
     }
-    pub fn use_brush(&'a mut self, idx: DrawObjectIndex<Texture>) -> &Texture {
+    pub fn use_brush(&mut self, idx: DrawObjectIndex<Texture>) -> &'a Texture {
         self.eventlist.push(UseBrush(idx));
-        let brush = self.textures.get_object(idx);
-        self.brush = Some(brush);
-        brush
+        self.textures.get_object(idx)
     }
-    pub fn load_interpolator(&mut self, script: Option<&str>) -> Option<DrawObjectIndex<LuaScript>> {
-        let initopt: LuaInitValues = script.map(|x|x.into_string());
+    pub fn load_interpolator(&mut self, script: Option<String>) -> GLResult<DrawObjectIndex<LuaScript>> {
+        let initopt: LuaInitValues = script;
         self.luascripts.push_object(initopt)
     }
 
-    pub fn use_interpolator(&mut self, idx: DrawObjectIndex<LuaScript>) -> &LuaScript {
+    pub fn use_interpolator(&mut self, idx: DrawObjectIndex<LuaScript>) -> &'a LuaScript {
         self.eventlist.push(UseInterpolator(idx));
-        let interpolator = self.luascripts.get_object(idx);
-        self.interpolator = Some(interpolator);
-        interpolator
+        self.luascripts.get_object(idx)
     }
 
     pub fn add_layer(&mut self, dimensions: (i32, i32)
                      , copyshader: Option<DrawObjectIndex<CopyShader>>, pointshader: Option<DrawObjectIndex<PointShader>>
-                     , pointidx: i32) -> &PaintLayer {
+                     , pointidx: i32) -> PaintLayer<'a> {
         self.eventlist.push(AddLayer(copyshader, pointshader, pointidx));
         let copyshader = match copyshader { Some(x) => Some(self.copyshaders.get_object(x)), None => None };
         let pointshader = match pointshader { Some(x) => Some(self.pointshaders.get_object(x)), None => None };
-        let layer = PaintLayer::new(dimensions, copyshader, pointshader, pointidx);
-        self.layers.push(layer);
-        &self.layers[self.layers.len() - 1]
+        PaintLayer::new(dimensions, copyshader, pointshader, pointidx)
     }
 
     pub fn clear_layers(&mut self) {
         self.eventlist.push(ClearLayers);
-        self.layers.clear();
     }
 
     pub fn pushpoint(&mut self, event: PointEntry) {
@@ -158,7 +135,7 @@ impl EventStream {
     pub fn new() -> EventStream {
         EventStream { position: 0 }
     }
-    pub fn advance<'a>(&mut self, events: &'a mut Events<'a>, mut framecount: u32, playback: bool, m: &mut ::point::PointProducer, gl: &mut ::glinit::Data) {
+    pub fn advance<'a>(&mut self, events: &'a mut Events<'a>, mut framecount: u32, playback: bool, m: &mut ::point::PointProducer, gl: &'a mut ::glinit::GLInit<'a>) {
         if framecount == 0 || self.position >= events.get_eventcount() {
             return;
         }
@@ -167,16 +144,16 @@ impl EventStream {
         let event = events.get_event(self.position);
         while framecount > 0 && self.position < limit {
             match event {
-                // FIXME do this without exposing Events internal details
-                UseAnimShader(idx) => events.animshader = Some(events.copyshaders.get_object(idx)),
-                UseCopyShader(idx) => events.copyshader = Some(events.copyshaders.get_object(idx)),
-                UsePointShader(idx) => events.pointshader = Some(events.pointshaders.get_object(idx)),
-                UseBrush(idx) => events.brush = Some(events.textures.get_object(idx)),
-                UseInterpolator(idx) => events.interpolator = Some(events.luascripts.get_object(idx)),
+                // FIXME do this without exposing Events or GLInit internal details
+                UseAnimShader(idx) => gl.paintstate.animshader = Some(events.copyshaders.get_object(idx)),
+                UseCopyShader(idx) => gl.paintstate.copyshader = Some(events.copyshaders.get_object(idx)),
+                UsePointShader(idx) => gl.paintstate.pointshader = Some(events.pointshaders.get_object(idx)),
+                UseBrush(idx) => gl.paintstate.brush = Some(events.textures.get_object(idx)),
+                UseInterpolator(idx) => gl.paintstate.interpolator = Some(events.luascripts.get_object(idx)),
                 Frame => {
                     framecount -= 1;
                     if playback {
-                        ::glinit::render_frame(gl);
+                        gl.render_frame();
                     }
                 },
                 Point(p) => m.push(p),

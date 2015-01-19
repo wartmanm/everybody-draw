@@ -14,6 +14,7 @@
     }, {
         "path": "android/native_window"
     }, {
-        "path": "jni"
+        "path": "jni",
+        "remove_fnptr_opts": true
     }
 ]

@@ -1,7 +1,9 @@
 use core::prelude::*;
 use core::{ptr, fmt};
 use core::fmt::Show;
+use collections::str::StrAllocating;
 use log::logi;
+use glcommon::GLResult;
 
 extern "C" {
     fn loadLuaScript(script: *const u8) -> i32;
@@ -14,13 +16,13 @@ pub struct LuaScript {
 }
 
 impl LuaScript {
-    pub fn new(script: Option<&str>) -> Option<LuaScript> {
+    pub fn new(script: Option<&str>) -> GLResult<LuaScript> {
         match unsafe { loadLuaScript(script.map_or(ptr::null(), |x| x.as_bytes().as_ptr())) } {
-            -1 => None,
+            -1 => Err("something went wrong loading the script!".into_string()),
             x  => {
                 let script = LuaScript { registry_id: x };
                 logi!("created {}", script);
-                Some(script)
+                Ok(script)
             }
         }
     }
