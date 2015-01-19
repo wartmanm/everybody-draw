@@ -1,8 +1,7 @@
 use core::prelude::*;
 use core::{mem, fmt};
 use core::fmt::Show;
-use collections::str::{StrAllocating, IntoMaybeOwned};
-use collections::string::String;
+use collections::str::IntoMaybeOwned;
 
 use opengles::gl2;
 use opengles::gl2::{GLint, GLuint, GLfloat};
@@ -64,7 +63,7 @@ impl Shader for CopyShader {
             }
             _ => {
                 gl2::delete_program(program);
-                Err("copy shader missing vPosition, vTexCoord, or texture".into_string())
+                Err("copy shader missing vPosition, vTexCoord, or texture".into_maybe_owned())
             }
         }
     }

@@ -1,4 +1,4 @@
-#![feature(globs, macro_rules, default_type_params, if_let, unboxed_closures, unboxed_closure_sugar, overloaded_calls, unsafe_destructor)]
+#![feature(globs, macro_rules, default_type_params, if_let, unboxed_closures, unsafe_destructor)]
 #![crate_name = "rustgl"]
 #![crate_type = "staticlib"]
 #![no_std]
@@ -12,6 +12,7 @@ extern crate alloc;
 extern crate std;
 extern crate arena;
 extern crate lua;
+extern crate rustrt;
 
 pub mod bindgen_builtins;
 pub mod android;
@@ -43,3 +44,4 @@ pub mod rustjni;
 pub mod lua_geom;
 pub mod lua_callbacks;
 pub mod redirect_stderr;
+pub mod jni_helpers;

@@ -3,7 +3,7 @@ name = "rustgl"
 version = "0.0.1"
 authors = [ ]
 
-build = [ "./mkbindings.py --prefix ./src bindings.json build" ]
+build = "build.rs"
 
 [dependencies.egl]
 path = "./deps/rust-egl"

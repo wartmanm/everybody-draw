@@ -1,8 +1,8 @@
 #![allow(non_snake_case)]
 use core::prelude::*;
 use core::{mem, ptr, raw};
-use core::str::raw::c_str_to_static_slice;
-use collections::str::StrAllocating;
+use core::str;
+use collections::str::{StrAllocating, IntoMaybeOwned};
 use collections::string::String;
 use libc::{c_char, c_void, size_t};
 
@@ -12,10 +12,13 @@ use lua::raw::*;
 use luajit::*;
 use luajit_constants::*;
 
-use glcommon::GLResult;
+use glcommon::{GLResult, MString};
 use log::{logi, loge};
 
 use lua_callbacks::LuaCallback;
+
+use lua_geom::SandboxMode::{Sandboxed, Unsandboxed};
+use lua_geom::LuaValue::{RegistryValue, IndexValue};
 
 static mut GLDRAW_LUA_CREATE_SANDBOX: *mut c_void = 0 as *mut c_void;
 static mut GLDRAW_LUA_STOPFNS: *mut c_void = 0 as *mut c_void;
@@ -44,6 +47,7 @@ enum SandboxMode {
 }
 
 enum LuaValue {
+    #[allow(dead_code)]
     RegistryValue(*mut c_void),
     IndexValue(i32),
 }
@@ -114,7 +118,7 @@ static mut LUA_ORIGINAL_PANICFN: *mut c_void = 0 as *mut c_void;
 unsafe extern "C" fn panic_wrapper(L: *mut lua_State) -> i32 {
     loge!("inside lua panic handler!");
     let errorcstr = lua_tostring(L, -1);
-    let errorstr = if errorcstr.is_null() { "" } else { c_str_to_static_slice(errorcstr) };
+    let errorstr = if errorcstr.is_null() { "" } else { str::from_c_str(errorcstr) };
     loge!("error is {}", errorstr);
     let panicfn: lua_CFunction = mem::transmute(LUA_ORIGINAL_PANICFN);
     panicfn(L); // should never return
@@ -144,7 +148,7 @@ unsafe fn init_lua() -> GLResult<*mut lua_State> {
         assert_eq!(stacksize, lua_gettop(L));
         Ok(L)
     } else {
-        let err = format!("ffi init script failed to load: {}\nThis should never happen!", err_to_str(L));
+        let err = format!("ffi init script failed to load: {}\nThis should never happen!", err_to_str(L)).into_maybe_owned();
         lua_close(L);
         log_err(err)
     }
@@ -161,9 +165,10 @@ unsafe fn get_lua() -> GLResult<*mut lua_State> {
 }
 
 #[no_mangle]
-pub unsafe fn rust_raise_lua_err(L: Option<*mut lua_State>, msg: *const i8) -> ! {
+pub unsafe fn rust_raise_lua_err(L: Option<*mut lua_State>, msg: &str) -> ! {
     let L = L.unwrap_or(get_existing_lua().unwrap());
-    ::lua::aux::raw::luaL_error(L, msg);
+    ::lua::raw::lua_pushlstring(L, msg.as_ptr() as *const i8, msg.len() as u32);
+    ::lua::raw::lua_error(L);
     panic!("luaL_error() returned, this should never happen!");
 }
 
@@ -175,7 +180,7 @@ pub unsafe fn get_existing_lua() -> Option<*mut lua_State> {
 pub unsafe fn get_existing_lua_or_err() -> GLResult<*mut lua_State> {
     match get_existing_lua() {
         Some(lua) => Ok(lua),
-        None => Err("couldn't get lua state!".into_string()),
+        None => Err("couldn't get lua state!".into_maybe_owned()),
     }
 }
 
@@ -191,7 +196,7 @@ unsafe fn save_ondone(L: *mut lua_State, key: i32, sandbox: LuaValue) -> GLResul
     sandbox.push_self(L); {
         lua_pushlightuserdata(L, GLDRAW_LUA_STOPFNS); {
             lua_gettable(L, LUA_REGISTRYINDEX);
-            logi!("type of gldraw_lua_stopfns is {}", c_str_to_static_slice(lua_typename(L, lua_type(L, -1))));
+            logi!("type of gldraw_lua_stopfns is {}", str::from_c_str(lua_typename(L, lua_type(L, -1))));
             // stack holds sandbox -- stopfns
             lua_pushlightuserdata(L, key as *mut c_void); {
                 // stack holds sandbox -- stopfns -- stopidx
@@ -200,7 +205,7 @@ unsafe fn save_ondone(L: *mut lua_State, key: i32, sandbox: LuaValue) -> GLResul
                     if !lua_isfunction(L, -1) {
                         lua_pop(L, 4);
                         assert_eq!(stacksize, lua_gettop(L));
-                        return log_err("ondone not defined.\nThis should never happen!".into_string());
+                        return log_err("ondone not defined.\nThis should never happen!".into_maybe_owned());
                     }
                     logi!("saving ondone method to 0x{:x} in gldraw_lua_stopfns", key);
                     lua_settable(L, -3);
@@ -227,7 +232,7 @@ pub unsafe fn load_lua_script(script: &str) -> GLResult<i32> {
         lua_pushlightuserdata(L, key as *mut c_void); {
 
             if !runstring(L, script, cstr!("interpolator script"), Sandboxed(sandbox_idx)) {
-                let err = format!("script failed to load: {}", err_to_str(L));
+                let err = format!("script failed to load: {}", err_to_str(L)).into_maybe_owned();
                 assert_eq!(stacksize, lua_gettop(L));
                 return log_err(err);
             }
@@ -236,7 +241,7 @@ pub unsafe fn load_lua_script(script: &str) -> GLResult<i32> {
                 lua_getfield(L, -1, cstr!("main")); {
                     if !lua_isfunction(L, -1) {
                         lua_pop(L, 3);
-                        return log_err("no main function defined :(".into_string());
+                        return log_err("no main function defined :(".into_maybe_owned());
                     }
                     luaJIT_setmode(L, 0, LUAJIT_MODE_ENGINE as i32|LUAJIT_MODE_ON as i32);
                     lua_pop(L, 1);
@@ -248,7 +253,7 @@ pub unsafe fn load_lua_script(script: &str) -> GLResult<i32> {
 
             // FIXME compile runner once
             if !runstring(L, LUA_RUNNER, cstr!("built-in lua_runner script"), Unsandboxed) {
-                let err = format!("lua runner failed to load: {}\n This should never happen!", err_to_str(L));
+                let err = format!("lua runner failed to load: {}\n This should never happen!", err_to_str(L)).into_maybe_owned();
                 lua_pop(L, 1);
                 assert_eq!(stacksize, lua_gettop(L));
                 return log_err(err);
@@ -258,7 +263,7 @@ pub unsafe fn load_lua_script(script: &str) -> GLResult<i32> {
                 if !lua_isfunction(L, -1) {
                     lua_pop(L, 2);
                     assert_eq!(stacksize, lua_gettop(L));
-                    return log_err("runmain not defined.\nThis should never happen!".into_string());
+                    return log_err("runmain not defined.\nThis should never happen!".into_maybe_owned());
                 }
                 luaJIT_setmode(L, 0, LUAJIT_MODE_ENGINE as i32|LUAJIT_MODE_ON as i32);
 
@@ -286,12 +291,12 @@ pub unsafe fn finish_lua_script<T: LuaCallback>(output: &mut T, script: &::luasc
     let stacksize = lua_gettop(L);
     lua_pushlightuserdata(L, GLDRAW_LUA_STOPFNS);
     lua_gettable(L, LUA_REGISTRYINDEX);
-    logi!("type of gldraw_lua_stopfns is {}", c_str_to_static_slice(lua_typename(L, lua_type(L, -1))));
+    logi!("type of gldraw_lua_stopfns is {}", str::from_c_str(lua_typename(L, lua_type(L, -1))));
 
     // stack is stopfns
     script.push_self();
     lua_gettable(L, -2);
-    logi!("type of stopfn for {} is {}", script, c_str_to_static_slice(lua_typename(L, lua_type(L, -1))));
+    logi!("type of stopfn for {} is {}", script, str::from_c_str(lua_typename(L, lua_type(L, -1))));
     // stack is stopfns -- stopfn
     lua_pushlightuserdata(L, output as *mut T as *mut c_void);
     logi!("calling lua ondone()");
@@ -300,7 +305,7 @@ pub unsafe fn finish_lua_script<T: LuaCallback>(output: &mut T, script: &::luasc
             lua_pop(L, 1); // remove stopfns
             Ok(())
         },
-        _ => log_err(format!("ondone() script failed to run: {}", err_to_str(L))),
+        _ => log_err(format!("ondone() script failed to run: {}", err_to_str(L)).into_maybe_owned()),
     };
     assert_eq!(stacksize, lua_gettop(L));
     result
@@ -315,7 +320,7 @@ pub unsafe fn destroy_lua_script(key: i32) {
     assert_eq!(stacksize, lua_gettop(L));
 }
 
-fn log_err<T>(message: String) -> GLResult<T> {
+fn log_err<T>(message: MString) -> GLResult<T> {
     loge(message.as_slice());
     Err(message)
 }
@@ -339,7 +344,7 @@ pub unsafe fn do_interpolate_lua<T: LuaCallback>(script: &::luascript::LuaScript
 
     let result = match lua_pcall(L, 3, 0, 0) {
         0 => Ok(()),
-        _ => log_err(format!("script failed to run: {}", err_to_str(L))),
+        _ => log_err(format!("script failed to run: {}", err_to_str(L)).into_maybe_owned()),
     };
     assert_eq!(stacksize, lua_gettop(L));
     result

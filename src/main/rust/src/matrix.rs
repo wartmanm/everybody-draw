@@ -21,7 +21,7 @@ pub static IDENTITY: Matrix =
      0f32, 0f32, 0f32, 1f32,];
 
 pub fn log(matrix: &[f32]) -> ::collections::string::String {
-    format!("[[{:-5.3f}, {:-5.3f}, {:-5.3f}, {:-5.3f}]\n [{:-5.3f}, {:-5.3f}, {:-5.3f}, {:-5.3f}]\n [{:-5.3f}, {:-5.3f}, {:-5.3f}, {:-5.3f}]\n [{:-5.3f}, {:-5.3f}, {:-5.3f}, {:-5.3f}]]",
+    format!("[[{:-5.3}, {:-5.3}, {:-5.3}, {:-5.3}]\n [{:-5.3}, {:-5.3}, {:-5.3}, {:-5.3}]\n [{:-5.3}, {:-5.3}, {:-5.3}, {:-5.3}]\n [{:-5.3}, {:-5.3}, {:-5.3}, {:-5.3}]]",
           matrix[0], matrix[1], matrix[2], matrix[3],
           matrix[4], matrix[5], matrix[6], matrix[7],
           matrix[8], matrix[9], matrix[10], matrix[11],

@@ -5,8 +5,7 @@ use collections::vec_map::VecMap;
 use log::logi;
 use android::input::*;
 
-use point;
-use point::{PaintPoint, Coordinate, PointEntry, PointProducer};
+use point::{PaintPoint, Coordinate, PointEntry, PointProducer, PointInfo};
 use activestate;
 
 static AMOTION_EVENT_ACTION_POINTER_INDEX_SHIFT: uint = 8;
@@ -34,7 +33,7 @@ pub fn pause(data: &mut Data, queue: &mut PointProducer) {
     // pro: straightforward, con: extra 4 bytes on every pointentry
     // could fold index into pointinfo, or have a magic index like -1 to indicate framestop
     // maybe this entire approach isn't such a good one after all?
-    queue.push(PointEntry { index: 0, entry: point::FrameStop })
+    queue.push(PointEntry { index: 0, entry: PointInfo::FrameStop })
 }
 
 pub fn append_motion_event(data: &mut Data, evt: *const AInputEvent, queue: &mut PointProducer) -> () {
@@ -101,12 +100,12 @@ fn make_active(queue: &mut PointProducer, active: &mut PointerState, id: i32, ne
     let updated = active.get(&(id as uint)).unwrap_or(&activestate::INACTIVE).push(newstate);
     active.insert(id as uint, updated);
     if updated == activestate::STOPPING {
-        queue.push(PointEntry { index: id, entry: point::Stop });
+        queue.push(PointEntry { index: id, entry: PointInfo::Stop });
     }
 }
 
 fn push_historical_point(queue: &mut PointProducer, evt: *const AInputEvent, id: i32, ptr: u32, hist: u32) {
-    queue.push(PointEntry { index: id, entry: point::Point(PaintPoint {
+    queue.push(PointEntry { index: id, entry: PointInfo::Point(PaintPoint {
         pos: Coordinate {
              x: unsafe { AMotionEvent_getHistoricalX(evt, ptr, hist) },
              y: unsafe { AMotionEvent_getHistoricalY(evt, ptr, hist) },
@@ -117,7 +116,7 @@ fn push_historical_point(queue: &mut PointProducer, evt: *const AInputEvent, id:
 }
 
 fn push_current_point(queue: &mut PointProducer, evt: *const AInputEvent, id: i32, ptr: u32) {
-    queue.push(PointEntry { index: id, entry: point::Point(PaintPoint {
+    queue.push(PointEntry { index: id, entry: PointInfo::Point(PaintPoint {
         pos: Coordinate {
             x: unsafe { AMotionEvent_getX(evt, ptr) },
             y: unsafe { AMotionEvent_getY(evt, ptr) },
@@ -130,7 +129,7 @@ fn push_current_point(queue: &mut PointProducer, evt: *const AInputEvent, id: i3
 fn push_stops(queue: &mut PointProducer, active: &mut PointerState) {
     for (idx, active) in active.iter_mut() {
         if *active == activestate::STOPPING {
-            queue.push(PointEntry { index: idx as i32, entry: point::Stop });
+            queue.push(PointEntry { index: idx as i32, entry: PointInfo::Stop });
         }
     }
 }

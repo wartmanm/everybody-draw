@@ -8,7 +8,8 @@ macro_rules!  format (
 
 macro_rules! write(
     ($dst:expr, $($arg:tt)*) => ({
-        format_args_method!($dst, write_fmt, $($arg)*)
+        let dst = &mut *$dst;
+        format_args!(|args| { dst.write_fmt(args) }, $($arg)*)
     })
 )
 

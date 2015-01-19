@@ -2,22 +2,21 @@ extern crate opengles;
 use core::prelude::*;
 use core::mem;
 use collections::vec::Vec;
-use collections::str::{StrAllocating, IntoMaybeOwned};
-use collections::string::String;
+use collections::str::IntoMaybeOwned;
 
 use log::{logi,loge};
 
 use opengles::gl2;
 use opengles::gl2::{GLuint, GLenum, GLubyte};
 
-use glcommon::{Shader, check_gl_error, GLResult};
+use glcommon::{check_gl_error, GLResult};
 use glpoint::{MotionEventConsumer};
 use point::ShaderPaintPoint;
 use pointshader::PointShader;
 use paintlayer::{TextureTarget, CompletedLayer};
 use copyshader::*;
 use gltexture;
-use gltexture::Texture;
+use gltexture::{Texture, PixelFormat};
 use matrix;
 use eglinit;
 use luascript::LuaScript;
@@ -91,7 +90,7 @@ impl UndoTargets {
         let target = &mut self.targets[end as uint];
         if self.pos >= self.max {
             let (x, y) = buf.texture.dimensions;
-            *target = TextureTarget::new(x, y, gltexture::RGBA);
+            *target = TextureTarget::new(x, y, PixelFormat::RGBA);
             self.max += 1;
         }
         gl2::bind_framebuffer(gl2::FRAMEBUFFER, target.framebuffer);
@@ -210,16 +209,20 @@ impl<'a> GLInit<'a> {
                        0f32,                    -glratioy,                0f32, 0f32,
                        0f32,                     0f32,                    1f32, 0f32,
                       (1f32 - glratiox) / 2f32, (1f32 + glratioy) / 2f32, 0f32, 0f32];
-        logi!("drawing with ratio: {:5.3f}, glratio {:5.3f}, {:5.3f}, matrix:\n{}", ratio, glratiox, glratioy, matrix::log(matrix.as_slice()));
+        logi!("drawing with ratio: {:5.3}, glratio {:5.3}, {:5.3}, matrix:\n{}", ratio, glratiox, glratioy, matrix::log(matrix.as_slice()));
 
         self.paintstate.copyshader.map(|shader| {
-            let intexture = Texture::with_image(w, h, Some(pixels), gltexture::RGBA);
+            let intexture = Texture::with_image(w, h, Some(pixels), PixelFormat::RGBA);
             check_gl_error("creating texture");
             perform_copy(target.framebuffer, &intexture, shader, matrix.as_slice());
         });
     }
 
-    pub fn with_pixels<T>(&mut self, callback: |i32, i32, &[u8]|->T) -> T {
+    pub fn get_buffer_dimensions(&self) -> (i32, i32) {
+        self.targetdata.get_current_texturetarget().texture.dimensions
+    }
+
+    pub fn get_pixels(&mut self, pixels: &mut [u8]) {
         logi("in with_pixels");
         let oldtarget = self.targetdata.get_current_texturetarget();
         let (x,y) = oldtarget.texture.dimensions;
@@ -229,18 +232,15 @@ impl<'a> GLInit<'a> {
         // it might be better to finagle the output copy matrix so the rest of the targets
         // can stay in bitmap coords?  Or have a dedicated target for this.
         let saveshader = ::glstore::init_from_defaults((None, Some(include_str!("../includes/shaders/noalpha_copy.fsh").into_maybe_owned()))).unwrap();
-        let newtarget = TextureTarget::new(x, y, gltexture::RGB);
+        let newtarget = TextureTarget::new(x, y, PixelFormat::RGB);
         let matrix = [1f32,  0f32,  0f32,  0f32,
                       0f32, -1f32,  0f32,  0f32,
                       0f32,  0f32,  1f32,  0f32,
                       0f32,  1f32,  0f32,  1f32,];
         perform_copy(newtarget.framebuffer, &oldtarget.texture, &saveshader, matrix.as_slice());
         gl2::finish();
-        let pixels = gl2::read_pixels(0, 0, x, y, gl2::RGBA, gl2::UNSIGNED_BYTE);
+        gl2::read_pixels_into(0, 0, x, y, gl2::RGBA, gl2::UNSIGNED_BYTE, pixels);
         check_gl_error("read_pixels");
-        let result = callback(x, y, pixels.as_slice());
-        logi("gl2::read_pixels()");
-        result
     }
 
     // TODO: make an enum for these with a scala counterpart
@@ -301,7 +301,7 @@ impl<'a> GLInit<'a> {
             0 => self.targetdata.get_current_texturetarget().framebuffer,
             _ => match self.paintstate.layers.as_slice().get((layer - 1) as uint) {
                 Some(layer) => layer.target.framebuffer,
-                None => return Err(format!("tried to erase layer {} of {}", layer - 1, self.paintstate.layers.len())),
+                None => return Err(format!("tried to erase layer {} of {}", layer - 1, self.paintstate.layers.len()).into_maybe_owned()),
             },
         };
         gl2::bind_framebuffer(gl2::FRAMEBUFFER, target);
@@ -317,7 +317,7 @@ impl<'a> GLInit<'a> {
         print_gl_string("Extensions", gl2::EXTENSIONS);
 
         logi!("setupGraphics({},{})", w, h);
-        let targets = [TextureTarget::new(w, h, gltexture::RGBA), TextureTarget::new(w, h, gltexture::RGBA)];
+        let targets = [TextureTarget::new(w, h, PixelFormat::RGBA), TextureTarget::new(w, h, PixelFormat::RGBA)];
         let mut points: Vec<Vec<ShaderPaintPoint>> = Vec::new();
         points.push(Vec::new());
         let data = GLInit {
@@ -460,11 +460,11 @@ impl<'a> GLInit<'a> {
 }
 
 impl gltexture::ToPixelFormat for AndroidBitmapFormat {
-    fn to_pixelformat(&self) -> GLResult<gltexture::PixelFormat> {
+    fn to_pixelformat(&self) -> GLResult<PixelFormat> {
         match *self {
-            ANDROID_BITMAP_FORMAT_RGBA_8888 => Ok(gltexture::RGBA),
-            ANDROID_BITMAP_FORMAT_A_8 => Ok(gltexture::ALPHA),
-            _ => Err("Unsupported texture format!".into_string()),
+            AndroidBitmapFormat::ANDROID_BITMAP_FORMAT_RGBA_8888 => Ok(PixelFormat::RGBA),
+            AndroidBitmapFormat::ANDROID_BITMAP_FORMAT_A_8 => Ok(PixelFormat::ALPHA),
+            _ => Err("Unsupported texture format!".into_maybe_owned()),
         }
     }
 }

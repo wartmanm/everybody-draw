@@ -11,7 +11,6 @@
 use core::prelude::*;
 use core::mem;
 use collections::vec::Vec;
-use collections::string::String;
 use collections::hash::Hash;
 use collections::hash::sip::SipHasher;
 use std::collections::HashMap;
@@ -131,9 +130,10 @@ impl<'a, Unfilled, T: MaybeInitFromCache<Init> + FillDefaults<Unfilled, Init, T>
     pub fn push_object(&mut self, init: Unfilled) -> GLResult<DrawObjectIndex<T>> {
         // Can't use map.entry() here as it consumes the key
         let filled = FillDefaults::fill_defaults(init).val;
+        let filledref: &&Init = unsafe { mem::transmute(&&filled) };
         // see below -- these are safe, we just can't prove it
-        if self.map.contains_key(unsafe { mem::transmute(&&filled) }) {
-            Ok(*self.map.get(unsafe { mem::transmute(&&filled) }).unwrap())
+        if self.map.contains_key(filledref) {
+            Ok(*self.map.get(filledref).unwrap())
         } else {
             let inited: T = try!(MaybeInitFromCache::<Init>::maybe_init(filled));
             let key = unsafe { mem::transmute(inited.get_source()) };
