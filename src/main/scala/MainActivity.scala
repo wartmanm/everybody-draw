@@ -45,10 +45,16 @@ class MainActivity extends Activity with TypedActivity with AndroidImplicits {
     ininterppicker = findView(TR.interppicker).asInstanceOf[AdapterView[Adapter]],
     inunipicker = findView(TR.unipicker).asInstanceOf[AdapterView[Adapter]])
 
-  lazy val clearbutton = findView(TR.clearbutton)
-  lazy val loadbutton = findView(TR.loadbutton)
-  lazy val savebutton = findView(TR.savebutton)
-  lazy val replaybutton = findView(TR.replaybutton)
+  lazy val drawerParent = findView(TR.drawer_parent)
+  lazy val controlflipper = findView(TR.controlflipper)
+  lazy val controldrawer = findView(TR.control_drawer)
+  val controlTitles = Array( // must match order of controlflipper's children
+    "Brush Texture",
+    "Animation",
+    "Paint",
+    "Interpolator",
+    "Unibrushes"
+  )
 
   var textureThread: Option[TextureSurfaceThread] = None
 
@@ -102,12 +108,13 @@ class MainActivity extends Activity with TypedActivity with AndroidImplicits {
     super.onCreate(bundle)
     setContentView(R.layout.activity_main)
 
-    clearbutton.setOnClickListener(() => {
-        textureThread.foreach(_.clearScreen())
-      }) 
-    loadbutton.setOnClickListener(() => loadFile())
-    savebutton.setOnClickListener(() => saveFile())
-    replaybutton.setOnClickListener(() => startReplay())
+    controldrawer.setAdapter(new ArrayAdapter(this, android.R.layout.simple_list_item_activated_1, controlTitles))
+    controldrawer.setOnItemClickListener((v: View, pos: Int) => {
+        controlflipper.setDisplayedChild(pos)
+      })
+
+    drawerParent.setDrawerListener(new android.support.v7.app.ActionBarDrawerToggle(
+      this, drawerParent, R.string.sidebar_open, R.string.sidebar_close))
 
     // TODO: deal with rotation better
     Option(bundle) match {
@@ -241,30 +248,34 @@ class MainActivity extends Activity with TypedActivity with AndroidImplicits {
 
   override def onMenuItemSelected(featureId: Int, item: MenuItem): Boolean = {
     item.getItemId() match {
-      case _ => false
+      case R.id.menu_save => saveFile()
+      case R.id.menu_load => loadFile()
+      case R.id.menu_replay => startReplay()
+      case R.id.menu_clear => textureThread.foreach(_.clearScreen())
+      case _ => return false
     }
-  }
-
-  def disableEntry[U](picker: NamedPicker[U], pos: Int) = {
+    true
   }
 
   def populatePicker[U, T <: (String, (Unit)=>GLResult[U])](picker: NamedPicker[U], arr: Array[T], cb: (U)=>Unit, thread: TextureSurfaceThread) = {
     val adapter = new LazyPicker(this, thread, arr)
     picker.control.setAdapter(adapter)
-    picker.control.setOnItemSelectedListener(new AdapterView.OnItemSelectedListener() {
-        override def onItemSelected(parent: AdapterView[_], view: View, pos: Int, id: Long) = {
+    picker.control.setOnItemClickListener(new AdapterView.OnItemClickListener() {
+        override def onItemClick(parent: AdapterView[_], view: View, pos: Int, id: Long) = {
+          picker.selected = pos
+          Log.i("main", s"Item selected for {picker.name}! {pos}")
           adapter.getState(pos, (result: GLResult[U]) => result match {
               case Right(value) => cb(value)
               case Left(errmsg) => {
                 //adapter.getState(0, (result: GLResult[U]) => cb(result.right.get))
                 MainActivity.this.runOnUiThread(() => {
                   Toast.makeText(MainActivity.this, "unable to load item!\n" + errmsg, Toast.LENGTH_LONG).show()
-                  picker.control.setSelection(0)
+                  picker.control.performItemClick(null, 0, 0)
+                  ()
                 })
               }
             })
         }
-        override def onNothingSelected(parent: AdapterView[_]) = { }
       })
     picker.restoreState()
   }
@@ -309,7 +320,7 @@ class MainActivity extends Activity with TypedActivity with AndroidImplicits {
     Log.i("main", "loading unibrush")
     def getSelectedValue[T](picker: NamedPicker[T]) = {
       picker.control.getAdapter.asInstanceOf[LazyPicker[T]]
-      .getItem(picker.control.getSelectedItemPosition())._2.cachedValue.flatMap(_.right.toOption)
+      .getItem(picker.selected)._2.cachedValue.flatMap(_.right.toOption)
     }
     for (thread <- textureThread) {
       // TODO: don't load when nothing changed; perform load from texturethread side
@@ -375,7 +386,7 @@ class MainActivity extends Activity with TypedActivity with AndroidImplicits {
       val prefix = (
         e match {
           case _: LuaException => {
-            controls.interppicker.control.setSelection(0)
+            controls.interppicker.control.performItemClick(null, 0, 0)
             "An error occurred in the interpolator:\n" 
           }
           case _ => "An error occurred:\n" 

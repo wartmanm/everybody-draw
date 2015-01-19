@@ -19,7 +19,7 @@ class LazyPicker[T](context: Context, thread: TextureSurfaceThread, content: Seq
     var holder: Holder = null.asInstanceOf[Holder]
     val item = lazified(position)
     if (view == null) {
-      view = inflater.inflate(android.R.layout.simple_dropdown_item_1line, parent, false)
+      view = inflater.inflate(android.R.layout.simple_list_item_activated_1, parent, false)
       val text = view.findViewById(android.R.id.text1).asInstanceOf[TextView]
       holder = Holder(text)
       view.setTag(holder)

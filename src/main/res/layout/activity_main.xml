@@ -1,72 +1,78 @@
-<RelativeLayout xmlns:android="http://schemas.android.com/apk/res/android"
+<android.support.v4.widget.DrawerLayout xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:tools="http://schemas.android.com/tools"
+    android:id="@+id/drawer_parent"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
     tools:context="com.example.gldrawfromscratch.MainActivity" >
 
-    <LinearLayout 
+    <RelativeLayout
+        android:id="@+id/mainview"
         android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:layout_alignParentBottom="true"
-        android:id="@+id/controlholder" >
-        
-        <Spinner 
-            android:layout_weight="1"
-            android:layout_width="0dp"
-            android:layout_height="wrap_content"
-            android:id="@+id/brushpicker" />
-        <Spinner 
-            android:layout_weight="1"
-            android:layout_width="0dp"
-            android:layout_height="wrap_content"
-            android:id="@+id/animpicker" />
-        <Spinner 
-            android:layout_weight="1"
-            android:layout_width="0dp"
-            android:layout_height="wrap_content"
-            android:id="@+id/paintpicker" />
-        <Spinner 
-            android:layout_weight="1"
-            android:layout_width="0dp"
-            android:layout_height="wrap_content"
-            android:id="@+id/interppicker" />
-        <Spinner 
-            android:layout_weight="1"
-            android:layout_width="0dp"
-            android:layout_height="wrap_content"
-            android:id="@+id/unipicker" />
-        <Button
-            android:layout_weight="1"
-            android:layout_width="0dp"
-            android:layout_height="wrap_content"
-            android:text="Clear"
-            android:id="@+id/clearbutton" />
-          <Button
-            android:layout_weight="1"
-            android:layout_width="0dp"
-            android:layout_height="wrap_content"
-            android:text="Load"
-            android:id="@+id/loadbutton" />
-          <Button
-            android:layout_weight="1"
-            android:layout_width="0dp"
-            android:layout_height="wrap_content"
-            android:text="Save"
-            android:id="@+id/savebutton" />
-          <Button
-            android:layout_weight="1"
-            android:layout_width="0dp"
-            android:layout_height="wrap_content"
-            android:text="Replay"
-            android:id="@+id/replaybutton" />
-        
-    </LinearLayout>
-    
-    <FrameLayout
-        android:layout_width="match_parent"
-        android:layout_height="match_parent"
-        android:id="@+id/textureviewframe"
-        android:layout_above="@id/controlholder"
-        />
+        android:layout_height="match_parent" >
 
-</RelativeLayout>
+        <ViewFlipper
+            android:id="@+id/controlflipper"
+            android:layout_width="match_parent"
+            android:layout_height="160dp"
+            android:layout_alignParentBottom="true" >
+
+            <GridView
+                android:id="@+id/brushpicker"
+                android:layout_width="match_parent"
+                android:layout_height="match_parent"
+                android:choiceMode="singleChoice"
+                android:columnWidth="120dp"
+                android:numColumns="auto_fit" />
+
+            <GridView
+                android:id="@+id/animpicker"
+                android:layout_width="match_parent"
+                android:layout_height="match_parent"
+                android:choiceMode="singleChoice"
+                android:columnWidth="120dp"
+                android:numColumns="auto_fit" />
+
+            <GridView
+                android:id="@+id/paintpicker"
+                android:layout_width="match_parent"
+                android:layout_height="match_parent"
+                android:choiceMode="singleChoice"
+                android:columnWidth="120dp"
+                android:numColumns="auto_fit" />
+
+            <GridView
+                android:id="@+id/interppicker"
+                android:layout_width="match_parent"
+                android:layout_height="match_parent"
+                android:choiceMode="singleChoice"
+                android:columnWidth="120dp"
+                android:numColumns="auto_fit" />
+
+            <GridView
+                android:id="@+id/unipicker"
+                android:layout_width="match_parent"
+                android:layout_height="match_parent"
+                android:choiceMode="singleChoice"
+                android:columnWidth="120dp"
+                android:numColumns="auto_fit" />
+        </ViewFlipper>
+
+        <FrameLayout
+            android:id="@+id/textureviewframe"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:layout_above="@id/controlflipper" >
+        </FrameLayout>
+    </RelativeLayout>
+
+    <ListView
+        android:id="@+id/control_drawer"
+        android:layout_width="240dp"
+        android:layout_height="match_parent"
+        android:layout_gravity="start"
+        android:choiceMode="singleChoice"
+        android:background="#eee"
+        android:divider="@android:color/transparent"
+        android:dividerHeight="0dp" />
+
+</android.support.v4.widget.DrawerLayout>

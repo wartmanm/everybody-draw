@@ -2,5 +2,5 @@
 
 //resolvers += Resolver.file("local", file("/home/matt/.ivy2/local")) // this is built in
 
-addSbtPlugin("org.scala-sbt" % "sbt-android" % "0.7.1-SNAPSHOT")
+addSbtPlugin("org.scala-sbt" % "sbt-android" % "0.7.2-SNAPSHOT")
 

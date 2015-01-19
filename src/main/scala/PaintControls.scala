@@ -43,15 +43,16 @@ class PaintControls(inbrushpicker: AdapterView[Adapter], inanimpicker: AdapterVi
 object PaintControls {
 
   case class NamedPicker[T](name: String, control: AdapterView[Adapter]) {
+    var selected = AdapterView.INVALID_POSITION
     private var state: Option[String] = None
-    def restoreState() = {
+    def restoreState(): Unit = {
       val index = state.map(s => control.getAdapter().asInstanceOf[LazyPicker[T]].lazified.indexWhere(_._1 == s) match {
           case -1 => 0
           case  x => x
         }).getOrElse(0)
-      control.setSelection(index)
+      control.performItemClick(null, index, index)
     }
-    def updateState() = state = control.getSelectedItemPosition() match {
+    def updateState() = state = selected match {
       case AdapterView.INVALID_POSITION => None
       case x => Some(control.getAdapter().asInstanceOf[LazyPicker[T]].lazified(x)._1)
     }

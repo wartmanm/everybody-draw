@@ -3,6 +3,18 @@
     tools:context="com.example.gldrawfromscratch.MainActivity" >
 
     <item
+        android:id="@+id/menu_save"
+        android:title="Save"/>
+    <item
+        android:id="@+id/menu_load"
+        android:title="Load"/>
+    <item
+        android:id="@+id/menu_replay"
+        android:title="Replay"/>
+    <item
+        android:id="@+id/menu_clear"
+        android:title="Clear"/>
+    <item
         android:id="@+id/action_settings"
         android:orderInCategory="100"
         android:showAsAction="never"
