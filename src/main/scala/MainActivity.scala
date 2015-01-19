@@ -21,7 +21,7 @@ import scala.collection.mutable
 import com.ipaulpro.afilechooser.utils.FileUtils
 
 import PaintControls.NamedPicker
-import unibrush.UniBrush
+import unibrush.{UniBrush, Layer}
 
 import resource._
 
@@ -297,31 +297,30 @@ class MainActivity extends Activity with TypedActivity with AndroidImplicits {
   }
 
   // TODO: fewer callbacks
-  def loadUniBrushItem[T](setter: (T)=>Unit, item: Option[T], picker: NamedPicker[T]) = {
-    item match {
-      case Some(x) => {
-        setter(x)
-        runOnUiThread(() => picker.control.setEnabled(false))
-      }
-      case None => {
-        val adapter = picker.control.getAdapter().asInstanceOf[LazyPicker[T]]
-        val setting = adapter.getItem(picker.control.getSelectedItemPosition())._2
-        setting.get(newitem => {
-            newitem.right.map(setter)
-            runOnUiThread(() => picker.control.setEnabled(true))
-          })
-      }
-    }
+  def loadUniBrushControls(unibrush: UniBrush) = {
+    runOnUiThread(() => {
+      controls.brushpicker.control.setEnabled(unibrush.brush.isEmpty)
+      controls.animpicker.control.setEnabled(unibrush.baseanimshader.isEmpty)
+      controls.paintpicker.control.setEnabled(unibrush.basepointshader.isEmpty)
+      controls.interppicker.control.setEnabled(unibrush.interpolator.isEmpty)
+    })
   }
 
   def loadUniBrush(unibrush: UniBrush) = {
+    Log.i("main", "loading unibrush")
+    def getSelectedValue[T](picker: NamedPicker[T]) = {
+      picker.control.getAdapter.asInstanceOf[LazyPicker[T]]
+      .getItem(picker.control.getSelectedItemPosition())._2.cachedValue.get.right.get
+    }
     for (thread <- textureThread) {
       // TODO: don't load when nothing changed; perform load from texturethread side
-      loadUniBrushItem(thread.setBrushTexture, unibrush.brush, controls.brushpicker)
-      loadUniBrushItem(thread.setAnimShader, unibrush.baseanimshader, controls.animpicker)
-      loadUniBrushItem(thread.setPointShader, unibrush.basepointshader, controls.paintpicker)
-      loadUniBrushItem(thread.setInterpScript, unibrush.interpolator, controls.interppicker)
-      thread.setUnibrushLayers(unibrush.layers)
+      loadUniBrushControls(unibrush)
+
+      val brush = unibrush.brush.getOrElse(getSelectedValue(controls.brushpicker))
+      val anim = unibrush.baseanimshader.getOrElse(getSelectedValue(controls.animpicker))
+      val point = unibrush.basepointshader.getOrElse(getSelectedValue(controls.paintpicker))
+      val interp = unibrush.interpolator.getOrElse(getSelectedValue(controls.interppicker))
+      thread.loadUniBrush(brush, anim, point, interp, unibrush.layers)
     }
   }
 

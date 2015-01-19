@@ -52,7 +52,7 @@ class LazyPicker[T](context: Context, thread: TextureSurfaceThread, content: Seq
       }
     }
 
-    private var cachedValue: Option[GLResult[T]] = None
+    var cachedValue: Option[GLResult[T]] = None
 
     def isNotFailed = cachedValue match {
       case None => true

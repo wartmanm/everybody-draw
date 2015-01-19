@@ -209,6 +209,23 @@ extends Thread with Handler.Callback with AndroidImplicits {
     }}
   }
 
+    def loadUniBrush(brush: Texture, baseanim: CopyShader, basepoint: PointShader, script: LuaScript, layers: Array[Layer]) = {
+      for (gl <- glinit) { runHere {
+        Log.i("tst", "loading unibrush!")
+        nativeClearLayers(gl)
+        for (layer <- layers) {
+          nativeAddLayer(gl, layer.copyshader, layer.pointshader, layer.pointsrc)
+        }
+        Log.i("tst", "cleared layers!")
+        nativeSetAnimShader(gl, baseanim)
+        nativeSetPointShader(gl, basepoint)
+        nativeSetInterpolator(gl, script)
+        Log.i("tst", "set interpolator!")
+        nativeSetBrushTexture(gl, brush)
+        Log.i("tst", "done loading unibrush!")
+      }}
+    }
+
   // only set values, could maybe run on main thread
   def setAnimShader(shader: CopyShader) = for (gl <- glinit) { runHere { nativeSetAnimShader(gl, shader) } }
   def setPointShader(shader: PointShader) = for (gl <- glinit) { runHere { nativeSetPointShader(gl, shader) } }
