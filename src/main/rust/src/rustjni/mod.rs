@@ -11,7 +11,8 @@ use collections::str::IntoMaybeOwned;
 use collections::vec::Vec;
 use collections::str::MaybeOwned;
 
-use jni::{jobject, jclass, jmethodID, JNIEnv, jint, jstring, jvalue, JNINativeMethod, JavaVM};
+use jni::{jobject, jclass, jmethodID, jfieldID, JNIEnv, jint, jstring, jvalue, JNINativeMethod, JavaVM};
+#[cfg(test)] use jni::jlong;
 use jni_constants::*;
 
 use log::{logi, loge};
@@ -32,6 +33,14 @@ pub mod texturethread;
 pub mod android_bitmap;
 pub mod gldataclasses;
 pub mod motionevent;
+
+
+#[cfg(target_word_size = "32")]
+#[allow(non_camel_case_types)]
+pub type jpointer = jint;
+#[cfg(target_word_size = "64")]
+#[allow(non_camel_case_types)]
+pub type jpointer = jlong;
 
 struct CaseClass {
     constructor: jmethodID,
@@ -118,13 +127,36 @@ pub unsafe fn register_classmethods(env: *mut JNIEnv, classname: *const i8, meth
     ((**env).RegisterNatives)(env, class, methods.as_ptr(), methods.len() as i32);
 }
 
-fn get_safe_data<'a>(data: i32) -> &'a mut GLInitEvents<'a> {
+fn get_safe_data<'a>(data: jpointer) -> &'a mut GLInitEvents<'a> {
     unsafe {
         let data: &'a mut GLInitEvents<'a> = mem::transmute(data);
         assert_eq!(gettid(), data.owning_thread);
         data
     }
 }
+
+
+#[cfg(target_word_size = "32")]
+#[inline(always)]
+unsafe fn get_jpointer(env: *mut JNIEnv, obj: jobject, field: jfieldID) -> jpointer {
+    ((**env).GetIntField)(env, obj, field)
+}
+#[cfg(target_word_size = "64")]
+#[inline(always)]
+unsafe fn get_jpointer(env: *mut JNIEnv, obj: jobject, field: jfieldID) -> jpointer {
+    ((**env).GetLongField)(env, obj, field)
+}
+
+//#[cfg(target_word_size = "32")]
+//#[inline(always)]
+//fn set_jpointer(env: *mut JNIEnv, obj: jobject, field: jfieldID) -> jpointer {
+    //((**env).SetIntField)(env, obj, field)
+//}
+//#[cfg(target_word_size = "64")]
+//#[inline(always)]
+//fn set_jpointer(env: *mut JNIEnv, obj: jobject, field: jfieldID) -> jpointer {
+    //((**env).SetLongField)(env, obj, field)
+//}
 
 fn on_unwind(msg: &Any + Send, file: &'static str, line: uint) {
     use core::fmt::FormatWriter;

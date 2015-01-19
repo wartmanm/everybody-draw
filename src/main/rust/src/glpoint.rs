@@ -300,23 +300,3 @@ impl Spline<Coordinate> for CubicBezier {
         p0 + p1 + p2 + p3
     }
 }
-
-#[allow(dead_code)]
-struct SillyBezier {
-    pub bezier: CubicBezier,
-}
-
-#[allow(dead_code)]
-impl Spline<Coordinate> for SillyBezier {
-    fn new(points: [Coordinate, ..4]) -> SillyBezier {
-        SillyBezier { bezier: Spline::new(points) }
-    }
-    fn get_time_scale(&self) -> (f32, f32) {
-        let catmullrom: CatmullRom = Spline::new(self.bezier.points);
-        catmullrom.get_time_scale()
-    }
-    fn interpolate(&self, t: f32) -> Coordinate {
-        self.bezier.interpolate(t)
-    }
-}
-

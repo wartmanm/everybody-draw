@@ -10,10 +10,13 @@
 
 use core::prelude::*;
 use core::mem;
+use core::fmt::Show;
 use collections::vec::Vec;
 use collections::hash::Hash;
 use collections::hash::sip::SipHasher;
+
 use std::collections::HashMap;
+use std::collections::hash_map::{Vacant, Occupied};
 use copyshader::CopyShader;
 use gltexture::{PixelFormat, Texture, BrushTexture};
 use pointshader::PointShader;
@@ -22,6 +25,9 @@ use luascript::LuaScript;
 use arena::TypedArena;
 use glcommon::GLResult;
 use glcommon::{FillDefaults, MString};
+
+#[cfg(test)]
+use collections::str::IntoMaybeOwned;
 
 /// Holds GL objects that can be inited using the given keys.
 /// The list is to avoid having to pass those keys around, and serialize more easily.
@@ -39,7 +45,7 @@ pub struct DrawObjectIndex<T>(i32);
 
 impl<T> DrawObjectIndex<T> {
     pub fn error() -> DrawObjectIndex<T> {
-        unsafe { mem::transmute(-1i) }
+        unsafe { mem::transmute(-1i32) }
     }
 }
 
@@ -111,7 +117,7 @@ impl MaybeInitFromCache<LuaInitValues> for LuaScript {
     fn get_source(&self) -> &MString { &self.source }
 }
 
-impl<'a, Unfilled, T: MaybeInitFromCache<Init> + FillDefaults<Unfilled, Init, T>, Init: Hash+Eq> DrawObjectList<'a, T, Init> {
+impl<'a, Unfilled, T: MaybeInitFromCache<Init> + FillDefaults<Unfilled, Init, T>, Init: Hash+Eq+Show> DrawObjectList<'a, T, Init> {
     pub fn new() -> DrawObjectList<'a, T, Init> {
         // the default hasher is keyed off of the task-local rng,
         // which would blow up since we don't have a task
@@ -130,23 +136,23 @@ impl<'a, Unfilled, T: MaybeInitFromCache<Init> + FillDefaults<Unfilled, Init, T>
     pub fn push_object(&mut self, init: Unfilled) -> GLResult<DrawObjectIndex<T>> {
         // Can't use map.entry() here as it consumes the key
         let filled = FillDefaults::fill_defaults(init).val;
-        let filledref: &&Init = unsafe { mem::transmute(&&filled) };
+        let filledref: &'a Init = unsafe { mem::transmute(&filled) };
         // see below -- these are safe, we just can't prove it
-        if self.map.contains_key(filledref) {
-            Ok(*self.map.get(filledref).unwrap())
-        } else {
-            let inited: T = try!(MaybeInitFromCache::<Init>::maybe_init(filled));
-            let key = unsafe { mem::transmute(inited.get_source()) };
-            // ptr's lifetime is limited to &self's, which is fair but not very useful.
-            // smart ptrs involve individual allocs but are probably better
-            let ptr = self.arena.alloc(inited);
-            unsafe {
-                self.list.push(mem::transmute(ptr));
+        match self.map.entry(filledref) {
+            Occupied(entry) => Ok(*entry.get()),
+            Vacant(entry) => {
+                let inited: T = try!(MaybeInitFromCache::<Init>::maybe_init(filled));
+                // ptr's lifetime is limited to &self's, which is fair but not very useful.
+                // smart ptrs involve individual allocs but are probably better
+                let ptr = self.arena.alloc(inited);
+                unsafe {
+                    self.list.push(mem::transmute(ptr));
+                }
+                let index = self.list.len() - 1;
+                let objindex = DrawObjectIndex(index as i32);
+                entry.set(objindex);
+                Ok(objindex)
             }
-            let index = self.list.len() - 1;
-            let objindex = DrawObjectIndex(index as i32);
-            self.map.insert(key, objindex);
-            Ok(objindex)
         }
     }
 
@@ -156,9 +162,32 @@ impl<'a, Unfilled, T: MaybeInitFromCache<Init> + FillDefaults<Unfilled, Init, T>
     }
 }
 
-impl<'a, Unfilled, T: InitFromCache<Init> + MaybeInitFromCache<Init> + FillDefaults<Unfilled, Init, T>, Init: Hash+Eq> DrawObjectList<'a, T, Init> {
+impl<'a, Unfilled, T: InitFromCache<Init> + MaybeInitFromCache<Init> + FillDefaults<Unfilled, Init, T>, Init: Hash+Eq+Show> DrawObjectList<'a, T, Init> {
     pub fn safe_push_object(&mut self, init: Unfilled) -> DrawObjectIndex<T> {
         self.push_object(init).unwrap()
     }
 }
 
+#[test]
+fn equal_keys_match() {
+    let mut list: DrawObjectList<LuaScript, LuaInitValues> = DrawObjectList::new();
+    let script_1 = "function main() end".into_maybe_owned();
+    let script_2 = "function main() end".into_maybe_owned();
+    let idx_1 = list.push_object(Some(script_1)).unwrap();
+    let idx_2 = list.push_object(Some(script_2)).unwrap();
+    let (DrawObjectIndex(i1), DrawObjectIndex(i2)) = (idx_1, idx_2);
+    assert_eq!(i1, i2);
+    println!("test");
+}
+
+#[test]
+fn different_keys_differ() {
+    let mut list: DrawObjectList<LuaScript, LuaInitValues> = DrawObjectList::new();
+    let script_1 = "function main() end".into_maybe_owned();
+    let script_2 = "function main() end \n-- hello world".into_maybe_owned();
+    let idx_1 = list.push_object(Some(script_1)).unwrap();
+    let idx_2 = list.push_object(Some(script_2)).unwrap();
+    let (DrawObjectIndex(i1), DrawObjectIndex(i2)) = (idx_1, idx_2);
+    assert!(i1 != i2);
+    println!("test");
+}

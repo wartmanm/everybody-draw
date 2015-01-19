@@ -30,8 +30,9 @@ macro_rules! panic(
     ($msg:expr) => ({
         // static requires less code at runtime, more constant data
         static _FILE_LINE: (&'static str, uint) = (file!(), line!());
-        ::android::log::__android_log_write(::android::log::ANDROID_LOG_FATAL as ::libc::c_int,
-            cstr!("rust"), cstr!(concat!(file!(), ":", line!(), ": ", $msg, "\0")));
+        ::log::log(
+            concat!(file!(), ":", line!(), ": ", $msg),
+            ::android::log::ANDROID_LOG_FATAL);
         ::std::rt::begin_unwind($msg, &_FILE_LINE)
     });
     ($fmt:expr, $($arg:tt)*) => ({
@@ -56,9 +57,9 @@ macro_rules! panic(
             static _FILE_LINE: (&'static str, uint) = (file!(), line!());
             ::std::rt::begin_unwind_fmt(fmt, &_FILE_LINE)
         }
-        ::android::log::__android_log_write(::android::log::ANDROID_LOG_FATAL as ::libc::c_int,
-            cstr!("rust"),
-            format!(concat!("{}:{}: ", $fmt, "\0"), file!(), line!(), $($arg)*).as_ptr() as *const i8);
+        ::log::log(
+            format!(concat!(file!(), ":", line!(), ": ", $fmt), $($arg)*).as_slice(),
+            ::android::log::ANDROID_LOG_FATAL);
         format_args!(_run_fmt, $fmt, $($arg)*)
     });
 )

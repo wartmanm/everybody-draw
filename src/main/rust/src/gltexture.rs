@@ -11,7 +11,7 @@ use log::logi;
 
 use collections::vec::Vec;
 
-#[deriving(PartialEq, Eq, Hash)]
+#[deriving(PartialEq, Eq, Hash, Show)]
 pub enum PixelFormat {
     RGBA = gl2::RGBA as int,
     RGB = gl2::RGB as int,
@@ -69,6 +69,12 @@ impl Drop for Texture {
 impl Show for Texture {
     fn fmt(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
         write!(formatter, "texture 0x{:x}, dimensions {}", self.texture, self.dimensions)
+    }
+}
+
+impl Show for BrushTexture {
+    fn fmt(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
+        write!(formatter, "brushtexture 0x{:x}, dimensions {}", self.texture.texture, self.texture.dimensions)
     }
 }
 

@@ -14,7 +14,7 @@ use eglinit;
 use jni_helpers::ToJValue;
 use gltexture::{ToPixelFormat, BrushTexture};
 use glcommon::{GLResult, MString};
-use rustjni::{register_classmethods, CaseClass, get_safe_data, str_to_jstring, get_mstring};
+use rustjni::{register_classmethods, CaseClass, get_safe_data, str_to_jstring, get_mstring, jpointer};
 use rustjni::android_bitmap::AndroidBitmap;
 
 static mut SCALA_TUPLE2: CaseClass = CaseClass { constructor: 0 as jmethodID, class: 0 as jclass };
@@ -33,7 +33,7 @@ unsafe fn glresult_or_exception<T>(env: *mut JNIEnv, result: GLResult<DrawObject
     }
 }
 
-unsafe fn safe_create_texture(env: *mut JNIEnv, data: jint, bitmap: jobject) -> GLResult<DrawObjectIndex<BrushTexture>> {
+unsafe fn safe_create_texture(env: *mut JNIEnv, data: jpointer, bitmap: jobject) -> GLResult<DrawObjectIndex<BrushTexture>> {
     let bitmap = AndroidBitmap::from_jobject(env, bitmap);
     let (w, h) = (bitmap.info.width, bitmap.info.height);
     let format: AndroidBitmapFormat = mem::transmute(bitmap.info.format);
@@ -41,20 +41,20 @@ unsafe fn safe_create_texture(env: *mut JNIEnv, data: jint, bitmap: jobject) -> 
     Ok(get_safe_data(data).events.load_brush(w as i32, h as i32, bitmap.as_slice(), texformat))
 }
 
-unsafe extern "C" fn compile_copyshader(env: *mut JNIEnv, _: jobject, data: i32, vec: jstring, frag: jstring) -> jint {
+unsafe extern "C" fn compile_copyshader(env: *mut JNIEnv, _: jobject, data: jpointer, vec: jstring, frag: jstring) -> jint {
     glresult_or_exception(env, get_safe_data(data).events.load_copyshader(get_mstring(env, vec), get_mstring(env, frag)))
 }
 
-unsafe extern "C" fn compile_pointshader(env: *mut JNIEnv, _: jobject, data: i32, vec: jstring, frag: jstring) -> jint {
+unsafe extern "C" fn compile_pointshader(env: *mut JNIEnv, _: jobject, data: jpointer, vec: jstring, frag: jstring) -> jint {
     glresult_or_exception(env, get_safe_data(data).events.load_pointshader(get_mstring(env, vec), get_mstring(env, frag)))
 }
 
-unsafe extern "C" fn jni_lua_compile_script(env: *mut JNIEnv, _: jobject, data: i32, script: jstring) -> jint {
+unsafe extern "C" fn jni_lua_compile_script(env: *mut JNIEnv, _: jobject, data: jpointer, script: jstring) -> jint {
     let scriptstr = get_mstring(env, script);
     glresult_or_exception(env, get_safe_data(data).events.load_interpolator(scriptstr))
 }
 
-unsafe extern "C" fn create_texture(env: *mut JNIEnv, _: jobject, data: jint, bitmap: jobject) -> jint {
+unsafe extern "C" fn create_texture(env: *mut JNIEnv, _: jobject, data: jpointer, bitmap: jobject) -> jint {
     glresult_or_exception(env, safe_create_texture(env, data, bitmap))
 }
 
@@ -65,7 +65,7 @@ unsafe fn get_shader_source_tuple(env: *mut JNIEnv, source: &(MString, MString))
     SCALA_TUPLE2.construct(env, [jvert.as_jvalue(), jfrag.as_jvalue()].as_mut_slice())
 }
 
-pub unsafe extern "C" fn jni_get_copyshader_source(env: *mut JNIEnv, _: jobject, data: jint, copyshader: jint) -> jobject {
+pub unsafe extern "C" fn jni_get_copyshader_source(env: *mut JNIEnv, _: jobject, data: jpointer, copyshader: jint) -> jobject {
     logi!("getting copyshader source");
     let source = get_safe_data(data).events.get_copyshader_source(mem::transmute(copyshader));
     logi!("got copyshader source");
@@ -74,13 +74,13 @@ pub unsafe extern "C" fn jni_get_copyshader_source(env: *mut JNIEnv, _: jobject,
     tuple
 }
 
-unsafe extern "C" fn jni_get_pointshader_source(env: *mut JNIEnv, _: jobject, data: jint, pointshader: jint) -> jobject {
+unsafe extern "C" fn jni_get_pointshader_source(env: *mut JNIEnv, _: jobject, data: jpointer, pointshader: jint) -> jobject {
     logi!("getting pointshader source");
     let source = get_safe_data(data).events.get_pointshader_source(mem::transmute(pointshader));
     get_shader_source_tuple(env, source)
 }
 
-unsafe extern "C" fn jni_get_luascript_source(env: *mut JNIEnv, _: jobject, data: jint, luascript: jint) -> jstring {
+unsafe extern "C" fn jni_get_luascript_source(env: *mut JNIEnv, _: jobject, data: jpointer, luascript: jint) -> jstring {
     logi!("getting luascript source");
     let source = get_safe_data(data).events.get_luascript_source(mem::transmute(luascript));
     str_to_jstring(env, source.as_slice())

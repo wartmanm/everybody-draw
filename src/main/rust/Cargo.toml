@@ -17,7 +17,7 @@ path = "./deps/rust-lua"
 [lib]
 name = "rustgl"
 path = "src/lib.rs"
-test = false
+test = true
 doctest = false
 doc = false
 plugin = false
