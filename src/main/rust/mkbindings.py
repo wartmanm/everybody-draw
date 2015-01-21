@@ -60,7 +60,10 @@ def run_bindgen(args, outfile, verbosity):
   if verbosity > 0:
     sys.stderr.write(' '.join(allargs) + '\n')
   p = subprocess.Popen(allargs, stdout=subprocess.PIPE)
-  return p.communicate()[0]
+  stdout = p.communicate()[0]
+  if p.returncode != 0:
+    raise subprocess.CalledProcessError(p.returncode, allargs, stdout)
+  return stdout
 
 def append_allow_prelude(outfile):
   for lint in prelude_lints:
@@ -163,5 +166,3 @@ if __name__ == '__main__':
       sloppy_delete(joinprefix(path + '.rs'))
     for path, mods in gathermods(bindings).items():
       sloppy_delete(joinprefix(path, 'mod.rs'))
-
-
