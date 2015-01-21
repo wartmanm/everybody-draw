@@ -11,7 +11,6 @@ case class CreditItem(title: String, license: String)
 
 object Credits extends AndroidImplicits {
   val creditArray = CreditData.creditArray
-  Log.i("credits", s"got ${creditArray.length} credits: \n${creditArray.map(_.title).mkString("\n")}")
 
   class CreditAdapter(context: Context) extends BaseAdapter {
     val inflater = LayoutInflater.from(context)

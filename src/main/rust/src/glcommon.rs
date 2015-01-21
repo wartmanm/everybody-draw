@@ -38,7 +38,7 @@ pub fn check_framebuffer_complete() -> bool {
         gl2::FRAMEBUFFER_UNSUPPORTED => ("FRAMEBUFFER_UNSUPPORTED", false),
         _ => ("unknown error!", false)
     };
-    logi!("framebuffer status: {}", err);
+    debug_logi!("framebuffer status: {}", err);
     result
 }
 
@@ -85,16 +85,14 @@ pub fn create_program(vertex_source: &str, fragment_source: &str) -> GLResult<GL
 
 pub fn get_shader_handle(program: GLuint, name: &str) -> Option<GLuint> {
     let handle = gl2::get_attrib_location(program, name);
-    logi!("glGetAttribLocation({}) = {}", name, handle);
-    check_gl_error(format!("getHandle({})", name).as_slice());
+    check_gl_error(format!("get_shader_handle({})", name).as_slice());
     if handle == -1 { None } else { Some(handle as GLuint) }
 }
 
 /// gl silently ignores writes to uniform -1, so this is not strictly necessary
 pub fn get_uniform_handle_option(program: GLuint, name: &str) -> Option<GLint> {
     let handle = gl2::get_uniform_location(program, name);
-    logi!("glGetUniformLocation({}) = {}", name, handle);
-    check_gl_error(format!("getHandle({})", name).as_slice());
+    check_gl_error(format!("get_uniform_handle({})", name).as_slice());
     if handle == -1 { None } else { Some(handle) }
 }
 

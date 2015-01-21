@@ -55,7 +55,7 @@ impl Shader for PointShader {
                     texture_size_handle: gl2::get_uniform_location(program, "texturesize"),
                     source: (vert, frag),
                 };
-                logi!("created {:?}", shader);
+                debug_logi!("created {:?}", shader);
                 Ok(shader)
             }
             _ => {
@@ -119,7 +119,7 @@ impl PointShader {
 
 impl Drop for PointShader {
     fn drop(&mut self) {
-        logi!("dropping {:?}", self);
+        debug_logi!("dropping {:?}", self);
         gl2::delete_program(self.program);
     }
 }
@@ -142,8 +142,8 @@ impl UsingDefaults<(Option<MString>, Option<MString>)> for PointShader {
 
 fn fill_defaults(init: (Option<MString>, Option<MString>)) -> (MString, MString) {
     let (vertopt, fragopt) = init;
-    let vert = vertopt.unwrap_or_else(|| { logi!("point shader: using default vertex shader"); DEFAULT_VERTEX_SHADER.into_cow()});
-    let frag = fragopt.unwrap_or_else(|| { logi!("point shader: using default fragment shader"); DEFAULT_FRAGMENT_SHADER.into_cow()});
+    let vert = vertopt.unwrap_or(DEFAULT_VERTEX_SHADER.into_cow());
+    let frag = fragopt.unwrap_or(DEFAULT_FRAGMENT_SHADER.into_cow());
     (vert, frag)
 }
 

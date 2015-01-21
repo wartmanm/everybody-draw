@@ -43,7 +43,7 @@ impl Drop for TextureTarget {
     fn drop(&mut self) {
         // should drop texture automatically?
         gl2::delete_frame_buffers([self.framebuffer].as_slice());
-        logi!("deleted texturetarget: {:?} framebuffer {}", self.texture.dimensions, self.framebuffer);
+        debug_logi!("deleted texturetarget: {:?} framebuffer {}", self.texture.dimensions, self.framebuffer);
     }
 }
 

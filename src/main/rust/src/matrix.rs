@@ -42,7 +42,7 @@ pub fn log(matrix: &[f32]) -> ::collections::string::String {
 
 pub fn fit_inside(srcdimensions: (i32, i32), targetdimensions: (i32, i32), rotation: Rotation) -> Matrix {
     use matrix::Rotation::*;
-    logi!("using rotation {:?}", rotation);
+    debug_logi!("using rotation {:?}", rotation);
     let (tw, th) = targetdimensions;
     let (w, h) = {
         let (srcw, srch) = srcdimensions;

@@ -62,7 +62,7 @@ impl Texture {
 impl Drop for Texture {
     fn drop(&mut self) {
         gl2::delete_textures([self.texture].as_slice());
-        logi!("deleted {:?} texture", self.dimensions);
+        debug_logi!("deleted {:?} texture", self.dimensions);
     }
 }
 

@@ -123,7 +123,7 @@ case class UniBrush(
 
 object UniBrush {
   def logAbort[T](s: String): GLResult[T] = {
-    Log.e("unibrush", s"failed to load: ${s}")
+    Log.e("everybody-draws", s"unibrush: failed to load: ${s}")
     throw new GLException(s)
   }
 
@@ -156,7 +156,6 @@ object UniBrush {
         zis.closeEntry()
         nextEntry = zis.getNextEntry()
         baos = new ByteArrayOutputStream()
-        Log.i("unibrush", s"read ${oldEntry.getName()}: ${oldBytes.length} bytes")
         (oldEntry, oldBytes)
       } else {
         baos.write(ba, 0, readBytes)
@@ -166,13 +165,11 @@ object UniBrush {
   }
 
   def readFromStream(sourceZip: InputStream): UniBrushSource = {
-    Log.i("unibrush", "loading unibrush")
     try {
       val files = new ZipInputStream(sourceZip)
         .map { case (entry, bytes) => (entry.getName(), bytes) }
         .toMap
       val brushjson = files.get("brush.json").getOrElse(logAbort("unable to find brush.json"))
-      Log.i("unibrush", "got brush.json")
       val brushjsonreader = new JsonReader(new StringReader(new String(brushjson)))
       UniBrushSource.readFromJson(brushjsonreader, files)
     } catch {
@@ -183,7 +180,6 @@ object UniBrush {
 
   def compileFromSource(data: GLInit, source: UniBrushSource): GLResult[UniBrush] = {
     try {
-      Log.i("unibrush", "compiling unibrush")
       compile(data, source)
     } catch {
       case e: GLException => logAbort(s"Error in unibrush files ${e}")
@@ -205,7 +201,6 @@ object UniBrush {
   }
 
   def compile(data: GLInit, s: UniBrushSource): GLResult[UniBrush] = {
-    Log.i("unibrush", "compiling unibrush");
     val brush = s.brush.map(Texture(data, _))
     val pointshaders: GLResult[ArraySeq[PointShader]] = compileShaders(data, s.pointshaders, PointShader)
     val copyshaders = compileShaders(data, s.animshaders, CopyShader)
@@ -214,11 +209,6 @@ object UniBrush {
     val basepointshader = s.basepointshader.map(_.compile(data, PointShader))
     val interpolator = s.interpolator.map(LuaScript(data, _))
     val layers = getLayers(data, pointshaders.toArray, copyshaders.toArray, s.layers)
-    Log.i("unibrush", s"have interpolator: ${interpolator.nonEmpty}");
-    Log.i("unibrush", s"have pointshader: ${basepointshader.nonEmpty}");
-    Log.i("unibrush", s"have animshader: ${baseanimshader.nonEmpty}");
-    Log.i("unibrush", s"have layers: ${layers.length}");
-    Log.i("unibrush", s"have brush: ${brush.nonEmpty}");
     UniBrush(brush, basepointshader, baseanimshader, basecopyshader, interpolator, layers)
   }
 }

@@ -26,33 +26,29 @@ pub fn log(rustmsg: &str, _: u32) {
     println!("{}", rustmsg);
 }
 
-pub fn raw_loge(rustmsg: *const c_char) {
-    unsafe {
-        raw_log(ANDROID_LOG_ERROR as i32, cstr!("rust"), rustmsg);
-    }
+pub macro_rules! debug_logi {
+    ($($arg:tt)*) => (if cfg!(debug) { logi!($($arg)*); })
 }
 
-pub fn raw_logi(rustmsg: *const c_char) {
-    unsafe {
-        raw_log(ANDROID_LOG_INFO as i32, cstr!("rust"), rustmsg);
-    }
+/// wrapper for unsafe calls to raw_log, don't use directly
+pub fn _log(level: c_int, msg: *const c_char) {
+    unsafe { raw_log(level, cstr!("everybody-draws"), msg); }
 }
+
+macro_rules! log(
+    ($lvl:expr, $fmt:expr, $($arg:expr),+) => (
+        ::log::_log($lvl, format!(concat!("native: ", $fmt, "\0"), $($arg, )+).as_slice().as_ptr() as *const ::libc::c_char);
+    );
+    ($lvl:expr, $fmt:expr) => (
+        ::log::_log($lvl, concat!("native: ", $fmt, "\0").as_ptr() as *const ::libc::c_char);
+    );
+);
 
 // macros that define entire macro bodies don't seem to be allowed yet
-pub macro_rules! logi(
-    ($fmt:expr, $($arg:expr),+) => (
-        ::log::raw_logi(format!(concat!($fmt, "\0"), $($arg, )+).as_slice().as_ptr() as *const ::libc::c_char);
-    );
-    ($fmt:expr) => (
-        ::log::raw_logi(concat!($fmt, "\0").as_ptr() as *const ::libc::c_char);
-    )
-);
+pub macro_rules! logi {
+    ($($arg:tt)*) => ( log!(::android::log::ANDROID_LOG_INFO as i32, $($arg)*); )
+}
 
-pub macro_rules! loge(
-    ($fmt:expr, $($arg:expr),+) => (
-        ::log::raw_loge(format!(concat!($fmt, "\0"), $($arg, )+).as_slice().as_ptr() as *const ::libc::c_char);
-    );
-    ($fmt:expr) => (
-        ::log::raw_loge(concat!($fmt, "\0").as_ptr() as *const ::libc::c_char);
-    )
-);
+pub macro_rules! loge {
+    ($($arg:tt)*) => ( log!(::android::log::ANDROID_LOG_ERROR as i32, $($arg)*); )
+}

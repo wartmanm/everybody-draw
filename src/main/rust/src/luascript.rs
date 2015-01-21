@@ -16,7 +16,7 @@ impl LuaScript {
     pub fn new(source: MString) -> GLResult<LuaScript> {
         let registry_id = unsafe { try!(load_lua_script(source.as_slice())) };
         let script = LuaScript { registry_id: registry_id, source: source };
-        logi!("created {:?}", script);
+        debug_logi!("created {:?}", script);
         Ok(script)
     }
 
@@ -28,7 +28,7 @@ impl LuaScript {
 
 impl Drop for LuaScript {
     fn drop(&mut self) {
-        logi!("dropping {:?}", self);
+        debug_logi!("dropping {:?}", self);
         unsafe {
             destroy_lua_script(self.registry_id);
         }

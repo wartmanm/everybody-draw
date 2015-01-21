@@ -56,7 +56,7 @@ impl Shader for CopyShader {
                     texture_size_handle: texturesize_option,
                     source: (vert, frag),
                 };
-                logi!("created {:?}", shader);
+                debug_logi!("created {:?}", shader);
                 Ok(shader)
             }
             _ => {
@@ -89,7 +89,7 @@ impl CopyShader {
 
 impl Drop for CopyShader {
     fn drop(&mut self) {
-        logi!("dropping {:?}", self);
+        debug_logi!("dropping {:?}", self);
         gl2::delete_program(self.program);
     }
 }
@@ -111,7 +111,7 @@ impl UsingDefaults<(Option<MString>, Option<MString>)> for CopyShader {
 
 fn fill_defaults(init: (Option<MString>, Option<MString>)) -> (MString, MString) {
     let (vertopt, fragopt) = init;
-    let vert = vertopt.unwrap_or_else(|| { logi!("point shader: using default vertex shader"); DEFAULT_VERTEX_SHADER.into_cow()});
-    let frag = fragopt.unwrap_or_else(|| { logi!("point shader: using default fragment shader"); DEFAULT_FRAGMENT_SHADER.into_cow()});
+    let vert = vertopt.unwrap_or(DEFAULT_VERTEX_SHADER.into_cow());
+    let frag = fragopt.unwrap_or(DEFAULT_FRAGMENT_SHADER.into_cow());
     (vert, frag)
 }

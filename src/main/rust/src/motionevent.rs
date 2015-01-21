@@ -54,7 +54,6 @@ pub fn append_motion_event(data: &mut Data, evt: *const AInputEvent, queue: &mut
     let action_id = unsafe { AMotionEvent_getPointerId(evt, action_index as size_t) };
     match (data.attend_points, action_event) {
         (_, AMOTION_EVENT_ACTION_DOWN) => {
-            logi!("ACTION_DOWN: {}", action_id);
             push_stops(queue, active); // in case it's not paired with an action_up
             data.attend_points = is_valid_start_point(evt, data.left_edge);
             if data.attend_points {
@@ -62,22 +61,18 @@ pub fn append_motion_event(data: &mut Data, evt: *const AInputEvent, queue: &mut
             }
         }
         (_, AMOTION_EVENT_ACTION_UP) => {
-            logi!("ACTION_UP: {}", action_id);
             data.attend_points = true;
             push_stops(queue, active);
         }
         (_, AMOTION_EVENT_ACTION_CANCEL) => {
-            logi!("ACTION_CANCEL: {}", action_id);
             data.attend_points = true;
             push_stops(queue, active);
         }
         (true, AMOTION_EVENT_ACTION_POINTER_UP) => {
-            logi!("ACTION_POINTER_UP: {}", action_id);
             make_active(queue, active, action_id, false);
             push_moves(queue, active, evt);
         }
         (true, AMOTION_EVENT_ACTION_POINTER_DOWN) => {
-            logi!("ACTION_POINTER_DOWN: {}", action_id);
             make_active(queue, active, action_id, false); // in case it's not paired with an action_pointer_up
             push_moves(queue, active, evt);
         }

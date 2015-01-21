@@ -82,10 +82,9 @@ class MainActivity extends Activity with TypedActivity with AndroidImplicits {
   var handlers: Option[MotionEventHandlerPair] = None
 
   def createTextureThread(handlers: MotionEventHandlerPair)(s: SurfaceTexture, x: Int, y: Int): Unit = {
-    Log.i("main", "got surfacetexture");
     val thread = new TextureSurfaceThread(s, handlers.consumer, onTextureThreadStarted(x,y, handlers.producer), onTextureThreadError);
     thread.start()
-    Log.i("main", "started thread");
+    Log.i("everybody-draws", "main thread: started thread");
   }
 
   var undoCount: Int = 0
@@ -95,7 +94,7 @@ class MainActivity extends Activity with TypedActivity with AndroidImplicits {
 
   class MainUndoListener() extends UndoCallback() {
     override def undoBufferChanged(newSize: Int): Unit = {
-      Log.i("main", s"new undo buffer size: ${newSize}")
+      Log.i("everybody-draws", s"main thread: new undo buffer size: ${newSize}")
       undoCount = newSize
       undoPos = newSize - 1
       runOnUiThread(() => {
@@ -123,13 +122,10 @@ class MainActivity extends Activity with TypedActivity with AndroidImplicits {
   }
 
   val onTextureThreadStarted = (x: Int, y: Int, producer: MotionEventProducer) => (thread: TextureSurfaceThread) => this.runOnUiThread(() => {
-    Log.i("main", "got handler")
     textureThread = Some(thread)
     val undoCallback = new MainUndoListener()
     this.undoListener = Some(undoCallback)
     thread.beginGL(x, y, onTextureCreated(thread, producer, undoCallback) _, undoCallback)
-    //thread.startFrames() // FIXME is this needed?
-    Log.i("main", "sent begin_gl message")
     ()
   })
 
@@ -143,7 +139,7 @@ class MainActivity extends Activity with TypedActivity with AndroidImplicits {
     } catch {
       case e: GLException => {
         val message = "got exception while loading saved bitmap, this should never happen!\n" + e
-        Log.i("main", message)
+        Log.e("everybody-draws", "main thread: " + message)
         this.runOnUiThread(() => {
           Toast.makeText(MainActivity.this, message, Toast.LENGTH_LONG).show()
         })
@@ -161,7 +157,7 @@ class MainActivity extends Activity with TypedActivity with AndroidImplicits {
     val listener = new ToggleableMotionEventListener(producer)
     drawerToggle.setMotionEventListener(listener)
     content.setOnTouchListener(listener)
-    Log.i("main", "set ontouch listener")
+    Log.i("everybody-draws", "main thread: finished texture setup")
   }
 
   def createViewTouchListener(producer: MotionEventProducer) = {
@@ -169,7 +165,7 @@ class MainActivity extends Activity with TypedActivity with AndroidImplicits {
   }
 
   override def onCreate(bundle: Bundle) {
-    Log.i("main", "oncreate")
+    Log.i("everybody-draws", "main thread: oncreate")
     System.loadLibrary("gl-stuff")
 
     super.onCreate(bundle)
@@ -223,7 +219,7 @@ class MainActivity extends Activity with TypedActivity with AndroidImplicits {
     // TODO: deal with rotation better
     Option(bundle) match {
       case Some(inState) => {
-        Log.i("main", "got bundle to restore")
+        Log.i("everybody-draws", "main thread: restoring from bundle")
         savedBitmap = Option(inState.getParcelable("screen"))
         controls.load(inState)
       }
@@ -267,7 +263,7 @@ class MainActivity extends Activity with TypedActivity with AndroidImplicits {
   }
 
   override def onStart() = {
-    Log.i("main", "onStart")
+    Log.i("everybody-draws", "main thread: onStart")
     super.onStart()
     loadDrawFiles()
     handlers.foreach(h => {
@@ -282,22 +278,21 @@ class MainActivity extends Activity with TypedActivity with AndroidImplicits {
   override def onResume() = {
     super.onResume()
     textureThread.foreach(_.startFrames())
-    Log.i("main", "resumed!")
+    Log.i("everybody-draws", "main thread: resumed!")
   }
 
   override def onPause() = {
     textureThread.foreach(_.stopFrames())
     super.onPause()
     prepareForSave()
-    Log.i("main", "paused!")
+    Log.i("everybody-draws", "main thread: paused!")
   }
 
   protected override def onSaveInstanceState(outState: Bundle) = {
-    Log.i("main", "saving instance state")
+    //Log.i("everybody-draws", "main thread: onSaveInstanceState")
     super.onSaveInstanceState(outState)
     savedBitmap.synchronized {
       savedBitmap.foreach(bitmap => {
-          Log.i("main", "saved bitmap to bundle")
           outState.putParcelable("screen", bitmap)
         })
     }
@@ -306,7 +301,7 @@ class MainActivity extends Activity with TypedActivity with AndroidImplicits {
 
   override protected def onStop() = {
     super.onStop()
-    Log.i("main", "onStop");
+    Log.i("everybody-draws", "main thread: onStop");
     content.setOnTouchListener(null)
     // (textureview does its own cleanup, see SurfaceTextureListener.onSurfaceTextureDestroyed())
     // TODO: is this the right order? probably not
@@ -326,7 +321,6 @@ class MainActivity extends Activity with TypedActivity with AndroidImplicits {
   }
 
   private def prepareForSave() = {
-    Log.i("main", "preparing for save")
     for (thread <- textureThread) {
       textureThread.foreach(thread => savedBitmap = Some(thread.getBitmapSynchronized()))
     }
@@ -339,11 +333,11 @@ class MainActivity extends Activity with TypedActivity with AndroidImplicits {
         bitmap.compress(Bitmap.CompressFormat.PNG, 90, out)
         out.flush()
       } else {
-        Log.i("main", "tried to save recycled bitmap!")
+        Log.e("everybody-draws", "main thread: tried to save recycled bitmap!")
       }
     } catch {
       case e: IOException => {
-        Log.i("main", "saving to file failed: %s".format(e))
+        Log.i("everybody-draws", "main thread: saving to file failed: %s".format(e))
       }
     }
   }
@@ -354,13 +348,13 @@ class MainActivity extends Activity with TypedActivity with AndroidImplicits {
       controls.save(out2)
     } catch {
       case e: IOException => {
-        Log.i("main", "saving to file failed: %s".format(e))
+        Log.e("everybody-draws", "main thread: saving to file failed: %s".format(e))
       }
     }
   }
 
   private def loadFromFile() = {
-    Log.i("main", "loading from file")
+    Log.i("everybody-draws", "main thread: loading from file")
     try {
       // TODO: don't do this on the main thread
       StateSaveLock.synchronized {
@@ -375,7 +369,7 @@ class MainActivity extends Activity with TypedActivity with AndroidImplicits {
     } catch {
       case e: FileNotFoundException => { }
       case e @ (_: IOException | _: GLException) => { 
-        Log.i("main", "loading from file failed: %s".format(e))
+        Log.e("everybody-draws", "main thread: loading from file failed: %s".format(e))
       }
     }
   }
@@ -391,7 +385,7 @@ class MainActivity extends Activity with TypedActivity with AndroidImplicits {
                 saveBitmapToFile(bitmap, out)
               }
             } catch { case e: Exception => {
-              Log.i("main", "failed to save screen bitmap: " + e)
+              Log.e("everybody-draws", "main thread: failed to save screen bitmap: " + e)
             } }
           }
         }(saveThread)
@@ -403,7 +397,6 @@ class MainActivity extends Activity with TypedActivity with AndroidImplicits {
     val adapter = new LazyPicker(this, thread, arr)
     picker.setAdapter(adapter)
     picker.setListener((view: View, pos: Int) => {
-      //Log.i("main", s"Item selected for {picker.name}! {pos}")
       thread.withGL(gl => adapter.getState(pos, gl) match {
         case Right(value) => cb(gl, value)
         case Left(errmsg) => {
@@ -423,15 +416,15 @@ class MainActivity extends Activity with TypedActivity with AndroidImplicits {
     notify.synchronized {
       runOnUiThread(() => {
         MotionEventProducer.nativePauseMotionEvent(producer)
-        Log.i("main", "loading interpolator - paused motion events")
+        //Log.i("everybody-draws", "main thread: loading interpolator - paused motion events")
         notify.synchronized {
           notify.notify()
         }
       })
-      Log.i("main", "loading interpolator - waiting for pause")
+      //Log.i("everybody-draws", "main thread: loading interpolator - waiting for pause")
       notify.wait()
     }
-    Log.i("main", "loading interpolator - finishing lua script")
+    //Log.i("everybody-draws", "main thread: loading interpolator - finishing lua script")
     try {
       thread.finishLuaScript(gl)
     }
@@ -452,7 +445,7 @@ class MainActivity extends Activity with TypedActivity with AndroidImplicits {
       MainActivity.this.runOnUiThread(() => {
         // TODO: make hardcoded shaders accessible a better way
         val interpLoader = loadInterpolatorSynchronized(thread, producer)
-        Log.i("main", s"got ${drawfiles.brushes.length} brushes, ${drawfiles.anims.length} anims, ${drawfiles.paints.length} paints, ${drawfiles.interpscripts.length} interpolation scripts")
+        Log.i("everybody-draws", s"main thread: got ${drawfiles.brushes.length} brushes, ${drawfiles.anims.length} anims, ${drawfiles.paints.length} paints, ${drawfiles.interpscripts.length} interpolation scripts")
         populatePicker(controls.brushpicker, drawfiles.brushes, loadBrush(thread), thread)
         populatePicker(controls.animpicker, drawfiles.anims,  thread.setAnimShader _, thread)
         populatePicker(controls.paintpicker, drawfiles.paints,  thread.setPointShader _, thread)
@@ -470,7 +463,7 @@ class MainActivity extends Activity with TypedActivity with AndroidImplicits {
       }
       case Failure(err) => {
         val msg = "Something went wrong while loading your custom paint files:\n" + err;
-        Log.e("main", msg)
+        Log.e("everybody-draws", "main thread: " + msg)
         err.printStackTrace()
         MainActivity.this.runOnUiThread(() => {
           Toast.makeText(MainActivity.this, msg, Toast.LENGTH_LONG).show()
@@ -481,7 +474,7 @@ class MainActivity extends Activity with TypedActivity with AndroidImplicits {
           }
           case Failure(err) => {
             val msg = "Something went wrong while loading the default paint files.  This should never happen!\n" + err;
-            Log.e("main", msg)
+            Log.e("everybody-draws", "main thread: " + msg)
             err.printStackTrace()
             MainActivity.this.runOnUiThread(() => {
               Toast.makeText(MainActivity.this, msg, Toast.LENGTH_LONG).show()
@@ -508,7 +501,7 @@ class MainActivity extends Activity with TypedActivity with AndroidImplicits {
 
   def loadUniBrush(thread: TextureSurfaceThread, producer: MotionEventProducer) =
   (gl: GLInit, unibrush: UniBrush) => {
-    Log.i("main", "loading unibrush")
+    Log.i("everybody-draws", "main thread: loading unibrush")
     def getSelectedValue[T](picker: GLControl[T]): Option[T] = {
       // return None if the control is already active, or we're trying to restore a missing value
       // TODO: the missing-value part is probably busted
@@ -521,7 +514,7 @@ class MainActivity extends Activity with TypedActivity with AndroidImplicits {
             runOnUiThread(() => {
               Toast.makeText(MainActivity.this, "unable to load old control!" + msg, Toast.LENGTH_LONG).show()
             })
-            Log.i("main", s"unable to load old control: ${msg}")
+            Log.e("everybody-draws", s"main thread: unable to load old control: ${msg}")
             None
           }
           case Right(value) => {
@@ -531,35 +524,24 @@ class MainActivity extends Activity with TypedActivity with AndroidImplicits {
         }
       }
     }
-    //Log.i("main", s"copypicker is enabled: ${controls.copypicker.enabled}")
-    Log.i("unibrush", "loading unibrushes and old values...")
-    Log.i("unibrush", "loading brush")
     val brush: Option[Texture] = unibrush.brush.orElse(getSelectedValue(controls.brushpicker))
-    Log.i("unibrush", "loading anim")
     val anim = unibrush.baseanimshader.orElse(getSelectedValue(controls.animpicker))
-    Log.i("unibrush", "loading point")
     val point = unibrush.basepointshader.orElse(getSelectedValue(controls.paintpicker))
-    Log.i("unibrush", "loading copy")
     val copy = unibrush.basecopyshader.orElse(getSelectedValue(controls.copypicker))
-    Log.i("unibrush", "loading interp")
     val interp = unibrush.interpolator.orElse(getSelectedValue(controls.interppicker))
-    Log.i("unibrush", "loading unibrush!")
     
     // Unconditionally call ondone() in the interpolator to write layers, etc
     // This runs the old interpolator and so must run under the old state.
     unloadInterpolatorSynchronized(thread, producer, gl)
-    Log.i("unibrush", s"should have unloaded interpolator, which is ${interp} (unibrush interp is ${unibrush.interpolator})")
     thread.clearLayers(gl)
     for (layer <- unibrush.layers) {
       thread.addLayer(gl, layer.copyshader, layer.pointshader, layer.pointsrc)
     }
-    Log.i("unibrush", "set up layers!")
     brush.foreach(thread.setBrushTexture(gl, _))
     anim.foreach(thread.setAnimShader(gl, _))
     point.foreach(thread.setPointShader(gl, _))
     copy.foreach(thread.setCopyShader(gl, _))
     interp.foreach(thread.setInterpScript(gl, _))
-    Log.i("unibrush", "done loading unibrush!")
     loadUniBrushControls(unibrush) // now that we're done, update which controls are enabled
     ()
   }
@@ -600,7 +582,6 @@ class MainActivity extends Activity with TypedActivity with AndroidImplicits {
 
   protected override def onActivityResult(requestCode: Int, resultCode: Int, data: Intent) = requestCode match {
     case ACTIVITY_CHOOSE_IMAGE => {
-      Log.i("main", s"got activity result: ${data}")
       if (resultCode == Activity.RESULT_OK) {
         val path = FileUtils.getPath(this, data.getData())
         val bitmap = (try {
@@ -612,9 +593,7 @@ class MainActivity extends Activity with TypedActivity with AndroidImplicits {
             None
           }
         })
-        Log.i("main", s"got bitmap ${bitmap}")
         for (b <- bitmap; thread <- textureThread) {
-          Log.i("main", "drawing bitmap...")
           thread.withGL(gl => {
             val success = try {
               thread.drawBitmap(gl, b)
@@ -637,7 +616,7 @@ class MainActivity extends Activity with TypedActivity with AndroidImplicits {
       }
     }
     case _ => {
-      Log.i("main", s"got unidentified activity result: ${resultCode}, request code ${requestCode}, data: ${data}")
+      Log.e("everybody-draws", s"main thread: got unidentified activity result: ${resultCode}, request code ${requestCode}, data: ${data}")
     }
   }
 
@@ -656,7 +635,7 @@ class MainActivity extends Activity with TypedActivity with AndroidImplicits {
 
   def startReplay() = {
     for (thread <- textureThread) {
-      Log.i("main", "starting replay...")
+      Log.i("everybody-draws", "main thread: starting replay...")
       thread.beginReplay()
     }
   }
@@ -782,9 +761,9 @@ class MainActivity extends Activity with TypedActivity with AndroidImplicits {
     class SidebarHiddenEntryPicker[T](val name: String, picker: GLControl[_], getUnibrushValue: (UniBrush) => Option[T]) extends SidebarEntry {
       override def enabled = picker.enabled
       override def updateForUnibrush(u: UniBrush) = {
-        val oldstate = enabled
+        //val oldstate = enabled
         picker.enabled = getUnibrushValue(u).isEmpty
-        Log.i("main", s"${if (enabled) "enabling" else "disabling"} control ${name} for unibrush (was: ${if (oldstate) "enabled" else "disabled"})")
+        //Log.i("everybody-draws", s"main thread: ${if (enabled) "enabling" else "disabling"} control ${name} for unibrush (was: ${if (oldstate) "enabled" else "disabled"})")
       }
     }
     class SidebarEntryPicker[T](name: String, picker: GLControl[_] with SelectedListener, getUnibrushValue: (UniBrush) => Option[T])
@@ -830,14 +809,12 @@ object MainActivity {
     // so we have to track the drawer's current state instead
     private var drawerClosed = false
     override def onDrawerClosed(view: View) = {
-      Log.i("main", "drawer closed")
       // just to be sure
       motionEventListener.foreach(_.setForwardEvents(true))
       drawerClosed = true
       super.onDrawerClosed(view)
     }
     override def onDrawerOpened(view: View) = {
-      Log.i("main", "drawer opened")
       drawerClosed = false
     }
     // onDrawerStateChanged does get called consistently, and always after onDrawerClosed()/onDrawerOpened()
@@ -847,14 +824,6 @@ object MainActivity {
         case _ => false
       }
       motionEventListener.foreach(_.setForwardEvents(newForwarding))
-      val newStateName = newState match {
-        case DrawerLayout.STATE_DRAGGING => "STATE_DRAGGING"
-        case DrawerLayout.STATE_IDLE => {
-          "STATE_IDLE: drawer " + (if (drawerClosed) "closed" else "open")
-        }
-        case DrawerLayout.STATE_SETTLING => "STATE_SETTLING"
-      }
-      Log.i("main", s"drawer state changed to ${newStateName}")
       super.onDrawerStateChanged(newState)
     }
   }
@@ -865,7 +834,7 @@ object MainActivity {
       callback(st, w, h)
     }
     def onSurfaceTextureDestroyed(st: android.graphics.SurfaceTexture): Boolean = {
-      Log.i("main", "got onsurfacetexturedestroyed callback!")
+      Log.i("everybody-draws", "main thread: got onsurfacetexturedestroyed callback!")
       true
     }
     def onSurfaceTextureSizeChanged(st: android.graphics.SurfaceTexture, w: Int, h: Int): Unit = { }
@@ -887,7 +856,7 @@ object MainActivity {
   class Rotation(private val i: Int) extends AnyVal { }
   object Rotation {
     def fromSurfaceOrientation(oldOrientation: Int, newOrientation: Int) = {
-      Log.i("main", s"old rotation: ${oldOrientation}, new rotation: ${newOrientation}")
+      Log.i("everybody-draws", s"main thread: old rotation: ${oldOrientation}, new rotation: ${newOrientation}")
       if (oldOrientation == -1) {
         new Rotation(newOrientation)
       }

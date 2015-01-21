@@ -209,12 +209,13 @@ fn on_unwind(msg: &(Any + Send), file: &'static str, line: uint) {
 #[no_mangle]
 pub unsafe extern "C" fn JNI_OnLoad(vm: *mut JavaVM, reserved: *mut c_void) -> jint {
     logi!("jni onload!!");
+    debug_logi!("debug logging is enabled");
     let mut env: *mut c_void = ptr::null_mut();
     if ((**vm).GetEnv)(vm, (&mut env as *mut *mut c_void), JNI_VERSION_1_6) != JNI_OK {
+        loge!("failed to get environment?!");
         return -1;
     }
     let env = env as *mut JNIEnv;
-    logi!("got environment!: {:?}", env);
 
     texturethread::init(env);
     texturethread::init(env);
@@ -227,14 +228,14 @@ pub unsafe extern "C" fn JNI_OnLoad(vm: *mut JavaVM, reserved: *mut c_void) -> j
     //rustrt::init(1, ["rustjni".as_ptr()].as_ptr());
     std::rt::unwind::register(on_unwind);
 
-    logi!("finished jni_onload");
+    debug_logi!("finished jni_onload");
     JNI_VERSION_1_2
 }
 
 #[allow(non_snake_case, unused_variables)]
 #[no_mangle]
 pub unsafe extern "C" fn JNI_OnUnload(vm: *mut JavaVM, reserved: *mut c_void) {
-    logi!("jni onload!!");
+    logi!("jni onunload!!");
     let mut env: *mut c_void = ptr::null_mut();
     if ((**vm).GetEnv)(vm, (&mut env as *mut *mut c_void), JNI_VERSION_1_6) != JNI_OK {
         return;

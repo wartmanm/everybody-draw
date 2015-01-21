@@ -99,7 +99,7 @@ impl UndoTargets {
             loge!("undo index {} exceeds current buffer size {}!", idx, self.len);
             return;
         }
-        logi!("loading undo buffer {}/{}", idx, self.len);
+        debug_logi!("loading undo buffer {}/{}", idx, self.len);
         self.pos = idx + 1;
         let src = &mut self.targets[self.get_pos(idx) as uint];
         gl2::bind_framebuffer(gl2::FRAMEBUFFER, buf.framebuffer);
@@ -153,7 +153,7 @@ impl<'a> PaintState<'a> {
 
 fn print_gl_string(name: &str, s: GLenum) {
     let glstr = gl2::get_string(s);
-    logi!("GL {} = {}\n", name, glstr);
+    debug_logi!("GL {} = {}\n", name, glstr);
 }
 
 fn perform_copy(dest_framebuffer: GLuint, source_texture: &Texture, shader: &CopyShader, matrix: &[f32]) -> () {
@@ -190,7 +190,6 @@ impl TargetData {
 
 impl<'a> GLInit<'a> {
     pub fn draw_image(&mut self, w: i32, h: i32, pixels: &[u8], rotation: matrix::Rotation) -> () {
-        logi!("drawing image...");
         let target = self.targetdata.get_current_texturetarget();
         let (tw, th) = target.texture.dimensions;
         let heightratio = th as f32 / h as f32;
@@ -201,7 +200,7 @@ impl<'a> GLInit<'a> {
         let (glratiox, glratioy) = (widthratio / ratio, heightratio / ratio);
 
         let matrix = matrix::fit_inside((w, h), target.texture.dimensions, rotation);
-        logi!("drawing with ratio: {:5.3}, glratio {:5.3}, {:5.3}, matrix:\n{}", ratio, glratiox, glratioy, matrix::log(matrix.as_slice()));
+        debug_logi!("drawing image with ratio: {:5.3}, glratio {:5.3}, {:5.3}", ratio, glratiox, glratioy);
 
         let intexture = Texture::with_image(w, h, Some(pixels), PixelFormat::RGBA);
         check_gl_error("creating texture");
@@ -234,24 +233,24 @@ impl<'a> GLInit<'a> {
 
     // TODO: make an enum for these with a scala counterpart
     pub fn set_copy_shader(&mut self, shader: &'a CopyShader) -> () {
-        logi!("setting copy shader");
+        debug_logi!("setting copy shader");
         self.paintstate.copyshader = Some(shader);
     }
 
     // these can also be null to unset the shader
     // TODO: document better from scala side
     pub fn set_anim_shader(&mut self, shader: &'a CopyShader) -> () {
-        logi!("setting anim shader");
+        debug_logi!("setting anim shader");
         self.paintstate.animshader = Some(shader);
     }
 
     pub fn set_point_shader(&mut self, shader: &'a PointShader) -> () {
-        logi!("setting point shader");
+        debug_logi!("setting point shader");
         self.paintstate.pointshader = Some(shader);
     }
 
     pub fn set_interpolator(&mut self, interpolator: &'a LuaScript) -> () {
-        logi!("setting interpolator");
+        debug_logi!("setting interpolator");
         self.paintstate.interpolator = Some(interpolator);
     }
 
@@ -270,7 +269,7 @@ impl<'a> GLInit<'a> {
     }
 
     pub fn add_layer(&mut self, layer: PaintLayer<'a>) -> () {
-        logi!("adding layer");
+        debug_logi!("adding layer");
         let extra: i32 = (layer.pointidx as i32 + 1) - self.points.len() as i32;
         if extra > 0 {
             //self.points.extend(iter::repeat(Vec::new()).take(extra as uint));
@@ -280,7 +279,7 @@ impl<'a> GLInit<'a> {
     }
 
     pub fn clear_layers(&mut self) {
-        logi!("setting layer count to 0");
+        debug_logi!("setting layer count to 0");
         self.paintstate.layers.clear();
         self.points.truncate(1);
     }
@@ -306,7 +305,7 @@ impl<'a> GLInit<'a> {
         print_gl_string("Renderer", gl2::RENDERER);
         print_gl_string("Extensions", gl2::EXTENSIONS);
 
-        logi!("setupGraphics({},{})", w, h);
+        debug_logi!("setupGraphics({},{})", w, h);
         let targets = [TextureTarget::new(w, h, PixelFormat::RGBA), TextureTarget::new(w, h, PixelFormat::RGBA)];
         let mut points: Vec<Vec<ShaderPaintPoint>> = Vec::new();
 
@@ -338,7 +337,7 @@ impl<'a> GLInit<'a> {
 
     pub fn unload_interpolator(&mut self, handler: &mut MotionEventConsumer, events: &'a mut Events<'a>, undo_callback: &JNICallbackClosure) -> GLResult<()> {
         if let Some(interpolator) = self.paintstate.interpolator {
-            logi!("finishing {:?}", interpolator);
+            debug_logi!("finishing {:?}", interpolator);
             unsafe {
                 let mut callback = LuaCallbackType::new(self, events, handler, undo_callback);
                 finish_lua_script(&mut callback, interpolator)
@@ -421,7 +420,7 @@ impl<'a> GLInit<'a> {
                 gl2::bind_framebuffer(gl2::FRAMEBUFFER, layer.target.framebuffer);
                 gl2::clear_color(0f32, 0f32, 0f32, 0f32);
                 gl2::clear(gl2::COLOR_BUFFER_BIT);
-                logi!("copied brush layer down");
+                debug_logi!("copied brush layer down");
             }
         }
     }
@@ -451,7 +450,7 @@ impl<'a> GLInit<'a> {
                 eglinit::egl_swap();
             },
             (x, y) => {
-                logi!("skipped frame! copyshader is {:?}, animshader is {:?}", x, y);
+                debug_logi!("skipped frame! copyshader is {:?}, animshader is {:?}", x, y);
             }
         }
     }

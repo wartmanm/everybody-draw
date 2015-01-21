@@ -24,7 +24,6 @@ object DrawFiles {
 
   sealed trait ReadState[U] { }
   class Readable[U](path: String, private var state: ReadState[U]) {
-    Log.i("drawfiles", s"created readable ${this}")
     val name = {
       val pathsep = path.lastIndexOf('/')
       val extsep = path.lastIndexOf('.')
@@ -36,7 +35,6 @@ object DrawFiles {
     type FullyRead = DrawFiles.FullyRead[U]
     type FailedRead = DrawFiles.FailedRead[U]
     def read() = {
-      Log.i("drawfiles", s"readable ${this} .read()")
       state = state match {
         case s: BaseUnread => try {
           s.read(path)
@@ -51,7 +49,6 @@ object DrawFiles {
 
     @tailrec
     final def compile(gl: GLInit): U = {
-      Log.i("drawfiles", s"readable ${this} .compile()")
       state match {
         case s: BaseUnread => {
           this.read()
@@ -78,17 +75,15 @@ object DrawFiles {
     @tailrec
     final def compileSafe(gl: GLInit): GLStoredResult[U] = state match {
       case s: FullyRead => {
-        Log.i("drawfiles", s"readable ${this}: FullyRead: ${s.content}")
         Right(s.content)
       }
       case s: FailedRead => Left(s.error.toString())
       case _ => {
         try {
-          Log.i("drawfiles", s"readable ${this}: not fully read yet")
           this.compile(gl)
         } catch {
           case e: Exception => {
-            Log.i("drawfiles", s"readable ${this}: failed to read")
+            Log.e("everybody-draws", s"drawfiles: failed to read ${this}")
           }
         }
         compileSafe(gl)
@@ -162,7 +157,7 @@ object DrawFiles {
     Option(BitmapFactory.decodeStream(stream, null, options)) match {
       case None => throw new GLException("unable to load bitmap!")
       case Some(bitmap) => {
-        Log.i("drawfiles", "bitmap: config %s, w: %d, h: %d, alpha: %b".format(
+        Log.i("everybody-draws", "drawfiles: bitmap: config %s, w: %d, h: %d, alpha: %b".format(
           bitmap.getConfig(), bitmap.getHeight(), bitmap.getWidth(), bitmap.hasAlpha()))
         bitmap
       }

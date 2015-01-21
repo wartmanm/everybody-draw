@@ -44,7 +44,7 @@ pub unsafe fn init(env: *mut JNIEnv) {
     // TODO: use global ref here
     MOTION_CLASS = ((**env).FindClass)(env, cstr!("android/view/MotionEvent"));
     MOTIONEVENT_NATIVE_PTR_FIELD = ((**env).GetFieldID)(env, MOTION_CLASS, cstr!("mNativePtr"), cstr!("I"));
-    logi!("got motion classes");
+    debug_logi!("got motion classes");
 
     let producermethods = [
         native_method!("nativeAppendMotionEvent", "(ILandroid/view/MotionEvent;)V", native_append_motion_event),
@@ -57,7 +57,7 @@ pub unsafe fn init(env: *mut JNIEnv) {
         native_method!("destroy", "(Lcom/github/wartman4404/gldraw/MotionEventHandlerPair;)V", destroy_motion_event_handler),
     ];
     register_classmethods(env, cstr!("com/github/wartman4404/gldraw/MotionEventHandlerPair$"), &motioneventhandlerstaticmethods);
-    logi!("registered motionevent methods!");
+    debug_logi!("registered motionevent methods!");
 }
 
 pub unsafe fn destroy(_: *mut JNIEnv) {
