@@ -21,10 +21,7 @@ class LazyPicker[U](context: Context, thread: TextureSurfaceThread, content: Arr
     getResourceView(position, convertView, parent, android.R.layout.simple_spinner_item)
   }
   override def getDropDownView(position: Int, convertView: View, parent: ViewGroup) = {
-    val view = getResourceView(position, convertView, parent, android.R.layout.simple_spinner_dropdown_item)
-    val checked = parent.asInstanceOf[AdapterView[_]].getSelectedItemPosition() == position
-    view.getTag().asInstanceOf[Holder].nameView.asInstanceOf[CheckedTextView].setChecked(checked)
-    view
+    getResourceView(position, convertView, parent, android.R.layout.simple_list_item_activated_1)
   }
 
   private def getResourceView(position: Int, convertView: View, parent: ViewGroup, resource: Int): View = {
@@ -44,7 +41,6 @@ class LazyPicker[U](context: Context, thread: TextureSurfaceThread, content: Arr
     val ok = item.isNotFailed
     nameview.setEnabled(ok)
     view.setEnabled(ok)
-    //view.setBackgroundColor(if ok 0xffff0000 else 0x00000000);
     view
   }
 
