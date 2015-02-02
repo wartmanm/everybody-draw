@@ -3,15 +3,14 @@ package com.github.wartman4404.gldraw
 object LuaSyntaxHighlightProcessor {
   object Regex {
     // used as-is
-    val comment = """(?m:--[^\[].*$)|(?s:/--\[\[.*?(?:\]\]|$))"""
+    val comment = """(?m:--[^\[].*$)|(?s:--\[\[.*?(?:\]\]|$))"""
     val keywords = """\b(?:do|end|while|repeat|until|if|then|else|elseif|end|for|in|function|local|and|or|not)\b"""
     val stringbody = """@(?:[^@\\]|\\.)*?@"""
-    val string = stringbody.replace("@", "\"") + "|" + stringbody.replace("@", "'")
     val literals = joinKeywords(Array(
       """\d+\.?""",
-      "true|false|nil",
-      stringbody.replace("@", "\""),
-      stringbody.replace("@", "'")))
+      "true|false|nil")) +
+     "|" + stringbody.replace("@", "\"") +
+     "|" + stringbody.replace("@", "'")
 
     val types = """\bShaderPaintPoint\b"""
 
