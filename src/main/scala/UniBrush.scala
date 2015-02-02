@@ -106,7 +106,7 @@ object UniBrushSource extends AndroidImplicits {
     j.endObject()
     for (layer <- layers) {
       for (ps <- layer.pointshader) { if (ps < 0 || ps >= pointshaders.length) UniBrush.logAbort(s"no point shader numbered ${ps}") }
-      for (cs <- layer.pointshader) { if (cs < 0 || cs >= pointshaders.length) UniBrush.logAbort(s"no point shader numbered ${cs}") }
+      for (cs <- layer.copyshader) { if (cs < 0 || cs >= animshaders.length) UniBrush.logAbort(s"no anim shader numbered ${cs}") }
     }
     UniBrushSource(brush, pointshaders, animshaders, basepointshader,
       baseanimshader, basecopyshader, interpolator, layers)
