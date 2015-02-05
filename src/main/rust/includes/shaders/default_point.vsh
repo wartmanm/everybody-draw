@@ -1,4 +1,4 @@
-precision lowp float;
+precision mediump float;
 uniform mat4 textureMatrix;
 attribute float vSize;
 attribute float vTime;
@@ -15,8 +15,8 @@ varying vec2 position;
 
 void main() {
     time = vTime;
-    float tmpSize = vSize * 1500.0 * vSizeFactor;
-    size = clamp(tmpSize, 7.5, 60.0);
+    float tmpSize = 40.0 * (vSizeFactor - 0.1);
+    size = tmpSize;
     color = vColor;
     gl_PointSize = size;
     gl_Position = (textureMatrix * vPosition);

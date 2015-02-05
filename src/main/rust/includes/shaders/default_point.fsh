@@ -1,4 +1,4 @@
-precision lowp float;
+precision mediump float;
 varying float time;
 varying float size;
 varying vec3 color;
