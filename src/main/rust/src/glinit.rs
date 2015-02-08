@@ -51,7 +51,7 @@ pub struct TargetData {
 }
 
 pub struct UndoTargets {
-    targets: [TextureTarget; UNDO_BUFFERS as uint],
+    targets: [TextureTarget; UNDO_BUFFERS as usize],
     start: i32,
     len: i32,
     max: i32,
@@ -76,7 +76,7 @@ impl UndoTargets {
 
     pub fn push_new_buffer(&mut self, buf: &TextureTarget, copyshader: &CopyShader) {
         let end = self.get_pos(self.pos);
-        let target = &mut self.targets[end as uint];
+        let target = &mut self.targets[end as usize];
         if end >= self.max {
             let (x, y) = buf.texture.dimensions;
             *target = TextureTarget::new(x, y, PixelFormat::RGBA);
@@ -101,7 +101,7 @@ impl UndoTargets {
         }
         debug_logi!("loading undo buffer {}/{}", idx, self.len);
         self.pos = idx + 1;
-        let src = &mut self.targets[self.get_pos(idx) as uint];
+        let src = &mut self.targets[self.get_pos(idx) as usize];
         gl2::bind_framebuffer(gl2::FRAMEBUFFER, buf.framebuffer);
         gl2::blend_func(gl2::ONE, gl2::ZERO);
         perform_copy(buf.framebuffer, &src.texture, copyshader, matrix::IDENTITY.as_slice());
@@ -118,7 +118,7 @@ impl UndoTargets {
 impl Drop for UndoTargets {
     fn drop(&mut self) -> () {
         for pos in range(0, self.max) {
-            mem::drop(&mut self.targets[self.get_pos(pos) as uint]);
+            mem::drop(&mut self.targets[self.get_pos(pos) as usize]);
         }
     }
 }
@@ -176,11 +176,11 @@ fn draw_layer(layer: CompletedLayer, matrix: &[f32], color: [f32; 3], size: f32
 
 impl TargetData {
     fn get_current_texturetarget<'a>(&'a self) -> &'a TextureTarget {
-        &self.targets[self.current_target as uint]
+        &self.targets[self.current_target as usize]
     }
 
     fn get_current_texturesource<'a> (&'a self) -> &'a TextureTarget {
-        &self.targets[(self.current_target ^ 1) as uint]
+        &self.targets[(self.current_target ^ 1) as usize]
     }
 
     fn get_texturetargets<'a> (&'a self) -> (&'a TextureTarget, &'a TextureTarget) {
@@ -272,7 +272,7 @@ impl<'a> GLInit<'a> {
         debug_logi!("adding layer");
         let extra: i32 = (layer.pointidx as i32 + 1) - self.points.len() as i32;
         if extra > 0 {
-            //self.points.extend(iter::repeat(Vec::new()).take(extra as uint));
+            //self.points.extend(iter::repeat(Vec::new()).take(extra as usize));
             self.points.extend(iter::range(0, extra).map(|_| Vec::new()));
         }
         self.paintstate.layers.push(layer);
@@ -288,7 +288,7 @@ impl<'a> GLInit<'a> {
     pub fn erase_layer(&mut self, layer: i32) -> GLResult<()> {
         let target = match layer {
             0 => self.targetdata.get_current_texturetarget().framebuffer,
-            _ => match self.paintstate.layers.as_slice().get((layer - 1) as uint) {
+            _ => match self.paintstate.layers.as_slice().get((layer - 1) as usize) {
                 Some(layer) => layer.target.framebuffer,
                 None => return Err(format!("tried to erase layer {} of {}", layer - 1, self.paintstate.layers.len()).into_cow()),
             },
@@ -394,7 +394,7 @@ impl<'a> GLInit<'a> {
 
                 for layer in self.paintstate.layers.iter() {
                     let completed = layer.complete(copy_shader, point_shader);
-                    let points = drawvecs[layer.pointidx as uint].as_slice();
+                    let points = drawvecs[layer.pointidx as usize].as_slice();
                     draw_layer(completed, matrix, color, size, brush, back_buffer, points);
                 }
 

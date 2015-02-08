@@ -66,13 +66,13 @@ macro_rules! rust_raise_lua_err(
 
 fn get_queue_or_raise_err<'a, 'b, 'c, 'd>(data: &'d mut LuaCallbackType, queue: i32) -> &'d mut Vec<ShaderPaintPoint> {
     let points = &mut data.glinit.points;
-    if (queue as uint) >= points.len() {
+    if (queue as usize) >= points.len() {
         unsafe {
             loge!("tried to push point to queue {} of {}", queue + 1, points.len());
             rust_raise_lua_err!(None, "tried to push point to queue {} of {}", queue + 1, points.len());
         }
     }
-    unsafe { points.as_mut_slice().get_unchecked_mut(queue as uint) }
+    unsafe { points.as_mut_slice().get_unchecked_mut(queue as usize) }
 }
 
 #[no_mangle]

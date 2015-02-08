@@ -2,7 +2,7 @@
 use std::sync::mpsc;
 use core::ops::{Add, Div, Sub, Mul};
 
-#[derive(Clone, Show, PartialEq, Copy, Default)]
+#[derive(Clone, Debug, PartialEq, Copy, Default)]
 #[repr(C)]
 pub struct Coordinate {
     pub x: f32,
@@ -25,7 +25,7 @@ impl AsSelf<f32> for f32 {
 pub fn as_self<T, U: AsSelf<T>>(u: &U) -> &T { u.as_self() }
 
 /// Holds data from motionevent entries.
-#[derive(Clone, Show, PartialEq, Copy)]
+#[derive(Clone, Debug, PartialEq, Copy)]
 #[repr(C)]
 pub struct PaintPoint {
     pub pos: Coordinate,
@@ -36,7 +36,7 @@ pub struct PaintPoint {
 /// Holds raw data used for pointshader attribs.
 /// These fields overlap with PaintPoint somewhat but aren't necessarily directly sourced from one
 /// so adding it as a child doesn't seem ideal
-#[derive(Clone, Show, Copy)]
+#[derive(Clone, Debug, Copy)]
 #[repr(C)]
 pub struct ShaderPaintPoint {
     pub pos: Coordinate,

@@ -1,7 +1,6 @@
 use core::prelude::*;
 use core::fmt;
-use core::fmt::Show;
-use core::hash::Hash;
+use core::fmt::Debug;
 
 use opengles::gl2;
 use opengles::gl2::GLuint;
@@ -10,7 +9,7 @@ use glcommon::{check_gl_error, GLResult, UsingDefaults, UsingDefaultsSafe};
 
 use collections::vec::Vec;
 
-#[derive(PartialEq, Eq, Hash, Show, Copy)]
+#[derive(PartialEq, Eq, Hash, Debug, Copy)]
 #[repr(u32)]
 pub enum PixelFormat {
     RGBA = gl2::RGBA,
@@ -66,13 +65,13 @@ impl Drop for Texture {
     }
 }
 
-impl Show for Texture {
+impl Debug for Texture {
     fn fmt(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
         write!(formatter, "texture 0x{:x}, dimensions {:?}", self.texture, self.dimensions)
     }
 }
 
-impl Show for BrushTexture {
+impl Debug for BrushTexture {
     fn fmt(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
         write!(formatter, "brushtexture 0x{:x}, dimensions {:?}", self.texture.texture, self.texture.dimensions)
     }

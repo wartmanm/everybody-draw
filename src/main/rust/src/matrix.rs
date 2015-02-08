@@ -3,7 +3,7 @@ use core::prelude::*;
 pub type Matrix = [f32; 16];
 
 #[repr(i32)]
-#[derive(Copy, Show, PartialEq, Eq)]
+#[derive(Copy, Debug, PartialEq, Eq)]
 pub enum Rotation {
     Rotation0 = 0,
     Rotation90 = 1,

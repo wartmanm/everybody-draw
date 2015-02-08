@@ -1,6 +1,5 @@
 #![feature(unboxed_closures, unsafe_destructor)]
-#![allow(unstable)]
-#![feature(int_uint)]
+#![feature(no_std, core, hash, std_misc, rustc_private, alloc, collections, libc)]
 #![crate_name = "rustgl"]
 #![crate_type = "staticlib"]
 #![no_std]

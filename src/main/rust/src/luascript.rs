@@ -1,6 +1,6 @@
 use core::prelude::*;
 use core::fmt;
-use core::fmt::Show;
+use core::fmt::Debug;
 use glcommon::{GLResult, UsingDefaults, MString};
 use lua_geom::{load_lua_script, destroy_lua_script};
 use core::borrow::IntoCow;
@@ -35,7 +35,7 @@ impl Drop for LuaScript {
     }
 }
 
-impl Show for LuaScript {
+impl Debug for LuaScript {
     fn fmt(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
         write!(formatter, "lua script 0x{:x}", self.registry_id)
     }

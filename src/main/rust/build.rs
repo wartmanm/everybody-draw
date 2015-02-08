@@ -1,11 +1,11 @@
 // build.rs
 //
-#![allow(unstable)]
+#![feature(io, libc)]
 
 extern crate libc;
 
-use std::io::Command;
-use std::io::process::StdioContainer;
+use std::old_io::Command;
+use std::old_io::process::StdioContainer;
 use libc::consts::os::posix88::STDERR_FILENO;
 
 fn main() {

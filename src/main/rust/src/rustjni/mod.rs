@@ -104,7 +104,7 @@ unsafe fn get_string(env: *mut JNIEnv, string: jstring) -> Option<String> {
     let string = try_opt!(string.as_mut());
     let c = try_opt!(((**env).GetStringChars)(env, string, ptr::null_mut()).as_ref());
     let len = ((**env).GetStringLength)(env, string);
-    let strslice: &[u16] = mem::transmute(raw::Slice { data: c, len: len as uint });
+    let strslice: &[u16] = mem::transmute(raw::Slice { data: c, len: len as usize });
     let ruststr = String::from_utf16(strslice);
     ((**env).ReleaseStringChars)(env, string as jstring, strslice.as_ptr());
     match ruststr {
@@ -161,7 +161,7 @@ unsafe fn get_jpointer(env: *mut JNIEnv, obj: jobject, field: jfieldID) -> jpoin
     //((**env).SetLongField)(env, obj, field)
 //}
 
-fn on_unwind(msg: &(Any + Send), file: &'static str, line: uint) {
+fn on_unwind(msg: &(Any + Send), file: &'static str, line: usize) {
     //use core::fmt::FormatWriter;
     // as far as I know there's no way to identify traits that can be cast to Show at runtime
     // these cause compiler crashes:

@@ -82,14 +82,14 @@ pub fn next_point(s: &mut MotionEventConsumer, e: &mut Events) -> (point::Shader
             e.pushpoint(point);
             let idx = point.index;
             let newpoint = point.entry;
-            if !current_points.contains_key(&(idx as uint)) {
-                current_points.insert(idx as uint, PointStorage {
+            if !current_points.contains_key(&(idx as usize)) {
+                current_points.insert(idx as usize, PointStorage {
                     info: None,
                     sizeavg: RollingAverage16::new(),
                     speedavg: RollingAverage16::new(),
                 });
             }
-            let oldpoint = current_points.get_mut(&(idx as uint)).unwrap();
+            let oldpoint = current_points.get_mut(&(idx as usize)).unwrap();
             let pointevent = match (oldpoint.info, newpoint) {
                 (Some(op), PointInfo::Point(np)) => {
                     let dist = manhattan_distance(op.pos, np.pos);

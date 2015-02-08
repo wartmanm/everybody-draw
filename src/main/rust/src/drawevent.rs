@@ -10,7 +10,7 @@
 
 use core::prelude::*;
 use core::borrow::ToOwned;
-use collections::vec::Vec;
+//use collections::vec::Vec;
 use point::PointEntry;
 use glstore::{DrawObjectIndex, DrawObjectList};
 use glstore::{ShaderInitValues, BrushInitValues, LuaInitValues};
@@ -126,6 +126,7 @@ impl<'a> Events<'a> {
         self.luascripts.get_object(luascript).get_source()
     }
 
+    #[allow(unused_variables)]
     pub fn pushpoint(&mut self, event: PointEntry) {
         //self.eventlist.push(DrawEvent::Point(event));
     }
@@ -135,7 +136,7 @@ impl<'a> Events<'a> {
     pub fn clear(&mut self) {
         //self.eventlist.clear();
     }
-    //fn get_event(&self, idx: uint) -> Option<&DrawEvent> {
+    //fn get_event(&self, idx: usize) -> Option<&DrawEvent> {
         //self.eventlist.as_slice().get(idx)
     //}
 }
@@ -146,7 +147,7 @@ pub fn handle_event<'a>(gl: &mut ::glinit::GLInit<'a>, events: &mut Events<'a>, 
 
     // FIXME do this without exposing Events or GLInit internal details
     /*
-    match events.get_event(eventidx as uint) {
+    match events.get_event(eventidx as usize) {
         Some(event) => match event.clone() {
             DrawEvent::UseAnimShader(idx) => gl.set_anim_shader(events.copyshaders.get_object(idx)),
             DrawEvent::UseCopyShader(idx) => gl.set_copy_shader(events.copyshaders.get_object(idx)),
