@@ -651,9 +651,9 @@ class MainActivity extends Activity with TypedActivity with AndroidImplicits {
 
   def showDebugMessagebox() {
     for (thread <- textureThread) thread.withGL(gl => {
-       def getSource[T,U](gl: GLInit, control: GLControl[T], cb: (GLInit, T)=>U, default: U) = {
-         control.currentValue(gl).right.toOption.map(cb(gl, _)).getOrElse(default)
-       }
+       import GLSourceable._
+
+       def getGL[T](gl: GLInit, control: GLControl[T]) = control.currentValue(gl).right.toOption
        def shaderSource(name: String, src: (String, String)) = {
          SyntaxHighlightListAdapter.ShaderSource(name, src._1, src._2)
        }
@@ -661,20 +661,42 @@ class MainActivity extends Activity with TypedActivity with AndroidImplicits {
          SyntaxHighlightListAdapter.LuaSource(name, src)
        }
 
-       val animsrc = getSource(gl, controls.animpicker, CopyShader.getSource, ("", ""))
-       val copysrc = getSource(gl, controls.copypicker, CopyShader.getSource, ("", ""))
-       val paintsrc = getSource(gl, controls.paintpicker, PointShader.getSource, ("", ""))
-       val interpsrc = getSource(gl, controls.interppicker, LuaScript.getSource, "")
+       val unisrc = 
+         getGL(gl, controls.unipicker).getOrElse(UniBrush(None, None, None, None, None, Array()))
+       val anim = unisrc.baseanimshader.orElse(getGL(gl, controls.animpicker))
+       val copy = unisrc.basecopyshader.orElse(getGL(gl, controls.copypicker))
+       val paint = unisrc.basepointshader.orElse(getGL(gl, controls.paintpicker))
+       val interp = unisrc.interpolator.orElse(getGL(gl, controls.interppicker))
 
-       val animdebug = shaderSource("Base animation shader", animsrc)
-       val copydebug = shaderSource("Copy shader", copysrc)
-       val paintdebug = shaderSource("Base paint shader", paintsrc)
-       val interpdebug = luaSource("Base interpolator", interpsrc)
+       val animsrc = anim.map(_.getSource(gl)).getOrElse(("", ""))
+       val copysrc = copy.map(_.getSource(gl)).getOrElse(("", ""))
+       val paintsrc = paint.map(_.getSource(gl)).getOrElse(("", ""))
+       val interpsrc = interp.map(_.getSource(gl)).getOrElse("")
+
+       val layerviews = unisrc.layers.zipWithIndex.flatMap { case (layer, idx) => {
+         val name = s"Layer ${(idx + 1)}"
+         val result: Array[SyntaxHighlightListAdapter.ShaderSource] =
+         Array(
+           if (!layer.pointshader.isDefault)
+             Some(shaderSource(s"${name} paint shader", layer.pointshader.getSource(gl)))
+             else None,
+           if (!layer.copyshader.isDefault)
+             Some(shaderSource(s"${name} copy shader", layer.copyshader.getSource(gl)))
+             else None
+         ).flatten
+         result
+       }}
+
+       val sourceviews: Array[SyntaxHighlightListAdapter.Sources] = Array(
+         shaderSource("Base animation shader", animsrc),
+         shaderSource("Base copy shader", copysrc),
+         shaderSource("Base paint shader", paintsrc),
+         luaSource("Base interpolator", interpsrc)
+       ) ++ layerviews
 
        MainActivity.this.runOnUiThread(() => {
          val list = new ListView(this)
-         list.setAdapter(new SyntaxHighlightListAdapter(this,
-           Array(animdebug, copydebug, paintdebug, interpdebug)))
+         list.setAdapter(new SyntaxHighlightListAdapter(this, sourceviews))
          new AlertDialog.Builder(this)
          .setView(list)
          .setTitle("debug")

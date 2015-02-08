@@ -3,8 +3,12 @@ import android.graphics.Bitmap
 import android.os.Message
 import android.view.MotionEvent
 
-class CopyShader private (private val nativePtr: Int) extends AnyVal
-class PointShader private (private val nativePtr: Int) extends AnyVal
+class CopyShader private (private val nativePtr: Int) extends AnyVal {
+  def isDefault() = nativePtr == 0
+}
+class PointShader private (private val nativePtr: Int) extends AnyVal {
+  def isDefault() = nativePtr == 0
+}
 class Texture private (val ptr: TexturePtr, val bitmap: Bitmap)
 class TexturePtr private (private val nativePtr: Int) extends AnyVal
 class LuaScript private (private val nativePtr: Int) extends AnyVal
@@ -28,6 +32,15 @@ object GLResultTypeDef {
   type GLException = com.github.wartman4404.gldraw.GLException
 }
 
+object GLSourceable {
+  // value classes can't implement traits, so this has to be an extension method
+  trait Sourceable[T] {
+    def getSource(gl: GLInit): T
+  }
+  implicit class CopyShaderSource(cs: CopyShader) extends Sourceable[(String, String)] { def getSource(gl: GLInit) = CopyShader.getSource(gl, cs) }
+  implicit class PointShaderSource(cs: PointShader) extends Sourceable[(String, String)] { def getSource(gl: GLInit) = PointShader.getSource(gl, cs) }
+  implicit class LuaScriptSource(cs: LuaScript) extends Sourceable[(String)] { def getSource(gl: GLInit) = LuaScript.getSource(gl, cs) }
+}
 
 import GLResultTypeDef._
 
