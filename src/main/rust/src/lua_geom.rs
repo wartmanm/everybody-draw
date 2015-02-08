@@ -153,7 +153,6 @@ pub unsafe fn create_lua<'a>(w: i32, h: i32) -> GLResult<&'a LuaInterpolatorStat
     //}
 //}
 
-#[no_mangle]
 unsafe extern "C" fn panic_wrapper(L: *mut lua_State) -> i32 {
     loge!("inside lua panic handler!");
     let errorcstr = lua_tostring(L, -1);

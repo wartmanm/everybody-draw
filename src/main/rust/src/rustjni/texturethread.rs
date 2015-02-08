@@ -18,7 +18,8 @@ use lua_geom;
 static mut LUA_EXCEPTION: CaseClass = CaseClass { constructor: 0 as jmethodID, class: 0 as jclass };
 static mut RUNTIME_EXCEPTION: CaseClass = CaseClass { constructor: 0 as jmethodID, class: 0 as jclass };
 
-impl<'a> ::core::ops::Fn<(i32,), ()> for JNICallbackClosure<'a> {
+impl<'a> ::core::ops::Fn<(i32,)> for JNICallbackClosure<'a> {
+    type Output = ();
     extern "rust-call" fn call(&self, args: (i32,)) -> () {
         let (arg,) = args;
         unsafe {

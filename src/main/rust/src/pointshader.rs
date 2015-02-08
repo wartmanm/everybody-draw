@@ -1,6 +1,6 @@
 use core::prelude::*;
 use core::{mem, fmt};
-use core::fmt::Show;
+use core::fmt::Debug;
 use core::borrow::IntoCow;
 
 use opengles::gl2;
@@ -124,7 +124,7 @@ impl Drop for PointShader {
     }
 }
 
-impl Show for PointShader {
+impl Debug for PointShader {
     fn fmt(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
         write!(formatter, "point shader 0x{:x}", self.program)
     }

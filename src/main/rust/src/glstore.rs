@@ -10,7 +10,7 @@
 
 use core::prelude::*;
 use core::mem;
-use core::fmt::Show;
+use core::fmt::Debug;
 use collections::vec::Vec;
 use std::hash::Hash;
 
@@ -43,7 +43,7 @@ pub struct DrawObjectList<'a, T: 'a, Init: Eq+Hash<HashType>+'a> {
 }
 
 // copy doesn't work, wtf
-#[derive(Show, Copy)]
+#[derive(Debug, Copy)]
 pub struct DrawObjectIndex<T>(i32);
 
 impl<T> DrawObjectIndex<T> {
@@ -108,7 +108,7 @@ pub trait InitFromCache<Init> {
     //fn get_source(&self) -> &BrushInitValues { &self.source }
 //}
 
-pub fn init_from_defaults<T: UsingDefaults<Init>, Init: Hash<HashType>+Eq+Show>(init: Init) -> GLResult<T> {
+pub fn init_from_defaults<T: UsingDefaults<Init>, Init: Hash<HashType>+Eq+Debug>(init: Init) -> GLResult<T> {
     UsingDefaults::maybe_init(init)
 }
 
@@ -130,7 +130,7 @@ pub fn init_from_defaults<T: UsingDefaults<Init>, Init: Hash<HashType>+Eq+Show>(
     //fn get_source(&self) -> &MString { &self.source }
 //}
 
-impl<'a, T: UsingDefaults<Init>, Init: Hash<HashType>+Eq+Show> DrawObjectList<'a, T, Init> {
+impl<'a, T: UsingDefaults<Init>, Init: Hash<HashType>+Eq+Debug> DrawObjectList<'a, T, Init> {
     pub fn new() -> DrawObjectList<'a, T, Init> {
         // the default hasher is keyed off of the task-local rng,
         // which would blow up since we don't have a task
@@ -184,7 +184,7 @@ impl<'a, T: UsingDefaults<Init>, Init: Hash<HashType>+Eq+Show> DrawObjectList<'a
     }
 }
 
-impl<'a, T: UsingDefaults<Init> + UsingDefaultsSafe, Init: Hash<HashType>+Eq+Show> DrawObjectList<'a, T, Init> {
+impl<'a, T: UsingDefaults<Init> + UsingDefaultsSafe, Init: Hash<HashType>+Eq+Debug> DrawObjectList<'a, T, Init> {
     pub fn safe_push_object(&mut self, init: Init) -> DrawObjectIndex<T> {
         self.push_object(init).unwrap()
     }

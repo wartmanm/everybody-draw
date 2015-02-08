@@ -10,7 +10,7 @@
 
 use core::prelude::*;
 use core::borrow::ToOwned;
-use collections::vec::Vec;
+//use collections::vec::Vec;
 use point::PointEntry;
 use glstore::{DrawObjectIndex, DrawObjectList};
 use glstore::{ShaderInitValues, BrushInitValues, LuaInitValues};
@@ -126,6 +126,7 @@ impl<'a> Events<'a> {
         self.luascripts.get_object(luascript).get_source()
     }
 
+    #[allow(unused_variables)]
     pub fn pushpoint(&mut self, event: PointEntry) {
         //self.eventlist.push(DrawEvent::Point(event));
     }

@@ -11,7 +11,7 @@ use gltexture;
 use gltexture::PixelFormat;
 use glcommon::GLResult;
 use core::fmt;
-use core::fmt::Show;
+use core::fmt::Debug;
 
 static mut BITMAP_CLASS: jclass = 0 as jclass;
 static mut CONFIG_ARGB_8888: jobject = 0 as jobject;
@@ -32,7 +32,7 @@ pub struct AndroidBitmapFormat {
     value: i32,
 }
 
-impl Show for AndroidBitmapFormat {
+impl Debug for AndroidBitmapFormat {
     fn fmt(&self, fmt: &mut fmt::Formatter) -> fmt::Result {
         match self.value as u32 {
             ANDROID_BITMAP_FORMAT_NONE      => write!(fmt, "ANDROID_BITMAP_FORMAT_NONE"),

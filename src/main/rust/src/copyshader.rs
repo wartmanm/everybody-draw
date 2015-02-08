@@ -1,6 +1,6 @@
 use core::prelude::*;
 use core::{mem, fmt};
-use core::fmt::Show;
+use core::fmt::Debug;
 use core::borrow::IntoCow;
 
 use opengles::gl2;
@@ -94,7 +94,7 @@ impl Drop for CopyShader {
     }
 }
 
-impl Show for CopyShader {
+impl Debug for CopyShader {
     fn fmt(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
         write!(formatter, "copy shader 0x{:x}", self.program)
     }
