@@ -14,6 +14,7 @@ target/
 *.pyo
 *.vim
 *.class
+*.rsr
 /notes/
 /src/main/rust/src/android/
 Cargo.lock
