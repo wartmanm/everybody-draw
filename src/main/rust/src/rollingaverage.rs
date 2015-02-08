@@ -3,8 +3,8 @@ macro_rules! rolling_average_count (
         pub struct $name<T> {
             pub entries: [T; $count],
             sum: T,
-            count: uint,
-            pos: uint,
+            count: usize,
+            pos: usize,
         }
 
         #[allow(dead_code)]

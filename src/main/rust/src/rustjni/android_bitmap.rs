@@ -79,7 +79,7 @@ impl AndroidBitmap {
                 return Err(format!("bitmap format {} not implemented!", other).into_cow());
             },
         };
-        let pixelvec = raw::Slice { data: self.pixels as *const u8, len: (self.info.width * self.info.height * pixelsize) as uint };
+        let pixelvec = raw::Slice { data: self.pixels as *const u8, len: (self.info.width * self.info.height * pixelsize) as usize };
         Ok(mem::transmute(pixelvec))
     }
 

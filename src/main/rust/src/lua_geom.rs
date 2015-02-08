@@ -237,7 +237,7 @@ unsafe fn runstring(L: *mut lua_State, s: &str, filename: *const i8, env: Sandbo
 unsafe fn err_to_str(L: *mut lua_State) -> String {
     let mut size: size_t = 0;
     let strptr = lua_tolstring(L, -1, &mut size);
-    let luastr: &str = mem::transmute(raw::Slice { data: strptr, len: size as uint });
+    let luastr: &str = mem::transmute(raw::Slice { data: strptr, len: size as usize });
     let result = luastr.to_owned();
     safe_pop!(L, 1);
     result

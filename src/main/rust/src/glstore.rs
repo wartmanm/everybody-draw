@@ -172,12 +172,12 @@ impl<'a, T: UsingDefaults<Init>, Init: Hash<HashType>+Eq+Debug> DrawObjectList<'
 
     pub fn get_object(&self, i: DrawObjectIndex<T>) -> &'a T {
         let DrawObjectIndex(idx) = i;
-        self.list[idx as uint]
+        self.list[idx as usize]
     }
 
     pub fn maybe_get_object(&self, i: DrawObjectIndex<T>) -> GLResult<&'a T> {
         let DrawObjectIndex(idx) = i;
-        match self.list.get(idx as uint) {
+        match self.list.get(idx as usize) {
             Some(x) => Ok(*x),
             None => Err(format!("tried to get glstore index {} of {}", idx, self.list.len()).into_cow()),
         }

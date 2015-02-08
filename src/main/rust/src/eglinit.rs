@@ -45,7 +45,7 @@ fn choose_egl_config(display: EGLDisplay) -> Option<EGLConfig> {
     let mut config_count = 0;
     let mut config: EGLConfig = 0 as EGLConfig;
     let configattrs = get_config();
-    debug_logi!("choosing config... attrs = {}", configattrs as uint);
+    debug_logi!("choosing config... attrs = {}", configattrs as usize);
     if EGL_TRUE != ChooseConfig(display, get_config(), &mut config, 1, &mut config_count) {
         loge!("eglChooseConfig returned false :(");
         None
@@ -100,7 +100,7 @@ fn init_context(surface_texture: *mut c_void) -> Option<EGLStatus> {
     //logi!("got config: 0x{:x}", config);
     debug_logi!("creating context...");
     let context = CreateContext(display, config, EGL_NO_CONTEXT as *mut c_void, get_context_attribs());
-    debug_logi!("got context: 0x{:x}", context as uint);
+    debug_logi!("got context: 0x{:x}", context as usize);
     debug_logi!("creating window surface...");
     let surface = CreateWindowSurface(display, config, surface_texture, get_no_attribs());
     if surface == EGL_NO_SURFACE as *mut c_void {
@@ -116,7 +116,7 @@ fn init_context(surface_texture: *mut c_void) -> Option<EGLStatus> {
         }
         return None;
     }
-    debug_logi!("got surface: 0x{:x}", surface as uint);
+    debug_logi!("got surface: 0x{:x}", surface as usize);
 
     if MakeCurrent(display, surface, surface, context) != EGL_TRUE {
         loge!("eglMakeCurrent failed");

@@ -8,7 +8,7 @@ use point::{PaintPoint, Coordinate, PointEntry, PointProducer, PointInfo};
 use activestate;
 use activestate::ActiveState;
 
-static AMOTION_EVENT_ACTION_POINTER_INDEX_SHIFT: uint = 8;
+static AMOTION_EVENT_ACTION_POINTER_INDEX_SHIFT: usize = 8;
 
 // TODO: consider eliminating entirely and putting faith in ACTION_POINTER_UP/DOWN
 type PointerState = VecMap<ActiveState>;
@@ -101,8 +101,8 @@ fn push_moves(queue: &mut PointProducer, active: &mut PointerState, evt: *const 
 }
 
 fn make_active(queue: &mut PointProducer, active: &mut PointerState, id: i32, newstate: bool) {
-    let updated = active.get(&(id as uint)).unwrap_or(&activestate::INACTIVE).push(newstate);
-    active.insert(id as uint, updated);
+    let updated = active.get(&(id as usize)).unwrap_or(&activestate::INACTIVE).push(newstate);
+    active.insert(id as usize, updated);
     if updated == activestate::STOPPING {
         // really not anything to do if this fails
         let _ = queue.send(PointEntry { index: id, entry: PointInfo::Stop });
